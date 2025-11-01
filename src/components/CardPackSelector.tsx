@@ -1,0 +1,28 @@
+import { CardPackOption } from '../types';
+
+interface CardPackSelectorProps {
+  selectedPack: string;
+  onPackChange: (pack: string) => void;
+  cardPacks: CardPackOption[];
+}
+
+export const CardPackSelector = ({ selectedPack, onPackChange, cardPacks }: CardPackSelectorProps) => {
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">Choose Card Pack</h2>
+      <div className="flex justify-center">
+        <select
+          value={selectedPack}
+          onChange={(e) => onPackChange(e.target.value)}
+          className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none transition-colors duration-200 text-lg font-medium bg-white cursor-pointer hover:border-gray-400"
+        >
+          {cardPacks.map((pack) => (
+            <option key={pack.id} value={pack.id}>
+              {pack.emoji} {pack.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+};
