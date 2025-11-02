@@ -99,8 +99,15 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, em
         }`}
         style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
       >
+        {/* Semi-transparent white overlay to reduce background visibility (30% less visible = 70% opacity) */}
+        {!(useWhiteBackground || (card.isMatched && !forceGameplayBackground)) && (
+          <div 
+            className="absolute inset-0 bg-white opacity-30"
+            style={{ backfaceVisibility: 'hidden' }}
+          />
+        )}
         <div 
-          className="w-full h-full flex items-center justify-center"
+          className="relative w-full h-full flex items-center justify-center"
           style={{ fontSize: forceGameplaySize ? `${fontSize}px` : (card.isMatched ? `${matchedFontSize}px` : `${fontSize}px`) }}
         >
           {card.imageUrl}
