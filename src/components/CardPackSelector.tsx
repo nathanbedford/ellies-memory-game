@@ -14,7 +14,7 @@ export const CardPackSelector = ({ selectedPack, onPackChange, cardPacks }: Card
         <select
           value={selectedPack}
           onChange={(e) => onPackChange(e.target.value)}
-          className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none transition-colors duration-200 text-lg font-medium bg-white cursor-pointer hover:border-gray-400"
+          className="px-6 py-4 text-lg border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm hover:border-gray-400 transition-colors cursor-pointer min-w-[200px]"
         >
           {cardPacks.map((pack) => (
             <option key={pack.id} value={pack.id}>

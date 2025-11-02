@@ -5,7 +5,8 @@ export const CARD_PACKS: CardPackOption[] = [
   { id: 'animals', name: 'Animals', emoji: '🦁' },
   { id: 'plants', name: 'Plants', emoji: '🌿' },
   { id: 'buildings', name: 'Buildings', emoji: '🏛️' },
-  { id: 'colors', name: 'Colors', emoji: '🎨' }
+  { id: 'colors', name: 'Colors', emoji: '🎨' },
+  { id: 'ocean', name: 'Ocean', emoji: '🌊' }
 ];
 
 const ANIMAL_CARDS = [
@@ -48,6 +49,26 @@ const ANIMAL_CARDS = [
     id: 'panda', 
     emoji: '🐼',
     gradient: 'from-gray-200 to-gray-400'
+  },
+  { 
+    id: 'monkey', 
+    emoji: '🐵',
+    gradient: 'from-amber-500 to-amber-700'
+  },
+  { 
+    id: 'tiger', 
+    emoji: '🐯',
+    gradient: 'from-orange-500 to-orange-700'
+  },
+  { 
+    id: 'bear', 
+    emoji: '🐻',
+    gradient: 'from-amber-600 to-amber-800'
+  },
+  { 
+    id: 'fox', 
+    emoji: '🦊',
+    gradient: 'from-orange-400 to-red-600'
   }
 ];
 
@@ -91,6 +112,26 @@ const PLANT_CARDS = [
     id: 'mushroom', 
     emoji: '🍄',
     gradient: 'from-red-500 to-orange-600'
+  },
+  { 
+    id: 'palm-tree', 
+    emoji: '🌴',
+    gradient: 'from-green-500 to-yellow-600'
+  },
+  { 
+    id: 'herb', 
+    emoji: '🌿',
+    gradient: 'from-green-400 to-green-500'
+  },
+  { 
+    id: 'seedling', 
+    emoji: '🌱',
+    gradient: 'from-green-300 to-green-400'
+  },
+  { 
+    id: 'evergreen', 
+    emoji: '🌲',
+    gradient: 'from-green-600 to-green-900'
   }
 ];
 
@@ -134,6 +175,26 @@ const BUILDING_CARDS = [
     id: 'pyramid', 
     emoji: '🔺',
     gradient: 'from-yellow-600 to-yellow-800'
+  },
+  { 
+    id: 'hospital', 
+    emoji: '🏥',
+    gradient: 'from-red-400 to-red-600'
+  },
+  { 
+    id: 'hotel', 
+    emoji: '🏨',
+    gradient: 'from-blue-400 to-blue-600'
+  },
+  { 
+    id: 'office', 
+    emoji: '🏬',
+    gradient: 'from-gray-400 to-gray-600'
+  },
+  { 
+    id: 'school', 
+    emoji: '🏫',
+    gradient: 'from-amber-500 to-amber-700'
   }
 ];
 
@@ -177,6 +238,89 @@ const COLOR_CARDS = [
     id: 'teal-wave', 
     emoji: '🩵',
     gradient: 'from-teal-400 to-teal-700'
+  },
+  { 
+    id: 'brown-square', 
+    emoji: '🟤',
+    gradient: 'from-amber-700 to-amber-900'
+  },
+  { 
+    id: 'black-circle', 
+    emoji: '⚫',
+    gradient: 'from-gray-700 to-gray-900'
+  },
+  { 
+    id: 'white-square', 
+    emoji: '⚪',
+    gradient: 'from-gray-100 to-gray-300'
+  },
+  { 
+    id: 'green-heart', 
+    emoji: '💚',
+    gradient: 'from-green-500 to-green-600'
+  }
+];
+
+const OCEAN_CARDS = [
+  { 
+    id: 'fish', 
+    emoji: '🐟',
+    gradient: 'from-blue-400 to-blue-600'
+  },
+  { 
+    id: 'whale', 
+    emoji: '🐋',
+    gradient: 'from-blue-600 to-blue-800'
+  },
+  { 
+    id: 'dolphin', 
+    emoji: '🐬',
+    gradient: 'from-cyan-400 to-cyan-600'
+  },
+  { 
+    id: 'octopus', 
+    emoji: '🐙',
+    gradient: 'from-purple-400 to-purple-600'
+  },
+  { 
+    id: 'crab', 
+    emoji: '🦀',
+    gradient: 'from-red-500 to-orange-600'
+  },
+  { 
+    id: 'turtle', 
+    emoji: '🐢',
+    gradient: 'from-green-500 to-green-700'
+  },
+  { 
+    id: 'jellyfish', 
+    emoji: '🪼',
+    gradient: 'from-pink-300 to-purple-400'
+  },
+  { 
+    id: 'shark', 
+    emoji: '🦈',
+    gradient: 'from-gray-500 to-gray-700'
+  },
+  { 
+    id: 'seahorse', 
+    emoji: '🐴',
+    gradient: 'from-yellow-400 to-orange-500'
+  },
+  { 
+    id: 'shell', 
+    emoji: '🐚',
+    gradient: 'from-pink-200 to-pink-400'
+  },
+  { 
+    id: 'starfish', 
+    emoji: '⭐',
+    gradient: 'from-orange-300 to-orange-500'
+  },
+  { 
+    id: 'coral', 
+    emoji: '🪸',
+    gradient: 'from-red-300 to-pink-500'
   }
 ];
 
@@ -194,6 +338,8 @@ export const useCardPacks = () => {
           return BUILDING_CARDS;
         case 'colors':
           return COLOR_CARDS;
+        case 'ocean':
+          return OCEAN_CARDS;
         default:
           return ANIMAL_CARDS;
       }

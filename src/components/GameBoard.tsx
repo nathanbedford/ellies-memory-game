@@ -9,7 +9,7 @@ interface GameBoardProps {
 export const GameBoard = ({ cards, onCardClick }: GameBoardProps) => {
   return (
     <div 
-      className="grid grid-cols-4 gap-4 max-w-2xl mx-auto"
+      className="grid grid-cols-6 gap-3 max-w-4xl mx-auto"
       style={{ perspective: '1000px' }}
     >
       {cards.map((card) => (

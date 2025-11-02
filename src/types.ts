@@ -13,16 +13,18 @@ export interface Player {
   score: number;
 }
 
+export type GameStatus = 'setup' | 'playing' | 'finished';
+
 export interface GameState {
   cards: Card[];
   players: Player[];
   currentPlayer: number;
   selectedCards: string[];
-  gameStatus: 'playing' | 'finished';
+  gameStatus: GameStatus;
   winner: Player | null;
 }
 
-export type CardPack = 'animals' | 'plants' | 'buildings' | 'colors';
+export type CardPack = 'animals' | 'plants' | 'buildings' | 'colors' | 'ocean';
 
 export interface CardPackOption {
   id: CardPack;
