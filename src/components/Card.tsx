@@ -110,7 +110,16 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, em
           className="relative w-full h-full flex items-center justify-center"
           style={{ fontSize: forceGameplaySize ? `${fontSize}px` : (card.isMatched ? `${matchedFontSize}px` : `${fontSize}px`) }}
         >
-          {card.imageUrl}
+          {card.imageUrl && (card.imageUrl.startsWith('http') || card.imageUrl.startsWith('/') || card.imageUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) || card.imageUrl.includes('blob:') || card.imageUrl.includes('data:')) ? (
+            <img 
+              src={card.imageUrl} 
+              alt="" 
+              className="w-full h-full object-cover"
+              style={{ backfaceVisibility: 'hidden' }}
+            />
+          ) : (
+            card.imageUrl
+          )}
         </div>
       </div>
     </div>
