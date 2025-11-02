@@ -48,11 +48,11 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
     
     return cards.map((_, index) => {
       // Calculate card's position in grid
-      const col = index % 6;
-      const row = Math.floor(index / 6);
+      const col = index % 8;
+      const row = Math.floor(index / 8);
       
       // Estimate card's final position (center of game board)
-      const boardWidth = (cardSize * 6) + (8 * 5); // 6 cards + 5 gaps
+      const boardWidth = (cardSize * 8) + (8 * 7); // 8 cards + 7 gaps
       const boardLeft = (viewportWidth - boardWidth) / 2;
       const cardCenterX = boardLeft + (col * (cardSize + 8)) + (cardSize / 2);
       const cardCenterY = viewportHeight / 2 + (row * (cardSize + 8)) - (cardSize / 2);
@@ -115,9 +115,9 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       if (!card.isFlyingToPlayer) return null;
       
       // Get card's current position in grid
-      const col = index % 6;
-      const row = Math.floor(index / 6);
-      const boardWidth = (cardSize * 6) + (8 * 5);
+      const col = index % 8;
+      const row = Math.floor(index / 8);
+      const boardWidth = (cardSize * 8) + (8 * 7);
       const boardLeft = (window.innerWidth - boardWidth) / 2;
       
       // Calculate card's center position
@@ -255,10 +255,10 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       
       <div 
         ref={boardRef}
-        className="grid grid-cols-6 gap-2 max-w-none mx-auto justify-center"
+        className="grid grid-cols-8 gap-2 max-w-none mx-auto justify-center"
         style={{ 
           perspective: '1000px',
-          width: `${(cardSize * 6) + (8 * 5)}px` // 6 cards + 5 gaps
+          width: `${(cardSize * 8) + (8 * 7)}px` // 8 cards + 7 gaps
         }}
       >
         {cards.map((card, index) => {

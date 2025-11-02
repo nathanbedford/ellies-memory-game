@@ -70,6 +70,46 @@ const ANIMAL_CARDS = [
     id: 'fox', 
     emoji: '🦊',
     gradient: 'from-orange-400 to-red-600'
+  },
+  { 
+    id: 'pig', 
+    emoji: '🐷',
+    gradient: 'from-pink-300 to-pink-500'
+  },
+  { 
+    id: 'cow', 
+    emoji: '🐮',
+    gradient: 'from-black to-gray-600'
+  },
+  { 
+    id: 'horse', 
+    emoji: '🐴',
+    gradient: 'from-amber-500 to-brown-700'
+  },
+  { 
+    id: 'sheep', 
+    emoji: '🐑',
+    gradient: 'from-white to-gray-200'
+  },
+  { 
+    id: 'chicken', 
+    emoji: '🐔',
+    gradient: 'from-red-500 to-orange-500'
+  },
+  { 
+    id: 'duck', 
+    emoji: '🦆',
+    gradient: 'from-yellow-300 to-yellow-500'
+  },
+  { 
+    id: 'owl', 
+    emoji: '🦉',
+    gradient: 'from-amber-700 to-brown-800'
+  },
+  { 
+    id: 'butterfly', 
+    emoji: '🦋',
+    gradient: 'from-purple-300 to-pink-500'
   }
 ];
 
@@ -133,6 +173,46 @@ const PLANT_CARDS = [
     id: 'evergreen', 
     emoji: '🌲',
     gradient: 'from-green-600 to-green-900'
+  },
+  { 
+    id: 'cherry-blossom', 
+    emoji: '🌺',
+    gradient: 'from-pink-300 to-purple-500'
+  },
+  { 
+    id: 'hibiscus', 
+    emoji: '🌺',
+    gradient: 'from-red-400 to-pink-500'
+  },
+  { 
+    id: 'four-leaf-clover', 
+    emoji: '🍀',
+    gradient: 'from-green-300 to-green-500'
+  },
+  { 
+    id: 'wilted-flower', 
+    emoji: '🥀',
+    gradient: 'from-purple-600 to-gray-600'
+  },
+  { 
+    id: 'corn', 
+    emoji: '🌽',
+    gradient: 'from-yellow-400 to-yellow-600'
+  },
+  { 
+    id: 'carrot', 
+    emoji: '🥕',
+    gradient: 'from-orange-400 to-orange-600'
+  },
+  { 
+    id: 'grapes', 
+    emoji: '🍇',
+    gradient: 'from-purple-500 to-purple-700'
+  },
+  { 
+    id: 'apple', 
+    emoji: '🍎',
+    gradient: 'from-red-400 to-red-600'
   }
 ];
 
@@ -196,6 +276,46 @@ const BUILDING_CARDS = [
     id: 'school', 
     emoji: '🏫',
     gradient: 'from-amber-500 to-amber-700'
+  },
+  { 
+    id: 'factory', 
+    emoji: '🏭',
+    gradient: 'from-gray-600 to-gray-800'
+  },
+  { 
+    id: 'japanese-castle', 
+    emoji: '🏯',
+    gradient: 'from-red-600 to-red-800'
+  },
+  { 
+    id: 'stadium', 
+    emoji: '🏟️',
+    gradient: 'from-gray-500 to-gray-700'
+  },
+  { 
+    id: 'airport', 
+    emoji: '🛫',
+    gradient: 'from-blue-400 to-blue-600'
+  },
+  { 
+    id: 'bank', 
+    emoji: '🏦',
+    gradient: 'from-gray-400 to-gray-600'
+  },
+  { 
+    id: 'post-office', 
+    emoji: '🏣',
+    gradient: 'from-red-500 to-red-700'
+  },
+  { 
+    id: 'department-store', 
+    emoji: '🏬',
+    gradient: 'from-purple-500 to-purple-700'
+  },
+  { 
+    id: 'convenience-store', 
+    emoji: '🏪',
+    gradient: 'from-green-500 to-green-700'
   }
 ];
 
@@ -259,6 +379,46 @@ const COLOR_CARDS = [
     id: 'green-heart', 
     emoji: '💚',
     gradient: 'from-green-500 to-green-600'
+  },
+  { 
+    id: 'blue-heart', 
+    emoji: '💙',
+    gradient: 'from-blue-500 to-blue-600'
+  },
+  { 
+    id: 'yellow-heart', 
+    emoji: '💛',
+    gradient: 'from-yellow-400 to-yellow-600'
+  },
+  { 
+    id: 'purple-heart', 
+    emoji: '💜',
+    gradient: 'from-purple-500 to-purple-700'
+  },
+  { 
+    id: 'red-heart', 
+    emoji: '❤️',
+    gradient: 'from-red-500 to-red-700'
+  },
+  { 
+    id: 'orange-heart', 
+    emoji: '🧡',
+    gradient: 'from-orange-500 to-orange-700'
+  },
+  { 
+    id: 'brown-circle', 
+    emoji: '🟫',
+    gradient: 'from-amber-600 to-amber-800'
+  },
+  { 
+    id: 'large-blue-circle', 
+    emoji: '🔵',
+    gradient: 'from-blue-500 to-blue-800'
+  },
+  { 
+    id: 'large-red-circle', 
+    emoji: '🔴',
+    gradient: 'from-red-600 to-red-800'
   }
 ];
 
@@ -305,7 +465,7 @@ const OCEAN_CARDS = [
   },
   { 
     id: 'seahorse', 
-    emoji: '🐴',
+    emoji: '🦭',
     gradient: 'from-yellow-400 to-orange-500'
   },
   { 
@@ -322,6 +482,46 @@ const OCEAN_CARDS = [
     id: 'coral', 
     emoji: '🪸',
     gradient: 'from-red-300 to-pink-500'
+  },
+  { 
+    id: 'squid', 
+    emoji: '🦑',
+    gradient: 'from-purple-500 to-purple-700'
+  },
+  { 
+    id: 'lobster', 
+    emoji: '🦞',
+    gradient: 'from-red-600 to-orange-700'
+  },
+  { 
+    id: 'shrimp', 
+    emoji: '🦐',
+    gradient: 'from-pink-400 to-orange-500'
+  },
+  { 
+    id: 'blowfish', 
+    emoji: '🐠',
+    gradient: 'from-yellow-400 to-yellow-600'
+  },
+  { 
+    id: 'tropical-fish', 
+    emoji: '🐡',
+    gradient: 'from-blue-300 to-purple-500'
+  },
+  { 
+    id: 'eel', 
+    emoji: '🐍',
+    gradient: 'from-gray-600 to-gray-800'
+  },
+  { 
+    id: 'ray', 
+    emoji: '🪼',
+    gradient: 'from-blue-400 to-blue-700'
+  },
+  { 
+    id: 'pearl', 
+    emoji: '💎',
+    gradient: 'from-white to-gray-200'
   }
 ];
 
@@ -385,6 +585,46 @@ const CONSTRUCTION_CARDS = [
     id: 'hard-hat', 
     emoji: '👷',
     gradient: 'from-yellow-400 to-yellow-600'
+  },
+  { 
+    id: 'scissors', 
+    emoji: '✂️',
+    gradient: 'from-gray-500 to-gray-700'
+  },
+  { 
+    id: 'chainsaw', 
+    emoji: '🪚',
+    gradient: 'from-gray-600 to-gray-800'
+  },
+  { 
+    id: 'nail-polish', 
+    emoji: '💅',
+    gradient: 'from-pink-400 to-pink-600'
+  },
+  { 
+    id: 'bucket', 
+    emoji: '🪣',
+    gradient: 'from-blue-400 to-blue-600'
+  },
+  { 
+    id: 'magnifying-glass', 
+    emoji: '🔍',
+    gradient: 'from-gray-300 to-gray-500'
+  },
+  { 
+    id: 'crane', 
+    emoji: '🏗️',
+    gradient: 'from-yellow-500 to-orange-600'
+  },
+  { 
+    id: 'ruler', 
+    emoji: '📏',
+    gradient: 'from-blue-400 to-blue-600'
+  },
+  { 
+    id: 'gear', 
+    emoji: '⚙️',
+    gradient: 'from-gray-500 to-gray-700'
   }
 ];
 
