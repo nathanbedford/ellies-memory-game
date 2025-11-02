@@ -1,4 +1,4 @@
-import { BackgroundOption, BACKGROUND_OPTIONS } from '../hooks/useBackgroundSelector';
+import { BACKGROUND_OPTIONS } from '../hooks/useBackgroundSelector';
 
 interface BackgroundModalProps {
   selectedBackground: string;
