@@ -8,7 +8,7 @@ const getAnimalImageUrl = (animalId: string): string => {
 
 // Helper function to get image URL for ocean-real deck
 const getOceanImageUrl = (oceanId: string): string => {
-  return `/deck-images/ocean-animals/${oceanId}.png`;
+  return `/deck-images/ocean-animals/${oceanId}.jpg`;
 };
 
 export interface CardData {
