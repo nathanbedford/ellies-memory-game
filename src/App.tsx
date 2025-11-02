@@ -4,7 +4,6 @@ import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme } from './hooks/useBackgroundSelector';
 import { GameBoard } from './components/GameBoard';
 import { GameOver } from './components/GameOver';
-import { PlayerSetup } from './components/PlayerSetup';
 import { PlayerNameEditor } from './components/PlayerNameEditor';
 import { Modal } from './components/Modal';
 import { CardPackModal } from './components/CardPackModal';
@@ -14,13 +13,15 @@ import screenfull from 'screenfull';
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, showStartModal, initializeGame, startGame, startGameWithFirstPlayer, updatePlayerName, flipCard, resetGame } = useMemoryGame();
+  const { gameState, showStartModal, setShowStartModal, cardSize, initializeGame, startGame, startGameWithFirstPlayer, updatePlayerName, increaseCardSize, decreaseCardSize, flipCard, resetGame } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const previousPackRef = useRef(selectedPack);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCardPackModalOpen, setIsCardPackModalOpen] = useState(false);
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [originalPack, setOriginalPack] = useState<string | null>(null);
+  const [originalBackground, setOriginalBackground] = useState<BackgroundTheme | null>(null);
 
   useEffect(() => {
     if (previousPackRef.current !== selectedPack) {
@@ -30,10 +31,14 @@ function App() {
     }
   }, [selectedPack, getCurrentPackImages, initializeGame]);
 
-  // Initialize on first mount
+  // Initialize on first mount - only show modal if no cards exist
   useEffect(() => {
     const images = getCurrentPackImages;
-    initializeGame(images);
+    if (gameState.cards.length === 0) {
+      initializeGame(images, true); // true = show modal
+    } else {
+      initializeGame(images, false); // false = don't show modal, just initialize
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle fullscreen change
@@ -57,41 +62,65 @@ function App() {
   };
 
   const handlePackChange = (newPack: string) => {
-    setSelectedPack(newPack as any);
-    setIsCardPackModalOpen(false);
-    
     if (isResetting) {
-      // During reset flow, move to background selection
+      // During reset flow, just update the selection but don't apply yet
+      setSelectedPack(newPack as any);
+      setIsCardPackModalOpen(false);
       setIsBackgroundModalOpen(true);
     } else {
+      setSelectedPack(newPack as any);
+      setIsCardPackModalOpen(false);
       resetGame();
     }
   };
 
   const handleBackgroundChange = (newBackground: BackgroundTheme) => {
-    setSelectedBackground(newBackground);
-    setIsBackgroundModalOpen(false);
-    
     if (isResetting) {
-      // During reset flow, initialize game and show start modal
-      const images = getCurrentPackImages;
-      initializeGame(images, false);
-      resetGame();
-      setIsResetting(false);
+      // During reset flow, just update the selection but don't apply yet
+      setSelectedBackground(newBackground);
+      setIsBackgroundModalOpen(false);
+      // Show start modal without initializing game yet
+      setShowStartModal(true);
+    } else {
+      setSelectedBackground(newBackground);
+      setIsBackgroundModalOpen(false);
     }
   };
 
   const handleResetClick = () => {
+    // Store original state when reset starts
+    setOriginalPack(selectedPack);
+    setOriginalBackground(selectedBackground);
     setIsResetting(true);
     setIsCardPackModalOpen(true);
   };
 
-  const handleStartGame = (player1Name: string, player2Name: string, firstPlayer: number) => {
-    startGame(player1Name, player2Name, firstPlayer);
-    // Initialize cards and show the start modal
-    const images = getCurrentPackImages;
-    initializeGame(images, true); // true = show modal
+  const cancelResetFlow = () => {
+    // Restore original state
+    if (originalPack !== null) {
+      setSelectedPack(originalPack as any);
+    }
+    if (originalBackground !== null) {
+      setSelectedBackground(originalBackground);
+    }
+    setIsResetting(false);
+    setIsCardPackModalOpen(false);
+    setIsBackgroundModalOpen(false);
+    setShowStartModal(false);
   };
+
+  const handleStartModalBack = () => {
+    // Go back to background selection
+    setShowStartModal(false);
+    setIsBackgroundModalOpen(true);
+  };
+
+  const handleBackgroundModalBack = () => {
+    // Go back to card pack selection
+    setIsBackgroundModalOpen(false);
+    setIsCardPackModalOpen(true);
+  };
+
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${getCurrentBackground()} py-8`}>
@@ -122,21 +151,45 @@ function App() {
           </header>
         ) : (
           <header className="text-center mb-4">
-            <button
-              onClick={handleResetClick}
-              className="px-6 py-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
-            >
-              🔄 Reset Game
-            </button>
+            <div className="flex justify-center items-center gap-3">
+              {/* Decrease Size Button */}
+              <button
+                onClick={decreaseCardSize}
+                disabled={cardSize <= 60}
+                className="px-4 py-3 text-base font-semibold bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 disabled:transform-none"
+                title="Make cards smaller"
+              >
+                −
+              </button>
+              
+              {/* Reset Button */}
+              <button
+                onClick={handleResetClick}
+                className="px-6 py-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+              >
+                🔄 Reset Game
+              </button>
+              
+              {/* Increase Size Button */}
+              <button
+                onClick={increaseCardSize}
+                disabled={cardSize >= 150}
+                className="px-4 py-3 text-base font-semibold bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 disabled:transform-none"
+                title="Make cards bigger"
+              >
+                +
+              </button>
+            </div>
+            
+            {/* Size Indicator */}
+            <div className="text-sm text-gray-600 mt-2">
+              Card Size: {cardSize}px
+            </div>
           </header>
         )}
 
         <main>
-          {gameState.gameStatus === 'setup' ? (
-            <div className="flex justify-center items-center">
-              <PlayerSetup onStartGame={handleStartGame} />
-            </div>
-          ) : (
+          {gameState.gameStatus === 'playing' && (
             <div className="flex gap-8 items-center justify-center">
               {/* Left Score Panel */}
               <div className="w-48 flex-shrink-0">
@@ -166,10 +219,11 @@ function App() {
               </div>
 
               {/* Center Game Area */}
-              <div className="flex-1 max-w-4xl">
+              <div className="flex-1">
                 <GameBoard 
                   cards={gameState.cards} 
-                  onCardClick={flipCard} 
+                  onCardClick={flipCard}
+                  cardSize={cardSize}
                 />
               </div>
 
@@ -213,22 +267,48 @@ function App() {
         {/* Game Start Modal */}
         <Modal
           isOpen={showStartModal}
-          onClose={() => {}} // Can't close without choosing
+          onClose={() => {
+            // Cancel the reset flow or go back to setup
+            if (isResetting) {
+              cancelResetFlow();
+            } else {
+              setShowStartModal(false);
+            }
+          }}
+          onBack={isResetting ? handleStartModalBack : () => setShowStartModal(false)}
           title={isResetting ? "Step 3: Who Goes First?" : "Who Goes First?"}
         >
           <GameStartModal
             players={gameState.players}
             currentPlayer={gameState.currentPlayer}
             onStartGame={(firstPlayer) => {
-              startGameWithFirstPlayer(firstPlayer);
+              if (isResetting) {
+                // Now apply all the changes: initialize game and start
+                const images = getCurrentPackImages;
+                initializeGame(images, false);
+                resetGame();
+                startGameWithFirstPlayer(firstPlayer);
+                setIsResetting(false);
+              } else {
+                startGameWithFirstPlayer(firstPlayer);
+              }
             }}
+            onPlayerNameChange={updatePlayerName}
+            onBack={handleStartModalBack}
+            isResetting={isResetting}
           />
         </Modal>
 
         {/* Card Pack Modal */}
         <Modal
           isOpen={isCardPackModalOpen}
-          onClose={() => !isResetting && setIsCardPackModalOpen(false)}
+          onClose={() => {
+            if (isResetting) {
+              cancelResetFlow();
+            } else {
+              setIsCardPackModalOpen(false);
+            }
+          }}
           title={isResetting ? "Step 1: Choose Your Card Pack" : "Choose Your Card Pack"}
         >
           <CardPackModal
@@ -242,13 +322,28 @@ function App() {
         {/* Background Modal */}
         <Modal
           isOpen={isBackgroundModalOpen}
-          onClose={() => !isResetting && setIsBackgroundModalOpen(false)}
+          onClose={() => {
+            if (isResetting) {
+              cancelResetFlow();
+            } else {
+              setIsBackgroundModalOpen(false);
+            }
+          }}
+          onBack={isResetting ? handleBackgroundModalBack : undefined}
           title={isResetting ? "Step 2: Choose Your Background" : "Choose Your Background"}
         >
           <BackgroundModal
             selectedBackground={selectedBackground}
             onSelect={(bg) => handleBackgroundChange(bg as BackgroundTheme)}
-            onClose={() => setIsBackgroundModalOpen(false)}
+            onClose={() => {
+              setIsBackgroundModalOpen(false);
+              if (isResetting) {
+                // Move to start modal
+                setShowStartModal(true);
+              }
+            }}
+            onBack={handleBackgroundModalBack}
+            isResetting={isResetting}
           />
         </Modal>
       </div>

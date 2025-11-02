@@ -25,6 +25,7 @@ export const useMemoryGame = () => {
 
   const [currentImages, setCurrentImages] = useState<{ id: string; url: string; gradient?: string }[]>([]);
   const [showStartModal, setShowStartModal] = useState(false);
+  const [cardSize, setCardSize] = useState(100); // Default size in pixels
 
   const initializeGame = useCallback((images: { id: string; url: string; gradient?: string }[], showModal: boolean = false) => {
     const cards: Card[] = [];
@@ -92,7 +93,16 @@ export const useMemoryGame = () => {
   }, []);
 
   const showStartGameModal = useCallback(() => {
+    console.log('showStartGameModal called'); // Debug log
     setShowStartModal(true);
+  }, []);
+
+  const increaseCardSize = useCallback(() => {
+    setCardSize(prev => Math.min(prev + 10, 150)); // Max 150px
+  }, []);
+
+  const decreaseCardSize = useCallback(() => {
+    setCardSize(prev => Math.max(prev - 10, 60)); // Min 60px
   }, []);
 
   const updatePlayerName = useCallback((playerId: 1 | 2, newName: string) => {
@@ -149,6 +159,7 @@ export const useMemoryGame = () => {
     }));
     
     // Show the start modal to confirm who goes first
+    console.log('resetGame: Setting showStartModal to true'); // Debug log
     setShowStartModal(true);
   }, [currentImages, gameState.currentPlayer]);
 
@@ -245,11 +256,15 @@ export const useMemoryGame = () => {
   return {
     gameState,
     showStartModal,
+    setShowStartModal,
+    cardSize,
     initializeGame,
     startGame,
     startGameWithFirstPlayer,
     showStartGameModal,
     updatePlayerName,
+    increaseCardSize,
+    decreaseCardSize,
     flipCard,
     resetGame
   };
