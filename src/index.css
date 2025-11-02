@@ -48,3 +48,27 @@
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
+
+@keyframes playerTurnGlow {
+  0% {
+    box-shadow: 0 0 0 0 var(--glow-color-start, rgba(59, 130, 246, 0.8));
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 40px 20px var(--glow-color-mid, rgba(59, 130, 246, 0.7)),
+                0 0 80px 40px var(--glow-color-outer, rgba(59, 130, 246, 0.5)),
+                0 0 120px 60px var(--glow-color-outer, rgba(59, 130, 246, 0.3));
+    transform: scale(1.08);
+  }
+  100% {
+    box-shadow: 0 0 0 0 var(--glow-color-end, rgba(59, 130, 246, 0));
+    transform: scale(1);
+  }
+}
+
+.player-turn-glow {
+  animation: playerTurnGlow 1000ms ease-out forwards;
+  position: relative;
+  z-index: 10;
+  overflow: visible !important;
+}

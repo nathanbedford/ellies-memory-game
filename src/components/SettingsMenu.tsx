@@ -3,6 +3,7 @@ interface SettingsMenuProps {
   useWhiteCardBackground: boolean;
   flipDuration: number;
   emojiSizePercentage: number;
+  ttsEnabled: boolean;
   onIncreaseSize: () => void;
   onDecreaseSize: () => void;
   onToggleWhiteCardBackground: () => void;
@@ -10,6 +11,7 @@ interface SettingsMenuProps {
   onDecreaseFlipDuration: () => void;
   onIncreaseEmojiSize: () => void;
   onDecreaseEmojiSize: () => void;
+  onToggleTtsEnabled: () => void;
   onClose: () => void;
   onToggleFullscreen: () => void;
   isFullscreen: boolean;
@@ -17,7 +19,7 @@ interface SettingsMenuProps {
   gameStatus?: 'setup' | 'playing' | 'finished';
 }
 
-export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, onIncreaseSize, onDecreaseSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus }: SettingsMenuProps) => {
+export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus }: SettingsMenuProps) => {
   return (
     <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
@@ -104,6 +106,30 @@ export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, e
               </span>
             </div>
           </label>
+        </div>
+
+        {/* Voice Announcements Section */}
+        <div className="border-t border-gray-200 pt-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Audio</h3>
+          <label className="flex items-center gap-3 px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={ttsEnabled}
+              onChange={onToggleTtsEnabled}
+              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+            />
+            <div className="flex items-center gap-3 flex-1">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+              <span className="text-base font-medium text-gray-800">
+                Voice Announcements
+              </span>
+            </div>
+          </label>
+          <p className="text-xs text-gray-500 mt-2 px-4">
+            Announce whose turn it is after each pair is picked
+          </p>
         </div>
 
         {/* Flip Duration Section */}

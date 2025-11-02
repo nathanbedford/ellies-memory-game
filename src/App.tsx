@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useMemoryGame } from './hooks/useMemoryGame';
 import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme } from './hooks/useBackgroundSelector';
@@ -19,7 +19,7 @@ type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, flipCard, endTurn, resetGame, isAnimatingCards } = useMemoryGame();
+  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -38,6 +38,46 @@ function App() {
   const [isReplaying, setIsReplaying] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedPlayerForMatches, setSelectedPlayerForMatches] = useState<number | null>(null);
+  const [glowingPlayer, setGlowingPlayer] = useState<number | null>(null);
+  const prevCurrentPlayerRef = useRef<number | null>(null);
+
+  // Detect turn switches and trigger glow effect
+  useEffect(() => {
+    if (gameState.gameStatus === 'playing' && gameState.currentPlayer !== prevCurrentPlayerRef.current) {
+      // Only trigger glow if there was a previous player (not on initial game start)
+      if (prevCurrentPlayerRef.current !== null) {
+        console.log('[GLOW] Triggering glow for player', gameState.currentPlayer, 'from', prevCurrentPlayerRef.current);
+        setGlowingPlayer(gameState.currentPlayer);
+        // Clear glow after animation completes (1 second)
+        const timer = setTimeout(() => {
+          setGlowingPlayer(null);
+        }, 1000);
+        // Update ref after setting glow
+        prevCurrentPlayerRef.current = gameState.currentPlayer;
+        return () => clearTimeout(timer);
+      }
+      // Update ref even when not showing glow (initial game start)
+      prevCurrentPlayerRef.current = gameState.currentPlayer;
+    }
+    
+    // Reset glow when game status changes
+    if (gameState.gameStatus !== 'playing') {
+      setGlowingPlayer(null);
+      prevCurrentPlayerRef.current = null;
+    }
+  }, [gameState.currentPlayer, gameState.gameStatus]);
+
+  // Helper function to convert hex color to RGB
+  const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16),
+        }
+      : { r: 59, g: 130, b: 246 }; // Default blue
+  };
 
   // Handle replay initialization when pack changes
   useEffect(() => {
@@ -266,6 +306,7 @@ function App() {
                         useWhiteCardBackground={useWhiteCardBackground}
                         flipDuration={flipDuration}
                         emojiSizePercentage={emojiSizePercentage}
+                        ttsEnabled={ttsEnabled}
                         onIncreaseSize={increaseCardSize}
                         onDecreaseSize={decreaseCardSize}
                         onToggleWhiteCardBackground={toggleWhiteCardBackground}
@@ -273,6 +314,7 @@ function App() {
                         onDecreaseFlipDuration={decreaseFlipDuration}
                         onIncreaseEmojiSize={increaseEmojiSize}
                         onDecreaseEmojiSize={decreaseEmojiSize}
+                        onToggleTtsEnabled={toggleTtsEnabled}
                         onClose={() => setIsSettingsOpen(false)}
                         onToggleFullscreen={toggleFullscreen}
                         isFullscreen={isFullscreen}
@@ -312,18 +354,38 @@ function App() {
             <div className="flex flex-col gap-6 items-center w-full max-w-full">
               {/* Compact Header - Players Points and Current Player */}
               <div className="w-full max-w-2xl mx-auto">
-                <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-lg shadow-lg p-3">
-                  <div className="flex items-center justify-between">
+                <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-lg shadow-lg p-3 overflow-visible">
+                  <div className="flex items-center justify-between overflow-visible">
               {/* Player 1 */}
               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
                 gameState.currentPlayer === 1 
                   ? 'bg-opacity-90 ring-2' 
                   : 'bg-gray-50 bg-opacity-50'
-              }`}
-              style={gameState.currentPlayer === 1 ? {
-                backgroundColor: `${gameState.players[0]?.color || '#3b82f6'}20`,
-                '--tw-ring-color': gameState.players[0]?.color || '#3b82f6'
-              } as React.CSSProperties & { '--tw-ring-color': string } : {}}
+              } ${glowingPlayer === 1 ? 'player-turn-glow' : ''}`}
+              style={(() => {
+                const playerColor = gameState.players[0]?.color || '#3b82f6';
+                const rgb = hexToRgb(playerColor);
+                const baseStyle: React.CSSProperties & { 
+                  '--tw-ring-color'?: string; 
+                  '--glow-color-start'?: string;
+                  '--glow-color-mid'?: string;
+                  '--glow-color-outer'?: string;
+                  '--glow-color-end'?: string;
+                } = {};
+                
+                if (gameState.currentPlayer === 1) {
+                  baseStyle.backgroundColor = `${playerColor}20`;
+                  baseStyle['--tw-ring-color'] = playerColor;
+                }
+                
+                // Set glow color RGB strings for CSS variables with different opacities
+                baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
+                baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
+                baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+                baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
+                
+                return baseStyle;
+              })()}
               >
                 <span className="text-3xl text-gray-600 font-medium">{gameState.players[0]?.name || 'Player 1'}:</span>
                 <button
@@ -352,11 +414,31 @@ function App() {
                 gameState.currentPlayer === 2 
                   ? 'bg-opacity-90 ring-2' 
                   : 'bg-gray-50 bg-opacity-50'
-              }`}
-              style={gameState.currentPlayer === 2 ? {
-                backgroundColor: `${gameState.players[1]?.color || '#10b981'}20`,
-                '--tw-ring-color': gameState.players[1]?.color || '#10b981'
-              } as React.CSSProperties & { '--tw-ring-color': string } : {}}
+              } ${glowingPlayer === 2 ? 'player-turn-glow' : ''}`}
+              style={(() => {
+                const playerColor = gameState.players[1]?.color || '#10b981';
+                const rgb = hexToRgb(playerColor);
+                const baseStyle: React.CSSProperties & { 
+                  '--tw-ring-color'?: string; 
+                  '--glow-color-start'?: string;
+                  '--glow-color-mid'?: string;
+                  '--glow-color-outer'?: string;
+                  '--glow-color-end'?: string;
+                } = {};
+                
+                if (gameState.currentPlayer === 2) {
+                  baseStyle.backgroundColor = `${playerColor}20`;
+                  baseStyle['--tw-ring-color'] = playerColor;
+                }
+                
+                // Set glow color RGB strings for CSS variables with different opacities
+                baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
+                baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
+                baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+                baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
+                
+                return baseStyle;
+              })()}
               >
                 <span className="text-3xl text-gray-600 font-medium">{gameState.players[1]?.name || 'Player 2'}:</span>
                 <button

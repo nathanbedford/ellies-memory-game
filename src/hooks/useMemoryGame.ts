@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { Card, Player, GameState } from '../types';
+import { useTextToSpeech } from './useTextToSpeech';
 
 export const useMemoryGame = () => {
   const [gameState, setGameState] = useState<GameState>(() => {
@@ -51,6 +52,16 @@ export const useMemoryGame = () => {
     const saved = localStorage.getItem('emojiSizePercentage');
     return saved ? parseInt(saved, 10) : 72;
   });
+
+  const [ttsEnabled, setTtsEnabled] = useState(() => {
+    // Load TTS enabled preference from localStorage, default to true
+    const saved = localStorage.getItem('ttsEnabled');
+    return saved === null ? true : saved === 'true';
+  });
+
+  // Initialize text-to-speech
+  const { speakPlayerTurn, speakMatchFound, isAvailable, cancel: cancelTTS } = useTextToSpeech();
+  const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const initializeGame = useCallback((images: { id: string; url: string; gradient?: string }[], startPlaying: boolean = false) => {
     // Cancel any pending match check
@@ -134,15 +145,26 @@ export const useMemoryGame = () => {
   }, []);
 
   const startGameWithFirstPlayer = useCallback((firstPlayer: number) => {
-    setGameState(prev => ({
-      ...prev,
-      currentPlayer: firstPlayer,
-      gameStatus: 'playing' as const
-    }));
+    setGameState(prev => {
+      const firstPlayerName = prev.players.find(p => p.id === firstPlayer)?.name || `Player ${firstPlayer}`;
+      
+      // Announce first player's turn after a short delay
+      if (ttsEnabled && isAvailable()) {
+        setTimeout(() => {
+          speakPlayerTurn(firstPlayerName);
+        }, 400);
+      }
+      
+      return {
+        ...prev,
+        currentPlayer: firstPlayer,
+        gameStatus: 'playing' as const
+      };
+    });
     setShowStartModal(false);
     localStorage.setItem('firstPlayer', firstPlayer.toString());
     isInitialLoadRef.current = false;
-  }, []);
+  }, [speakPlayerTurn, isAvailable, ttsEnabled]);
 
   const showStartGameModal = useCallback(() => {
     console.log('showStartGameModal called'); // Debug log
@@ -203,6 +225,12 @@ export const useMemoryGame = () => {
       clearTimeout(matchCheckTimeoutRef.current);
       matchCheckTimeoutRef.current = null;
     }
+    // Cancel any pending TTS
+    if (ttsDelayTimeoutRef.current) {
+      clearTimeout(ttsDelayTimeoutRef.current);
+      ttsDelayTimeoutRef.current = null;
+    }
+    cancelTTS();
     isCheckingMatchRef.current = false;
     
     // Reset clears cards and goes back to setup mode
@@ -219,7 +247,7 @@ export const useMemoryGame = () => {
       winner: null,
       isTie: false
     }));
-  }, []);
+  }, [cancelTTS]);
 
   const checkForMatch = useCallback((selectedIds: string[]) => {
     // Prevent duplicate match checks
@@ -303,6 +331,19 @@ export const useMemoryGame = () => {
         
         // Capture the player ID who matched these cards
         const matchedByPlayerId = prev.currentPlayer;
+        
+        // Announce match found immediately (don't wait for animation)
+        if (ttsEnabled && isAvailable()) {
+          // Cancel any pending TTS
+          if (ttsDelayTimeoutRef.current) {
+            clearTimeout(ttsDelayTimeoutRef.current);
+          }
+          ttsDelayTimeoutRef.current = setTimeout(() => {
+            const matchedPlayerName = prev.players.find(p => p.id === matchedByPlayerId)?.name || `Player ${matchedByPlayerId}`;
+            speakMatchFound(matchedPlayerName);
+            ttsDelayTimeoutRef.current = null;
+          }, 400); // Small delay to let visual feedback register
+        }
         
         // After animation completes, mark as matched
         setTimeout(() => {
@@ -406,6 +447,20 @@ export const useMemoryGame = () => {
         selectedCardsCount: newState.selectedCards.length
       }));
 
+      // Announce next player's turn if no match was found
+      if (!isMatch && ttsEnabled && isAvailable()) {
+        // Cancel any pending TTS
+        if (ttsDelayTimeoutRef.current) {
+          clearTimeout(ttsDelayTimeoutRef.current);
+        }
+        // Announce immediately after determining no match (don't wait for flip animation)
+        ttsDelayTimeoutRef.current = setTimeout(() => {
+          const nextPlayerName = newPlayers.find(p => p.id === nextPlayer)?.name || `Player ${nextPlayer}`;
+          speakPlayerTurn(nextPlayerName);
+          ttsDelayTimeoutRef.current = null;
+        }, 400); // Small delay to let visual feedback register
+      }
+
       // Reset the checking flag after state update completes
       // Use requestAnimationFrame to ensure React has rendered the update
       requestAnimationFrame(() => {
@@ -416,7 +471,7 @@ export const useMemoryGame = () => {
 
       return newState;
     });
-  }, []);
+  }, [speakPlayerTurn, speakMatchFound, isAvailable, flipDuration, cancelTTS, ttsEnabled]);
 
   const endTurn = useCallback(() => {
     // Cancel any pending match check
@@ -424,6 +479,12 @@ export const useMemoryGame = () => {
       clearTimeout(matchCheckTimeoutRef.current);
       matchCheckTimeoutRef.current = null;
     }
+    // Cancel any pending TTS
+    if (ttsDelayTimeoutRef.current) {
+      clearTimeout(ttsDelayTimeoutRef.current);
+      ttsDelayTimeoutRef.current = null;
+    }
+    cancelTTS();
     isCheckingMatchRef.current = false;
     
     setGameState(prev => {
@@ -500,7 +561,7 @@ export const useMemoryGame = () => {
         selectedCards: []
       };
     });
-  }, []);
+  }, [cancelTTS]);
 
   const increaseFlipDuration = useCallback(() => {
     setFlipDuration(prev => {
@@ -533,6 +594,22 @@ export const useMemoryGame = () => {
       return newPercentage;
     });
   }, []);
+
+  const toggleTtsEnabled = useCallback(() => {
+    setTtsEnabled(prev => {
+      const newValue = !prev;
+      localStorage.setItem('ttsEnabled', newValue.toString());
+      // Cancel any ongoing TTS when disabling
+      if (!newValue) {
+        cancelTTS();
+        if (ttsDelayTimeoutRef.current) {
+          clearTimeout(ttsDelayTimeoutRef.current);
+          ttsDelayTimeoutRef.current = null;
+        }
+      }
+      return newValue;
+    });
+  }, [cancelTTS]);
 
   const flipCard = useCallback((cardId: string) => {
     // Prevent card flips during match checks to avoid race conditions
@@ -635,6 +712,7 @@ export const useMemoryGame = () => {
     useWhiteCardBackground,
     flipDuration,
     emojiSizePercentage,
+    ttsEnabled,
     initializeGame,
     startGame,
     startGameWithFirstPlayer,
@@ -648,6 +726,7 @@ export const useMemoryGame = () => {
     decreaseFlipDuration,
     increaseEmojiSize,
     decreaseEmojiSize,
+    toggleTtsEnabled,
     flipCard,
     endTurn,
     resetGame,
