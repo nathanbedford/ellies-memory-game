@@ -181,7 +181,7 @@ const PLANT_CARDS = [
   },
   { 
     id: 'hibiscus', 
-    emoji: '🌺',
+    emoji: '🏵️',
     gradient: 'from-red-400 to-pink-500'
   },
   { 
@@ -239,7 +239,7 @@ const BUILDING_CARDS = [
   },
   { 
     id: 'windmill', 
-    emoji: '🏭',
+    emoji: '🎡',
     gradient: 'from-red-500 to-red-700'
   },
   { 
@@ -309,7 +309,7 @@ const BUILDING_CARDS = [
   },
   { 
     id: 'department-store', 
-    emoji: '🏬',
+    emoji: '🏛️',
     gradient: 'from-purple-500 to-purple-700'
   },
   { 
@@ -411,13 +411,13 @@ const COLOR_CARDS = [
     gradient: 'from-amber-600 to-amber-800'
   },
   { 
-    id: 'large-blue-circle', 
-    emoji: '🔵',
+    id: 'large-blue-diamond', 
+    emoji: '🔷',
     gradient: 'from-blue-500 to-blue-800'
   },
   { 
-    id: 'large-red-circle', 
-    emoji: '🔴',
+    id: 'large-red-diamond', 
+    emoji: '🔶',
     gradient: 'from-red-600 to-red-800'
   }
 ];
@@ -515,7 +515,7 @@ const OCEAN_CARDS = [
   },
   { 
     id: 'ray', 
-    emoji: '🪼',
+    emoji: '🦦',
     gradient: 'from-blue-400 to-blue-700'
   },
   { 
@@ -593,7 +593,7 @@ const CONSTRUCTION_CARDS = [
   },
   { 
     id: 'chainsaw', 
-    emoji: '🪚',
+    emoji: '🔪',
     gradient: 'from-gray-600 to-gray-800'
   },
   { 
@@ -613,7 +613,7 @@ const CONSTRUCTION_CARDS = [
   },
   { 
     id: 'crane', 
-    emoji: '🏗️',
+    emoji: '🏋️',
     gradient: 'from-yellow-500 to-orange-600'
   },
   { 
