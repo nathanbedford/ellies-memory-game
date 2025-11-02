@@ -4,7 +4,13 @@
   "version": "1.0.0",
   "type": "module",
   "description": "A beautiful memory card game with emoji cards and multiple themes",
-  "keywords": ["memory-game", "react", "typescript", "tailwindcss", "emoji"],
+  "keywords": [
+    "memory-game",
+    "react",
+    "typescript",
+    "tailwindcss",
+    "emoji"
+  ],
   "author": "Ellie",
   "license": "MIT",
   "scripts": {
@@ -14,6 +20,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "canvas-confetti": "^1.9.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "screenfull": "^6.0.2"

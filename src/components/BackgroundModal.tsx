@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BACKGROUND_OPTIONS } from '../hooks/useBackgroundSelector';
 
 interface BackgroundModalProps {
@@ -9,18 +10,45 @@ interface BackgroundModalProps {
 }
 
 export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack, isResetting = false }: BackgroundModalProps) => {
+  const [activeTab, setActiveTab] = useState<'colors' | 'photos'>('colors');
+
   const handleSelect = (backgroundId: string) => {
     onSelect(backgroundId);
-    if (!isResetting) {
-      onClose();
-    }
+    // Don't call onClose here - let the parent handle navigation
   };
+
+  const colorOptions = BACKGROUND_OPTIONS.filter(option => option.gradient);
+  const photoOptions = BACKGROUND_OPTIONS.filter(option => option.imageUrl);
 
   return (
     <div className="space-y-6">
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('colors')}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            activeTab === 'colors'
+              ? 'border-purple-500 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Colors
+        </button>
+        <button
+          onClick={() => setActiveTab('photos')}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            activeTab === 'photos'
+              ? 'border-purple-500 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Photos
+        </button>
+      </div>
+
       {/* Background Options */}
       <div className="grid grid-cols-1 gap-4">
-        {BACKGROUND_OPTIONS.map((option) => (
+        {(activeTab === 'colors' ? colorOptions : photoOptions).map((option) => (
           <button
             key={option.id}
             onClick={() => handleSelect(option.id)}
@@ -33,14 +61,31 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
             <div className="flex items-center gap-6">
               {/* Preview Section */}
               <div className="flex-shrink-0">
-                <div className={`w-24 h-24 rounded-lg bg-gradient-to-br ${option.gradient} shadow-inner`}>
-                  {/* Add some visual elements to show the gradient */}
-                  <div className="w-full h-full rounded-lg flex items-center justify-center">
-                    <div className="w-16 h-16 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
-                      <div className="w-8 h-8 bg-white bg-opacity-50 rounded-full"></div>
+                {option.imageUrl ? (
+                  <div 
+                    className="w-24 h-24 rounded-lg shadow-inner overflow-hidden"
+                    style={{
+                      backgroundImage: `url(${option.imageUrl})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center'
+                    }}
+                  >
+                    <div className="w-full h-full rounded-lg flex items-center justify-center bg-black bg-opacity-20">
+                      <div className="w-16 h-16 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-white bg-opacity-50 rounded-full"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className={`w-24 h-24 rounded-lg bg-gradient-to-br ${option.gradient} shadow-inner`}>
+                    {/* Add some visual elements to show the gradient */}
+                    <div className="w-full h-full rounded-lg flex items-center justify-center">
+                      <div className="w-16 h-16 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
+                        <div className="w-8 h-8 bg-white bg-opacity-50 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Info Section */}
@@ -54,6 +99,9 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
                   {option.id === 'sunset' && '🌅 Warm and cozy with orange and red colors'}
                   {option.id === 'forest' && '🌲 Natural and peaceful with green shades'}
                   {option.id === 'galaxy' && '🌌 Mysterious and exciting with purple and pink'}
+                  {option.id === 'photo1' && '🎨 Beautiful abstract art photo'}
+                  {option.id === 'photo2' && '🚧 Construction site photo'}
+                  {option.id === 'photo3' && '🚂 Wooden boxcar photo'}
                 </div>
                 {selectedBackground === option.id && (
                   <div className="text-sm font-semibold text-purple-600">

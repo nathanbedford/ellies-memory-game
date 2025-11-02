@@ -7,10 +7,10 @@ interface CardPackModalProps {
   onClose: () => void;
 }
 
-export const CardPackModal = ({ cardPacks, selectedPack, onSelect, onClose }: CardPackModalProps) => {
+export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackModalProps) => {
   const handleSelect = (packId: string) => {
     onSelect(packId);
-    onClose();
+    // Don't call onClose here - let the parent handle navigation
   };
 
   return (

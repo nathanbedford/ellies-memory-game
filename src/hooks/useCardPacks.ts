@@ -6,7 +6,8 @@ export const CARD_PACKS: CardPackOption[] = [
   { id: 'plants', name: 'Plants', emoji: '🌿' },
   { id: 'buildings', name: 'Buildings', emoji: '🏛️' },
   { id: 'colors', name: 'Colors', emoji: '🎨' },
-  { id: 'ocean', name: 'Ocean', emoji: '🌊' }
+  { id: 'ocean', name: 'Ocean', emoji: '🌊' },
+  { id: 'construction', name: 'Construction', emoji: '🔨' }
 ];
 
 const ANIMAL_CARDS = [
@@ -324,6 +325,69 @@ const OCEAN_CARDS = [
   }
 ];
 
+const CONSTRUCTION_CARDS = [
+  { 
+    id: 'hammer', 
+    emoji: '🔨',
+    gradient: 'from-amber-600 to-amber-800'
+  },
+  { 
+    id: 'axe', 
+    emoji: '🪓',
+    gradient: 'from-gray-600 to-gray-800'
+  },
+  { 
+    id: 'pickaxe', 
+    emoji: '⛏️',
+    gradient: 'from-gray-500 to-gray-700'
+  },
+  { 
+    id: 'wrench', 
+    emoji: '🔧',
+    gradient: 'from-gray-400 to-gray-600'
+  },
+  { 
+    id: 'screwdriver', 
+    emoji: '🪛',
+    gradient: 'from-blue-500 to-blue-700'
+  },
+  { 
+    id: 'nut-bolt', 
+    emoji: '🔩',
+    gradient: 'from-gray-500 to-gray-700'
+  },
+  { 
+    id: 'construction', 
+    emoji: '🏗️',
+    gradient: 'from-orange-500 to-orange-700'
+  },
+  { 
+    id: 'brick', 
+    emoji: '🧱',
+    gradient: 'from-red-600 to-red-800'
+  },
+  { 
+    id: 'saw', 
+    emoji: '🪚',
+    gradient: 'from-gray-600 to-gray-800'
+  },
+  { 
+    id: 'toolbox', 
+    emoji: '🧰',
+    gradient: 'from-red-500 to-red-700'
+  },
+  { 
+    id: 'level', 
+    emoji: '📐',
+    gradient: 'from-gray-400 to-gray-600'
+  },
+  { 
+    id: 'hard-hat', 
+    emoji: '👷',
+    gradient: 'from-yellow-400 to-yellow-600'
+  }
+];
+
 export const useCardPacks = () => {
   const [selectedPack, setSelectedPack] = useState<CardPack>('animals');
 
@@ -340,6 +404,8 @@ export const useCardPacks = () => {
           return COLOR_CARDS;
         case 'ocean':
           return OCEAN_CARDS;
+        case 'construction':
+          return CONSTRUCTION_CARDS;
         default:
           return ANIMAL_CARDS;
       }
