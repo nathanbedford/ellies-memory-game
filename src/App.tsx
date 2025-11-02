@@ -349,9 +349,6 @@ function App() {
                     <span className="text-xs">Turn</span>
                   </div>
                 )}
-                {isFirstTurn && gameState.currentPlayer === 1 && (
-                  <div className="rounded-full" style={{ width: '30px', height: '30px', backgroundColor: gameState.players[0]?.color || '#3b82f6' }}></div>
-                )}
               </div>
 
                     {/* VS Divider */}
@@ -384,9 +381,6 @@ function App() {
                     </svg>
                     <span className="text-xs">Turn</span>
                   </div>
-                )}
-                {isFirstTurn && gameState.currentPlayer === 2 && (
-                  <div className="rounded-full" style={{ width: '30px', height: '30px', backgroundColor: gameState.players[1]?.color || '#10b981' }}></div>
                 )}
               </div>
                   </div>
