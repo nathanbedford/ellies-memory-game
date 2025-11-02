@@ -13,7 +13,7 @@ import screenfull from 'screenfull';
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, showStartModal, setShowStartModal, cardSize, initializeGame, startGame, startGameWithFirstPlayer, updatePlayerName, increaseCardSize, decreaseCardSize, flipCard, resetGame } = useMemoryGame();
+  const { gameState, showStartModal, setShowStartModal, cardSize, initializeGame, startGameWithFirstPlayer, updatePlayerName, increaseCardSize, decreaseCardSize, flipCard, resetGame } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const previousPackRef = useRef(selectedPack);
   const [isFullscreen, setIsFullscreen] = useState(false);
