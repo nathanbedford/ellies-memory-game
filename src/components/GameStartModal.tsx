@@ -112,8 +112,8 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
           style={selectedPlayer === 1 ? {
             borderColor: tempColors[1],
             backgroundColor: `${tempColors[1]}20`,
-            ringColor: tempColors[1]
-          } : {}}
+            '--tw-ring-color': tempColors[1]
+          } as React.CSSProperties & { '--tw-ring-color': string } : {}}
         >
           <div className="space-y-4">
             <div className="text-6xl">👤</div>
@@ -205,8 +205,8 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
           style={selectedPlayer === 2 ? {
             borderColor: tempColors[2],
             backgroundColor: `${tempColors[2]}20`,
-            ringColor: tempColors[2]
-          } : {}}
+            '--tw-ring-color': tempColors[2]
+          } as React.CSSProperties & { '--tw-ring-color': string } : {}}
         >
           <div className="space-y-4">
             <div className="text-6xl">👤</div>

@@ -168,7 +168,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
     console.log('[FLY DATA] Fly data calculation complete', {
       totalResults: result.length,
       validResults: validResults.length,
-      validCardIds: validResults.map((r, i) => cards.find(c => c.isFlyingToPlayer && result.indexOf(r) === cards.indexOf(c))?.id)
+      validCardIds: validResults.map((r) => cards.find(c => c.isFlyingToPlayer && result.indexOf(r) === cards.indexOf(c))?.id)
     });
     
     return result;

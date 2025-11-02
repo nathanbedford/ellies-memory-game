@@ -329,8 +329,8 @@ function App() {
               }`}
               style={gameState.currentPlayer === 1 ? {
                 backgroundColor: `${gameState.players[0]?.color || '#3b82f6'}20`,
-                ringColor: gameState.players[0]?.color || '#3b82f6'
-              } : {}}
+                '--tw-ring-color': gameState.players[0]?.color || '#3b82f6'
+              } as React.CSSProperties & { '--tw-ring-color': string } : {}}
               >
                 <span className="text-3xl text-gray-600 font-medium">{gameState.players[0]?.name || 'Player 1'}:</span>
                 <button
@@ -365,8 +365,8 @@ function App() {
               }`}
               style={gameState.currentPlayer === 2 ? {
                 backgroundColor: `${gameState.players[1]?.color || '#10b981'}20`,
-                ringColor: gameState.players[1]?.color || '#10b981'
-              } : {}}
+                '--tw-ring-color': gameState.players[1]?.color || '#10b981'
+              } as React.CSSProperties & { '--tw-ring-color': string } : {}}
               >
                 <span className="text-3xl text-gray-600 font-medium">{gameState.players[1]?.name || 'Player 2'}:</span>
                 <button
