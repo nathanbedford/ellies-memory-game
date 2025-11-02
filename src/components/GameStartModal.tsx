@@ -187,7 +187,7 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
               selectedPlayer === 1
                 ? 'shadow-xl ring-4 ring-opacity-30'
                 : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg'
-            } ${editingPlayer !== null && editingPlayer !== 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            } ${editingPlayer === 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={selectedPlayer === 1 ? {
               borderColor: tempColors[1],
               backgroundColor: `${tempColors[1]}20`,
@@ -315,7 +315,7 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
               selectedPlayer === 2
                 ? 'shadow-xl ring-4 ring-opacity-30'
                 : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg'
-            } ${editingPlayer !== null && editingPlayer !== 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            } ${editingPlayer === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={selectedPlayer === 2 ? {
               borderColor: tempColors[2],
               backgroundColor: `${tempColors[2]}20`,

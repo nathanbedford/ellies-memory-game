@@ -28,7 +28,6 @@ function App() {
   const [originalPack, setOriginalPack] = useState<string | null>(null);
   const [originalBackground, setOriginalBackground] = useState<BackgroundTheme | null>(null);
   const [originalCardBack, setOriginalCardBack] = useState<CardBackType | null>(null);
-  const [isFirstTurn, setIsFirstTurn] = useState(true);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const [lastConfig, setLastConfig] = useState<{
     pack: string;
@@ -108,7 +107,6 @@ function App() {
     setSelectedBackground(lastConfig.background);
     setSelectedCardBack(lastConfig.cardBack);
     setShowResetConfirmation(false);
-    setIsFirstTurn(true);
     setIsReplaying(true);
   };
 
@@ -162,7 +160,6 @@ function App() {
     startGameWithFirstPlayer(firstPlayer);
     setSetupStep(null);
     setIsResetting(false);
-    setIsFirstTurn(true);
     localStorage.setItem('hasPlayedBefore', 'true');
     
     // Store configuration for replay
@@ -173,13 +170,6 @@ function App() {
       firstPlayer
     });
   };
-
-  // Track when first turn ends
-  useEffect(() => {
-    if (gameState.gameStatus === 'playing' && gameState.selectedCards.length > 0) {
-      setIsFirstTurn(false);
-    }
-  }, [gameState.gameStatus, gameState.selectedCards.length]);
 
   // Prevent scrollbars during card animation
   useEffect(() => {
