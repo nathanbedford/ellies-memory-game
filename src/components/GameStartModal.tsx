@@ -176,7 +176,24 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
                   title="Custom color"
                 />
               </div>
-              <div className="text-xs text-gray-500">Press Enter to save, Escape to cancel</div>
+              <div className="flex gap-2 justify-center mt-3">
+                <button
+                  type="button"
+                  onClick={handleNameCancel}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-white font-semibold rounded-lg transition-all duration-200 hover:opacity-90"
+                  style={{
+                    background: tempColors[1],
+                  }}
+                >
+                  Save
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -304,7 +321,24 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
                   title="Custom color"
                 />
               </div>
-              <div className="text-xs text-gray-500">Press Enter to save, Escape to cancel</div>
+              <div className="flex gap-2 justify-center mt-3">
+                <button
+                  type="button"
+                  onClick={handleNameCancel}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-white font-semibold rounded-lg transition-all duration-200 hover:opacity-90"
+                  style={{
+                    background: tempColors[2],
+                  }}
+                >
+                  Save
+                </button>
+              </div>
             </form>
           </div>
         </div>

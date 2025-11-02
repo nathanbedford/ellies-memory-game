@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type BackgroundTheme = 'rainbow' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'photo1' | 'photo2' | 'photo3';
+export type BackgroundTheme = 'rainbow' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'photo1' | 'photo2' | 'photo3' | 'photo4';
 
 export interface BackgroundOption {
   id: BackgroundTheme;
@@ -49,6 +49,11 @@ export const BACKGROUND_OPTIONS: BackgroundOption[] = [
     id: 'photo3',
     name: 'Wooden Boxcar',
     imageUrl: 'https://images.unsplash.com/photo-1719678275096-70b51a7bc915?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2070'
+  },
+  {
+    id: 'photo4',
+    name: 'Mountains in Fall',
+    imageUrl: 'https://images.unsplash.com/photo-1631941461005-a915d514ef03?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2070'
   }
 ];
 

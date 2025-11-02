@@ -102,6 +102,7 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
                   {option.id === 'photo1' && '🎨 Beautiful abstract art photo'}
                   {option.id === 'photo2' && '🚧 Construction site photo'}
                   {option.id === 'photo3' && '🚂 Wooden boxcar photo'}
+                  {option.id === 'photo4' && '🏔️ Beautiful mountain landscape in autumn'}
                 </div>
                 {selectedBackground === option.id && (
                   <div className="text-sm font-semibold text-purple-600">
