@@ -9,6 +9,7 @@ interface PlayerMatchesModalProps {
   cards: Card[];
   cardSize?: number;
   useWhiteCardBackground?: boolean;
+  emojiSizePercentage?: number;
   cardBack?: CardBackOption;
 }
 
@@ -19,6 +20,7 @@ export const PlayerMatchesModal = ({
   cards,
   cardSize = 100,
   useWhiteCardBackground = false,
+  emojiSizePercentage = 72,
   cardBack
 }: PlayerMatchesModalProps) => {
   if (!isOpen) return null;
@@ -100,6 +102,7 @@ export const PlayerMatchesModal = ({
                         onClick={() => {}}
                         size={cardSize}
                         useWhiteBackground={useWhiteCardBackground}
+                        emojiSizePercentage={emojiSizePercentage}
                         cardBack={cardBack}
                         forceGameplaySize={true}
                         forceGameplayBackground={true}
@@ -117,6 +120,7 @@ export const PlayerMatchesModal = ({
                         onClick={() => {}}
                         size={cardSize}
                         useWhiteBackground={useWhiteCardBackground}
+                        emojiSizePercentage={emojiSizePercentage}
                         cardBack={cardBack}
                         forceGameplaySize={true}
                         forceGameplayBackground={true}

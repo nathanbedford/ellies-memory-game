@@ -7,12 +7,13 @@ interface CardProps {
   onClick: () => void;
   size?: number;
   useWhiteBackground?: boolean;
+  emojiSizePercentage?: number;
   cardBack?: CardBackOption;
   forceGameplaySize?: boolean; // Force use of regular gameplay size instead of matched size
   forceGameplayBackground?: boolean; // Force use of gradient background instead of white matched background
 }
 
-export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, cardBack, forceGameplaySize = false, forceGameplayBackground = false }: CardProps) => {
+export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, emojiSizePercentage = 72, cardBack, forceGameplaySize = false, forceGameplayBackground = false }: CardProps) => {
   // Debug: Log when isFlipped changes
   useEffect(() => {
     console.log('[CARD] Card prop changed', JSON.stringify({
@@ -23,10 +24,11 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, ca
     }));
   }, [card.id, card.isFlipped, card.isMatched]);
   
-  // Calculate font size based on card size (roughly 40% of card size, then 80% bigger)
-  const fontSize = Math.round(size * 0.4 * 1.8); // 0.4 * 1.8 = 0.72 (72% of card size)
-  // For matched cards, make emoji 50% bigger (then 80% bigger on top of that)
-  const matchedFontSize = Math.round(size * 0.6 * 1.8); // 0.6 * 1.8 = 1.08 (108% of card size)
+  // Calculate font size based on card size and emoji size percentage
+  // emojiSizePercentage is a percentage (e.g., 72 means 72% of card size)
+  const fontSize = Math.round(size * emojiSizePercentage / 100);
+  // For matched cards, make emoji 50% bigger (1.5x the normal size)
+  const matchedFontSize = Math.round(size * emojiSizePercentage / 100 * 1.5);
   
   // Default card back if none provided
   const defaultCardBack: CardBackOption = {

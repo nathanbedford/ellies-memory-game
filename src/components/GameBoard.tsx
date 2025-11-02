@@ -9,6 +9,7 @@ interface GameBoardProps {
   cardSize?: number;
   isAnimating?: boolean;
   useWhiteCardBackground?: boolean;
+  emojiSizePercentage?: number;
   cardBack?: CardBackOption;
 }
 
@@ -18,7 +19,7 @@ interface CardAnimationData {
   rotation: number;
 }
 
-export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, cardBack }: GameBoardProps) => {
+export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack }: GameBoardProps) => {
   const boardRef = useRef<HTMLDivElement>(null);
   
   // Monitor card state changes for debugging
@@ -245,6 +246,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
               onClick={() => {}}
               size={cardSize}
               useWhiteBackground={useWhiteCardBackground}
+              emojiSizePercentage={emojiSizePercentage}
               cardBack={cardBack}
             />
           </div>
@@ -302,6 +304,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
                 onClick={() => onCardClick(card.id)}
                 size={cardSize}
                 useWhiteBackground={useWhiteCardBackground}
+                emojiSizePercentage={emojiSizePercentage}
                 cardBack={cardBack}
               />
             </div>

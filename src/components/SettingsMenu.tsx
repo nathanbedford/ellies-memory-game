@@ -2,11 +2,14 @@ interface SettingsMenuProps {
   cardSize: number;
   useWhiteCardBackground: boolean;
   flipDuration: number;
+  emojiSizePercentage: number;
   onIncreaseSize: () => void;
   onDecreaseSize: () => void;
   onToggleWhiteCardBackground: () => void;
   onIncreaseFlipDuration: () => void;
   onDecreaseFlipDuration: () => void;
+  onIncreaseEmojiSize: () => void;
+  onDecreaseEmojiSize: () => void;
   onClose: () => void;
   onToggleFullscreen: () => void;
   isFullscreen: boolean;
@@ -14,7 +17,7 @@ interface SettingsMenuProps {
   gameStatus?: 'setup' | 'playing' | 'finished';
 }
 
-export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, onIncreaseSize, onDecreaseSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus }: SettingsMenuProps) => {
+export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, onIncreaseSize, onDecreaseSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus }: SettingsMenuProps) => {
   return (
     <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
@@ -132,6 +135,38 @@ export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, o
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
             How long cards stay flipped before checking for a match
+          </p>
+        </div>
+
+        {/* Emoji Size Section */}
+        <div className="border-t border-gray-200 pt-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Emoji Size</h3>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onDecreaseEmojiSize}
+              disabled={emojiSizePercentage <= 20}
+              className="px-6 py-3 text-base font-semibold bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 disabled:transform-none"
+              title="Make emojis smaller"
+            >
+              −
+            </button>
+            
+            <div className="flex-1 text-center">
+              <div className="text-sm text-gray-600 mb-1">Current Size</div>
+              <div className="text-2xl font-bold text-gray-800">{emojiSizePercentage}%</div>
+            </div>
+            
+            <button
+              onClick={onIncreaseEmojiSize}
+              disabled={emojiSizePercentage >= 150}
+              className="px-6 py-3 text-base font-semibold bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 disabled:transform-none"
+              title="Make emojis bigger"
+            >
+              +
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            Size of emojis relative to card size
           </p>
         </div>
 

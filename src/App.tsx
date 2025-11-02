@@ -19,7 +19,7 @@ type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, cardSize, useWhiteCardBackground, flipDuration, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, flipCard, endTurn, resetGame, isAnimatingCards } = useMemoryGame();
+  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, flipCard, endTurn, resetGame, isAnimatingCards } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -265,11 +265,14 @@ function App() {
                         cardSize={cardSize}
                         useWhiteCardBackground={useWhiteCardBackground}
                         flipDuration={flipDuration}
+                        emojiSizePercentage={emojiSizePercentage}
                         onIncreaseSize={increaseCardSize}
                         onDecreaseSize={decreaseCardSize}
                         onToggleWhiteCardBackground={toggleWhiteCardBackground}
                         onIncreaseFlipDuration={increaseFlipDuration}
                         onDecreaseFlipDuration={decreaseFlipDuration}
+                        onIncreaseEmojiSize={increaseEmojiSize}
+                        onDecreaseEmojiSize={decreaseEmojiSize}
                         onClose={() => setIsSettingsOpen(false)}
                         onToggleFullscreen={toggleFullscreen}
                         isFullscreen={isFullscreen}
@@ -385,6 +388,7 @@ function App() {
                   cardSize={cardSize}
                   isAnimating={isAnimatingCards}
                   useWhiteCardBackground={useWhiteCardBackground}
+                  emojiSizePercentage={emojiSizePercentage}
                   cardBack={getCurrentCardBack()}
                 />
               </div>
@@ -487,6 +491,7 @@ function App() {
             cards={gameState.cards}
             cardSize={cardSize}
             useWhiteCardBackground={useWhiteCardBackground}
+            emojiSizePercentage={emojiSizePercentage}
             cardBack={getCurrentCardBack()}
           />
         )}

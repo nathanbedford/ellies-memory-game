@@ -46,6 +46,11 @@ export const useMemoryGame = () => {
     const saved = localStorage.getItem('flipDuration');
     return saved ? parseInt(saved, 10) : 2000;
   });
+  const [emojiSizePercentage, setEmojiSizePercentage] = useState(() => {
+    // Load emoji size percentage from localStorage, default to 72 (matches current default: 0.4 * 1.8 = 0.72)
+    const saved = localStorage.getItem('emojiSizePercentage');
+    return saved ? parseInt(saved, 10) : 72;
+  });
 
   const initializeGame = useCallback((images: { id: string; url: string; gradient?: string }[], startPlaying: boolean = false) => {
     // Cancel any pending match check
@@ -513,6 +518,22 @@ export const useMemoryGame = () => {
     });
   }, []);
 
+  const increaseEmojiSize = useCallback(() => {
+    setEmojiSizePercentage(prev => {
+      const newPercentage = Math.min(prev + 5, 150); // Max 150%
+      localStorage.setItem('emojiSizePercentage', newPercentage.toString());
+      return newPercentage;
+    });
+  }, []);
+
+  const decreaseEmojiSize = useCallback(() => {
+    setEmojiSizePercentage(prev => {
+      const newPercentage = Math.max(prev - 5, 20); // Min 20%
+      localStorage.setItem('emojiSizePercentage', newPercentage.toString());
+      return newPercentage;
+    });
+  }, []);
+
   const flipCard = useCallback((cardId: string) => {
     // Prevent card flips during match checks to avoid race conditions
     if (isCheckingMatchRef.current) {
@@ -613,6 +634,7 @@ export const useMemoryGame = () => {
     cardSize,
     useWhiteCardBackground,
     flipDuration,
+    emojiSizePercentage,
     initializeGame,
     startGame,
     startGameWithFirstPlayer,
@@ -624,6 +646,8 @@ export const useMemoryGame = () => {
     toggleWhiteCardBackground,
     increaseFlipDuration,
     decreaseFlipDuration,
+    increaseEmojiSize,
+    decreaseEmojiSize,
     flipCard,
     endTurn,
     resetGame,
