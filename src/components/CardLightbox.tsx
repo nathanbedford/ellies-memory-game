@@ -164,7 +164,7 @@ export const CardLightbox = ({ isOpen, onClose, card, cards = [], currentIndex =
               )}
               <div 
                 className="text-center relative z-10"
-                style={{ fontSize: 'min(30vw, 30vh, 200px)' }}
+                style={{ fontSize: 'min(52.25vmin, 200px)' }}
               >
                 {card.imageUrl || '?'}
               </div>
