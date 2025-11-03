@@ -490,13 +490,14 @@ function App() {
                 <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-lg shadow-lg p-3 overflow-visible">
                   <div className="flex items-center justify-between overflow-visible">
               {/* Player 1 */}
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+              <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
                 gameState.currentPlayer === 1 
                   ? 'bg-opacity-90 ring-2' 
                   : 'bg-gray-50 bg-opacity-50'
               } ${glowingPlayer === 1 ? 'player-turn-glow' : ''}`}
               style={(() => {
-                const playerColor = gameState.players[0]?.color || '#3b82f6';
+                const player1 = gameState.players.find(p => p.id === 1);
+                const playerColor = player1?.color || '#3b82f6';
                 const rgb = hexToRgb(playerColor);
                 const baseStyle: React.CSSProperties & { 
                   '--tw-ring-color'?: string; 
@@ -520,17 +521,19 @@ function App() {
                 return baseStyle;
               })()}
               >
-                <span className="text-3xl text-gray-600 font-medium">{gameState.players[0]?.name || 'Player 1'}:</span>
-                <button
-                  onClick={() => setSelectedPlayerForMatches(1)}
-                  className={`text-2xl font-bold cursor-pointer hover:opacity-75 transition-opacity ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
-                  style={gameState.currentPlayer === 1 ? { color: gameState.players[0]?.color || '#3b82f6' } : {}}
-                  title="Click to view matches"
-                >
-                  {gameState.players[0]?.score || 0}
-                </button>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl text-gray-600 font-medium">{gameState.players.find(p => p.id === 1)?.name || 'Player 1'}:</span>
+                  <button
+                    onClick={() => setSelectedPlayerForMatches(1)}
+                    className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
+                    style={gameState.currentPlayer === 1 ? { color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' } : {}}
+                    title="Click to view matches"
+                  >
+                    {gameState.players.find(p => p.id === 1)?.score || 0}
+                  </button>
+                </div>
                 {gameState.currentPlayer === 1 && (
-                  <div className="font-semibold flex flex-col items-center gap-1" style={{ color: gameState.players[0]?.color || '#3b82f6' }}>
+                  <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' }}>
                     <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                     </svg>
@@ -543,13 +546,14 @@ function App() {
                     <div className="text-gray-400 font-semibold px-3 text-sm">VS</div>
 
               {/* Player 2 */}
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+              <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
                 gameState.currentPlayer === 2 
                   ? 'bg-opacity-90 ring-2' 
                   : 'bg-gray-50 bg-opacity-50'
               } ${glowingPlayer === 2 ? 'player-turn-glow' : ''}`}
               style={(() => {
-                const playerColor = gameState.players[1]?.color || '#10b981';
+                const player2 = gameState.players.find(p => p.id === 2);
+                const playerColor = player2?.color || '#10b981';
                 const rgb = hexToRgb(playerColor);
                 const baseStyle: React.CSSProperties & { 
                   '--tw-ring-color'?: string; 
@@ -573,17 +577,19 @@ function App() {
                 return baseStyle;
               })()}
               >
-                <span className="text-3xl text-gray-600 font-medium">{gameState.players[1]?.name || 'Player 2'}:</span>
-                <button
-                  onClick={() => setSelectedPlayerForMatches(2)}
-                  className={`text-2xl font-bold cursor-pointer hover:opacity-75 transition-opacity ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
-                  style={gameState.currentPlayer === 2 ? { color: gameState.players[1]?.color || '#10b981' } : {}}
-                  title="Click to view matches"
-                >
-                  {gameState.players[1]?.score || 0}
-                </button>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl text-gray-600 font-medium">{gameState.players.find(p => p.id === 2)?.name || 'Player 2'}:</span>
+                  <button
+                    onClick={() => setSelectedPlayerForMatches(2)}
+                    className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
+                    style={gameState.currentPlayer === 2 ? { color: gameState.players.find(p => p.id === 2)?.color || '#10b981' } : {}}
+                    title="Click to view matches"
+                  >
+                    {gameState.players.find(p => p.id === 2)?.score || 0}
+                  </button>
+                </div>
                 {gameState.currentPlayer === 2 && (
-                  <div className="font-semibold flex flex-col items-center gap-1" style={{ color: gameState.players[1]?.color || '#10b981' }}>
+                  <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: gameState.players.find(p => p.id === 2)?.color || '#10b981' }}>
                     <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                     </svg>

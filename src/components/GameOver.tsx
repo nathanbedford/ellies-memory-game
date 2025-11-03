@@ -73,7 +73,7 @@ export const GameOver = ({ winner, players, isTie, onPlayAgain, onExploreCards, 
                 It's a tie! Both players win! 🎊
               </p>
               <p className="text-lg text-gray-500">
-                {players[0]?.name} and {players[1]?.name} both scored {players[0]?.score} pairs!
+                {players.find(p => p.id === 1)?.name || 'Player 1'} and {players.find(p => p.id === 2)?.name || 'Player 2'} both scored {players.find(p => p.id === 1)?.score || 0} pairs!
               </p>
             </div>
           ) : (

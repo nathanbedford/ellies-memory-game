@@ -2,6 +2,16 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Card, Player, GameState } from '../types';
 import { useTextToSpeech } from './useTextToSpeech';
 
+// Helper function to ensure players are always sorted by ID (1, then 2)
+const sortPlayersByID = (players: Player[]): Player[] => {
+  return [...players].sort((a, b) => a.id - b.id);
+};
+
+// Helper function to get player by ID
+const getPlayerById = (players: Player[], id: number): Player | undefined => {
+  return players.find(p => p.id === id);
+};
+
 export const useMemoryGame = () => {
   const [gameState, setGameState] = useState<GameState>(() => {
     // Try to load saved game state from sessionStorage
@@ -18,12 +28,16 @@ export const useMemoryGame = () => {
             // Keep isFlipped and isMatched as they represent actual game state
           }));
           
+          const players = parsed.players && Array.isArray(parsed.players) && parsed.players.length >= 2
+            ? sortPlayersByID(parsed.players)
+            : [
+                { id: 1, name: 'Player 1', score: 0, color: '#3b82f6' },
+                { id: 2, name: 'Player 2', score: 0, color: '#10b981' }
+              ];
+          
           return {
             cards: cleanedCards,
-            players: parsed.players || [
-              { id: 1, name: 'Player 1', score: 0, color: '#3b82f6' },
-              { id: 2, name: 'Player 2', score: 0, color: '#10b981' }
-            ],
+            players,
             currentPlayer: parsed.currentPlayer || 1,
             selectedCards: [], // Reset selected cards on reload
             gameStatus: parsed.gameStatus || 'setup',
@@ -111,7 +125,8 @@ export const useMemoryGame = () => {
           isMatched: card.isMatched,
           matchedByPlayerId: card.matchedByPlayerId
           // Exclude isFlyingToPlayer and flyingToPlayerId as they're transient
-        }))
+        })),
+        players: sortPlayersByID(gameState.players) // Ensure players are sorted before saving
       };
       sessionStorage.setItem('gameState', JSON.stringify(stateToSave));
     } else {
@@ -186,12 +201,13 @@ export const useMemoryGame = () => {
   const startGame = useCallback((player1Name: string, player2Name: string, firstPlayer: number) => {
     const savedPlayer1Color = localStorage.getItem('player1Color') || '#3b82f6';
     const savedPlayer2Color = localStorage.getItem('player2Color') || '#10b981';
+    const players = sortPlayersByID([
+      { id: 1, name: player1Name, score: 0, color: savedPlayer1Color },
+      { id: 2, name: player2Name, score: 0, color: savedPlayer2Color }
+    ]);
     setGameState({
       cards: [],
-      players: [
-        { id: 1, name: player1Name, score: 0, color: savedPlayer1Color },
-        { id: 2, name: player2Name, score: 0, color: savedPlayer2Color }
-      ],
+      players,
       currentPlayer: firstPlayer,
       selectedCards: [],
       gameStatus: 'setup',
@@ -258,9 +274,9 @@ export const useMemoryGame = () => {
     
     setGameState(prev => ({
       ...prev,
-      players: prev.players.map(player =>
+      players: sortPlayersByID(prev.players.map(player =>
         player.id === playerId ? { ...player, name: newName.trim() } : player
-      )
+      ))
     }));
   }, []);
 
@@ -270,9 +286,9 @@ export const useMemoryGame = () => {
     
     setGameState(prev => ({
       ...prev,
-      players: prev.players.map(player =>
+      players: sortPlayersByID(prev.players.map(player =>
         player.id === playerId ? { ...player, color: newColor } : player
-      )
+      ))
     }));
   }, []);
 
@@ -295,18 +311,23 @@ export const useMemoryGame = () => {
     
     // Reset clears cards and goes back to setup mode
     // The actual reset flow will be handled by App.tsx
-    setGameState(prev => ({
-      ...prev,
-      cards: [],
-      players: [
-        { id: 1, name: prev.players[0]?.name || 'Player 1', score: 0, color: prev.players[0]?.color || '#3b82f6' },
-        { id: 2, name: prev.players[1]?.name || 'Player 2', score: 0, color: prev.players[1]?.color || '#10b981' }
-      ],
-      selectedCards: [],
-      gameStatus: 'setup',
-      winner: null,
-      isTie: false
-    }));
+    setGameState(prev => {
+      const player1 = getPlayerById(prev.players, 1);
+      const player2 = getPlayerById(prev.players, 2);
+      const players = sortPlayersByID([
+        { id: 1, name: player1?.name || 'Player 1', score: 0, color: player1?.color || '#3b82f6' },
+        { id: 2, name: player2?.name || 'Player 2', score: 0, color: player2?.color || '#10b981' }
+      ]);
+      return {
+        ...prev,
+        cards: [],
+        players,
+        selectedCards: [],
+        gameStatus: 'setup',
+        winner: null,
+        isTie: false
+      };
+    });
   }, [cancelTTS]);
 
   const checkForMatch = useCallback((selectedIds: string[]) => {
@@ -383,11 +404,11 @@ export const useMemoryGame = () => {
         }));
         
         // Increment current player's score
-        newPlayers = prev.players.map(p =>
+        newPlayers = sortPlayersByID(prev.players.map(p =>
           p.id === prev.currentPlayer
             ? { ...p, score: p.score + 1 }
             : p
-        );
+        ));
         
         // Capture the player ID who matched these cards
         const matchedByPlayerId = prev.currentPlayer;
@@ -839,10 +860,10 @@ export const useMemoryGame = () => {
       const player1Matches = pairs.filter((_, index) => index % 2 === 0).length;
       const player2Matches = pairs.filter((_, index) => index % 2 === 1).length;
       
-      const newPlayers = prev.players.map(player => ({
+      const newPlayers = sortPlayersByID(prev.players.map(player => ({
         ...player,
         score: player.id === 1 ? player1Matches : player2Matches
-      }));
+      })));
       
       return {
         ...prev,

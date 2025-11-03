@@ -14,13 +14,15 @@ interface GameStartModalProps {
 export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNameChange, onPlayerColorChange, onBack, isResetting = false }: GameStartModalProps) => {
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2>(currentPlayer as 1 | 2);
   const [editingPlayer, setEditingPlayer] = useState<1 | 2 | null>(null);
+  const player1 = players.find(p => p.id === 1);
+  const player2 = players.find(p => p.id === 2);
   const [tempNames, setTempNames] = useState({
-    1: players[0]?.name || 'Player 1',
-    2: players[1]?.name || 'Player 2'
+    1: player1?.name || 'Player 1',
+    2: player2?.name || 'Player 2'
   });
   const [tempColors, setTempColors] = useState({
-    1: players[0]?.color || '#3b82f6',
-    2: players[1]?.color || '#10b981'
+    1: player1?.color || '#3b82f6',
+    2: player2?.color || '#10b981'
   });
 
   // Predefined color options
@@ -38,18 +40,20 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
   ];
 
   const handleStart = () => {
+    const currentPlayer1 = players.find(p => p.id === 1);
+    const currentPlayer2 = players.find(p => p.id === 2);
     // Apply any name changes before starting
-    if (tempNames[1] !== players[0]?.name && onPlayerNameChange) {
+    if (tempNames[1] !== currentPlayer1?.name && onPlayerNameChange) {
       onPlayerNameChange(1, tempNames[1]);
     }
-    if (tempNames[2] !== players[1]?.name && onPlayerNameChange) {
+    if (tempNames[2] !== currentPlayer2?.name && onPlayerNameChange) {
       onPlayerNameChange(2, tempNames[2]);
     }
     // Apply any color changes before starting
-    if (tempColors[1] !== players[0]?.color && onPlayerColorChange) {
+    if (tempColors[1] !== currentPlayer1?.color && onPlayerColorChange) {
       onPlayerColorChange(1, tempColors[1]);
     }
-    if (tempColors[2] !== players[1]?.color && onPlayerColorChange) {
+    if (tempColors[2] !== currentPlayer2?.color && onPlayerColorChange) {
       onPlayerColorChange(2, tempColors[2]);
     }
     onStartGame(selectedPlayer);
@@ -85,9 +89,12 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
 
   const handleNameCancel = () => {
     if (editingPlayer) {
+      const currentPlayer = editingPlayer === 1 
+        ? players.find(p => p.id === 1)?.name || 'Player 1'
+        : players.find(p => p.id === 2)?.name || 'Player 2';
       setTempNames(prev => ({
         ...prev,
-        [editingPlayer]: editingPlayer === 1 ? players[0]?.name || 'Player 1' : players[1]?.name || 'Player 2'
+        [editingPlayer]: currentPlayer
       }));
       setEditingPlayer(null);
     }
