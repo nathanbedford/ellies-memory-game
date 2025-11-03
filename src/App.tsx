@@ -326,7 +326,9 @@ function App() {
 
 
   const currentBackground = getCurrentBackground();
-  const backgroundStyle = currentBackground.imageUrl
+  // Only show custom background when playing the game (when cards exist)
+  const shouldShowCustomBackground = gameState.cards.length > 0;
+  const backgroundStyle = shouldShowCustomBackground && currentBackground.imageUrl
     ? {
         backgroundImage: `url(${currentBackground.imageUrl})`,
         backgroundSize: 'cover',
@@ -334,9 +336,11 @@ function App() {
         backgroundRepeat: 'no-repeat'
       }
     : {};
-  const backgroundClass = currentBackground.imageUrl
+  const backgroundClass = shouldShowCustomBackground && currentBackground.imageUrl
     ? 'min-h-screen'
-    : `min-h-screen bg-gradient-to-br ${currentBackground.gradient || ''}`;
+    : shouldShowCustomBackground && currentBackground.gradient
+    ? `min-h-screen bg-gradient-to-br ${currentBackground.gradient}`
+    : 'min-h-screen bg-rainbow-gradient'; // Rainbow gradient for welcome screen
 
   return (
     <div className={`${backgroundClass} ${gameState.gameStatus === 'playing' ? 'pt-4' : 'py-8'}`} style={backgroundStyle}>

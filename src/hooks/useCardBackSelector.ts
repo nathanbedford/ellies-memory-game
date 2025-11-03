@@ -12,6 +12,11 @@ export interface CardBackOption {
 
 export const CARD_BACK_OPTIONS: CardBackOption[] = [
   {
+    id: 'image',
+    name: 'Matchimus',
+    imageUrl: '/matchy-min.png'
+  },
+  {
     id: 'default',
     name: 'Default Purple',
     gradient: 'from-indigo-500 to-purple-600',
@@ -22,11 +27,6 @@ export const CARD_BACK_OPTIONS: CardBackOption[] = [
     name: 'Question Mark',
     emoji: '❓',
     gradient: 'from-indigo-500 to-purple-600'
-  },
-  {
-    id: 'image',
-    name: 'Matchimus',
-    imageUrl: '/matchy-min.png'
   }
 ];
 

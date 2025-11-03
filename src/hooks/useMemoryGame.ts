@@ -352,7 +352,7 @@ export const useMemoryGame = () => {
             matchedByPlayerId,
             timestamp: new Date().toISOString()
           }));
-          
+
           setGameState(prevState => {
             const beforeMatch = prevState.cards.filter(c => c.isMatched).length;
             const updatedCards = prevState.cards.map(c =>
@@ -361,41 +361,45 @@ export const useMemoryGame = () => {
                 : c
             );
             const afterMatch = updatedCards.filter(c => c.isMatched).length;
-            
+
             console.log('[MATCH CHECK] Cards marked as matched', JSON.stringify({
               beforeMatchCount: beforeMatch,
               afterMatchCount: afterMatch,
               matchedCardIds: updatedCards.filter(c => c.isMatched).map(c => c.id)
             }));
-            
+
+            const filteredSelectedCards = prevState.selectedCards.filter(
+              id => id !== firstId && id !== secondId
+            );
+
             // Check if game is finished after cards are marked as matched
             const allMatched = updatedCards.every(c => c.isMatched);
             if (allMatched) {
               // Find the player with the highest score
-              const winner = prevState.players.reduce((prevPlayer, currentPlayer) => 
+              const winner = prevState.players.reduce((prevPlayer, currentPlayer) =>
                 currentPlayer.score > prevPlayer.score ? currentPlayer : prevPlayer
               );
-              
+
               // Check if it's a tie
               const isTie = prevState.players.every(player => player.score === winner.score);
-              
+
               return {
                 ...prevState,
                 cards: updatedCards,
-                selectedCards: [],
+                selectedCards: filteredSelectedCards,
                 gameStatus: 'finished' as const,
                 winner: isTie ? null : winner,
                 isTie
               };
             }
-            
+
             return {
               ...prevState,
               cards: updatedCards,
-              selectedCards: []
+              selectedCards: filteredSelectedCards
             };
           });
-        }, 1000); // Match animation duration (increased to match CSS animation)
+        }, 1000); // Match animation duration (matches CSS animation length)
       } else {
         // Flip cards back and switch player
         console.log('[MATCH CHECK] ✗ NO MATCH - Flipping cards back', JSON.stringify({
@@ -638,11 +642,10 @@ export const useMemoryGame = () => {
       // Check if any cards are currently flying to a player
       const flyingCards = prev.cards.filter(c => c.isFlyingToPlayer);
       if (flyingCards.length > 0) {
-        console.log('[FLIP CARD] Cards are currently flying to player, ignoring', JSON.stringify({
+        console.log('[FLIP CARD] Cards are currently flying to player, proceeding with new selection', JSON.stringify({
           flyingCardsCount: flyingCards.length,
           flyingCardIds: flyingCards.map(c => c.id)
         }));
-        return prev;
       }
       
       // Additional guard: prevent flipping if we have 2 selected cards and match check might be pending
@@ -773,8 +776,8 @@ export const useMemoryGame = () => {
       });
       
       // Calculate new scores (count pairs, not individual cards)
-      const player1Matches = pairs.filter((pair, index) => index % 2 === 0).length;
-      const player2Matches = pairs.filter((pair, index) => index % 2 === 1).length;
+      const player1Matches = pairs.filter((_, index) => index % 2 === 0).length;
+      const player2Matches = pairs.filter((_, index) => index % 2 === 1).length;
       
       const newPlayers = prev.players.map(player => ({
         ...player,

@@ -72,3 +72,24 @@
   z-index: 10;
   overflow: visible !important;
 }
+
+.text-white-glow {
+  text-shadow: 
+    0 0 10px rgba(255, 255, 255, 0.8),
+    0 0 20px rgba(255, 255, 255, 0.6),
+    0 0 30px rgba(255, 255, 255, 0.4),
+    0 0 40px rgba(255, 255, 255, 0.3);
+}
+
+.bg-rainbow-gradient {
+  background: linear-gradient(to bottom right, 
+    #f8b4d9 0%,      /* soft pink */
+    #ffc8dd 15%,     /* light pink */
+    #ffafcc 30%,     /* pink */
+    #e0b1cb 45%,     /* lavender pink */
+    #b8a9c9 60%,     /* soft purple */
+    #a8c4f0 75%,     /* light blue */
+    #c8d5f0 90%,     /* pale blue */
+    #dbeafe 100%     /* sky blue */
+  );
+}
