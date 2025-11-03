@@ -8,9 +8,10 @@ interface GameOverProps {
   isTie: boolean;
   onPlayAgain: () => void;
   onExploreCards: () => void;
+  onClose: () => void;
 }
 
-export const GameOver = ({ winner, players, isTie, onPlayAgain, onExploreCards }: GameOverProps) => {
+export const GameOver = ({ winner, players, isTie, onPlayAgain, onExploreCards, onClose }: GameOverProps) => {
   useEffect(() => {
     // Full-screen confetti celebration
     const duration = 3000;
@@ -48,7 +49,21 @@ export const GameOver = ({ winner, players, isTie, onPlayAgain, onExploreCards }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4 transform scale-100 transition-transform">
+      <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4 transform scale-100 transition-transform relative">
+        {/* Close button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors z-10"
+          type="button"
+          title="Close"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         <div className="text-center">
           <div className="text-6xl mb-4">🎉</div>
           <h2 className="text-3xl font-bold text-gray-800 mb-2">Game Over!</h2>

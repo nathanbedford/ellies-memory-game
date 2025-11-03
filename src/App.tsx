@@ -618,6 +618,11 @@ function App() {
             isTie={gameState.isTie}
             onPlayAgain={handleResetClick}
             onExploreCards={() => setShowCardExplorer(true)}
+            onClose={() => {
+              resetGame();
+              setSetupStep(null);
+              sessionStorage.removeItem('setupStep');
+            }}
           />
         )}
 
