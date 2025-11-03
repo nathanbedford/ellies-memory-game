@@ -32,8 +32,18 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
     return deck.cards.filter(card => previewIds.includes(card.id)).slice(0, 4);
   };
 
+  // Get preview images for emotions-real deck
+  const getEmotionsRealPreview = () => {
+    const deck = CARD_DECKS.find(d => d.id === 'emotions-real');
+    if (!deck) return [];
+    // Pick 4 images for preview: happy, sad, angry, excited
+    const previewIds = ['happy', 'sad', 'angry', 'excited'];
+    return deck.cards.filter(card => previewIds.includes(card.id)).slice(0, 4);
+  };
+
   const animalsRealPreview = getAnimalsRealPreview();
   const oceanRealPreview = getOceanRealPreview();
+  const emotionsRealPreview = getEmotionsRealPreview();
 
   return (
     <div className="grid grid-cols-2 gap-6">
@@ -80,6 +90,22 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
                 ))}
               </div>
             </div>
+          ) : pack.id === 'emotions-real' ? (
+            <div className="mb-4">
+              <div className="w-full h-40 rounded-lg bg-gradient-to-br from-pink-400 to-purple-600 grid grid-cols-2 grid-rows-2 gap-1 p-1">
+                {emotionsRealPreview.map((card) => (
+                  card.imageUrl && (
+                    <div key={card.id} className="w-full h-full flex items-center justify-center bg-white bg-opacity-20 rounded overflow-hidden">
+                      <img
+                        src={card.imageUrl}
+                        alt={card.id}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
           ) : (
             <div className="mb-4">
               <div className={`w-full h-32 rounded-lg bg-gradient-to-br ${
@@ -87,6 +113,8 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
                 pack.id === 'plants' ? 'from-green-400 to-green-700' :
                 pack.id === 'buildings' ? 'from-gray-500 to-gray-700' :
                 pack.id === 'ocean' ? 'from-blue-400 to-cyan-600' :
+                pack.id === 'colors' ? 'from-purple-400 to-purple-700' :
+                pack.id === 'construction' ? 'from-gray-600 to-gray-800' :
                 'from-purple-400 to-purple-700'
               } flex items-center justify-center`}>
                 <span className="text-6xl">{pack.emoji}</span>

@@ -69,22 +69,9 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
                       backgroundSize: 'cover',
                       backgroundPosition: 'center'
                     }}
-                  >
-                    <div className="w-full h-full rounded-lg flex items-center justify-center bg-black bg-opacity-20">
-                      <div className="w-16 h-16 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
-                        <div className="w-8 h-8 bg-white bg-opacity-50 rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
+                  />
                 ) : (
-                  <div className={`w-24 h-24 rounded-lg bg-gradient-to-br ${option.gradient} shadow-inner`}>
-                    {/* Add some visual elements to show the gradient */}
-                    <div className="w-full h-full rounded-lg flex items-center justify-center">
-                      <div className="w-16 h-16 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
-                        <div className="w-8 h-8 bg-white bg-opacity-50 rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
+                  <div className={`w-24 h-24 rounded-lg bg-gradient-to-br ${option.gradient} shadow-inner`} />
                 )}
               </div>
               

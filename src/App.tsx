@@ -13,6 +13,7 @@ import { GameStartModal } from './components/GameStartModal';
 import { ResetConfirmationModal } from './components/ResetConfirmationModal';
 import { SettingsMenu } from './components/SettingsMenu';
 import { PlayerMatchesModal } from './components/PlayerMatchesModal';
+import { CardExplorerModal } from './components/CardExplorerModal';
 import { Pong } from './components/Pong';
 import screenfull from 'screenfull';
 
@@ -20,7 +21,7 @@ type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards } = useMemoryGame();
+  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, flipAllExceptLastPair } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -44,9 +45,14 @@ function App() {
   const [showPong, setShowPong] = useState(false);
   const comboSequenceRef = useRef<string[]>([]);
   const comboTimeoutRef = useRef<number | null>(null);
+  const testComboSequenceRef = useRef<string[]>([]);
+  const testComboTimeoutRef = useRef<number | null>(null);
+  const [showCardExplorer, setShowCardExplorer] = useState(false);
   
   // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
   const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
+  // Test combo: 1, 2, 2, 5, 1, 2, 2, 5 (to advance game to end state)
+  const TEST_COMBO_SEQUENCE = ['1', '2', '2', '5', '1', '2', '2', '5'];
 
   // Detect turn switches and trigger glow effect
   useEffect(() => {
@@ -241,6 +247,7 @@ function App() {
 
       const key = e.key.toLowerCase();
       
+      // Handle Pong combo
       // Clear timeout if exists
       if (comboTimeoutRef.current) {
         clearTimeout(comboTimeoutRef.current);
@@ -270,6 +277,38 @@ function App() {
       comboTimeoutRef.current = window.setTimeout(() => {
         comboSequenceRef.current = [];
       }, 2000);
+
+      // Handle test combo (1, 2, 2, 5, 1, 2, 2, 5)
+      // Clear timeout if exists
+      if (testComboTimeoutRef.current) {
+        clearTimeout(testComboTimeoutRef.current);
+      }
+
+      // Add key to test sequence (use exact key, not lowercase)
+      const testKey = e.key;
+      testComboSequenceRef.current.push(testKey);
+      
+      // Keep only last 8 keys
+      if (testComboSequenceRef.current.length > TEST_COMBO_SEQUENCE.length) {
+        testComboSequenceRef.current.shift();
+      }
+
+      // Check if test sequence matches
+      if (testComboSequenceRef.current.length === TEST_COMBO_SEQUENCE.length) {
+        const matches = testComboSequenceRef.current.every(
+          (k, i) => k === TEST_COMBO_SEQUENCE[i]
+        );
+        
+        if (matches) {
+          flipAllExceptLastPair();
+          testComboSequenceRef.current = [];
+        }
+      }
+
+      // Reset test sequence after 5 seconds of no keypress
+      testComboTimeoutRef.current = window.setTimeout(() => {
+        testComboSequenceRef.current = [];
+      }, 5000);
     };
 
     window.addEventListener('keydown', handleKeyPress);
@@ -279,8 +318,11 @@ function App() {
       if (comboTimeoutRef.current) {
         clearTimeout(comboTimeoutRef.current);
       }
+      if (testComboTimeoutRef.current) {
+        clearTimeout(testComboTimeoutRef.current);
+      }
     };
-  }, []);
+  }, [flipAllExceptLastPair]);
 
 
   const currentBackground = getCurrentBackground();
@@ -541,7 +583,8 @@ function App() {
             winner={gameState.winner} 
             players={gameState.players}
             isTie={gameState.isTie}
-            onPlayAgain={handleResetClick} 
+            onPlayAgain={handleResetClick}
+            onExploreCards={() => setShowCardExplorer(true)}
           />
         )}
 
@@ -638,6 +681,17 @@ function App() {
 
         {/* Hidden Pong Game */}
         <Pong isOpen={showPong} onClose={() => setShowPong(false)} />
+
+        {/* Card Explorer Modal */}
+        <CardExplorerModal
+          isOpen={showCardExplorer}
+          onClose={() => setShowCardExplorer(false)}
+          cards={gameState.cards}
+          cardSize={cardSize}
+          useWhiteCardBackground={useWhiteCardBackground}
+          emojiSizePercentage={emojiSizePercentage}
+          cardBack={getCurrentCardBack()}
+        />
       </div>
     </div>
   );

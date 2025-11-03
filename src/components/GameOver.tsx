@@ -7,9 +7,10 @@ interface GameOverProps {
   players: Player[];
   isTie: boolean;
   onPlayAgain: () => void;
+  onExploreCards: () => void;
 }
 
-export const GameOver = ({ winner, players, isTie, onPlayAgain }: GameOverProps) => {
+export const GameOver = ({ winner, players, isTie, onPlayAgain, onExploreCards }: GameOverProps) => {
   useEffect(() => {
     // Full-screen confetti celebration
     const duration = 3000;
@@ -65,12 +66,20 @@ export const GameOver = ({ winner, players, isTie, onPlayAgain }: GameOverProps)
               {winner?.name} wins with {winner?.score} pairs!
             </p>
           )}
-          <button
-            onClick={onPlayAgain}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
-          >
-            Play Again
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={onPlayAgain}
+              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
+            >
+              Play Again
+            </button>
+            <button
+              onClick={onExploreCards}
+              className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
+            >
+              Explore All Cards
+            </button>
+          </div>
         </div>
       </div>
     </div>

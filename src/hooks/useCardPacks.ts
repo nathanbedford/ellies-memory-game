@@ -22,7 +22,7 @@ export const useCardPacks = () => {
     }));
   }, [selectedPack]);
 
-  // Preload images when animals-real or ocean-real deck is selected
+  // Preload images when animals-real, ocean-real, or emotions-real deck is selected
   useEffect(() => {
     if (selectedPack === 'animals-real') {
       const deck = CARD_DECKS.find(d => d.id === 'animals-real');
@@ -36,6 +36,16 @@ export const useCardPacks = () => {
       }
     } else if (selectedPack === 'ocean-real') {
       const deck = CARD_DECKS.find(d => d.id === 'ocean-real');
+      if (deck) {
+        deck.cards.forEach((card) => {
+          if (card.imageUrl) {
+            const img = new Image();
+            img.src = card.imageUrl;
+          }
+        });
+      }
+    } else if (selectedPack === 'emotions-real') {
+      const deck = CARD_DECKS.find(d => d.id === 'emotions-real');
       if (deck) {
         deck.cards.forEach((card) => {
           if (card.imageUrl) {

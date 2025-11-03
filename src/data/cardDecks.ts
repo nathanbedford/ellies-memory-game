@@ -11,6 +11,11 @@ const getOceanImageUrl = (oceanId: string): string => {
   return `/deck-images/ocean-animals/${oceanId}.jpg`;
 };
 
+// Helper function to get image URL for emotions-real deck
+const getEmotionImageUrl = (emotionId: string): string => {
+  return `/deck-images/emotions/${emotionId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -919,6 +924,133 @@ export const CARD_DECKS: CardDeck[] = [
         id: 'gear', 
         emoji: '⚙️',
         gradient: 'from-gray-500 to-gray-700'
+      }
+    ]
+  },
+  {
+    id: 'emotions-real',
+    name: 'Emotions',
+    emoji: '😊',
+    cards: [
+      { 
+        id: 'happy', 
+        emoji: '😊',
+        gradient: 'from-yellow-300 to-yellow-500',
+        imageUrl: getEmotionImageUrl('happy')
+      },
+      { 
+        id: 'sad', 
+        emoji: '😢',
+        gradient: 'from-blue-400 to-blue-600',
+        imageUrl: getEmotionImageUrl('sad')
+      },
+      { 
+        id: 'angry', 
+        emoji: '😠',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getEmotionImageUrl('angry')
+      },
+      { 
+        id: 'brave', 
+        emoji: '😤',
+        gradient: 'from-orange-400 to-orange-600',
+        imageUrl: getEmotionImageUrl('brave')
+      },
+      { 
+        id: 'curious', 
+        emoji: '🤔',
+        gradient: 'from-indigo-400 to-indigo-600',
+        imageUrl: getEmotionImageUrl('curious')
+      },
+      { 
+        id: 'excited', 
+        emoji: '🤩',
+        gradient: 'from-yellow-400 to-orange-500',
+        imageUrl: getEmotionImageUrl('excited')
+      },
+      { 
+        id: 'scared', 
+        emoji: '😨',
+        gradient: 'from-purple-400 to-purple-600',
+        imageUrl: getEmotionImageUrl('scared')
+      },
+      { 
+        id: 'surprised', 
+        emoji: '😲',
+        gradient: 'from-yellow-400 to-yellow-600',
+        imageUrl: getEmotionImageUrl('surprised')
+      },
+      { 
+        id: 'silly', 
+        emoji: '🤪',
+        gradient: 'from-pink-300 to-pink-500',
+        imageUrl: getEmotionImageUrl('silly')
+      },
+      { 
+        id: 'tired', 
+        emoji: '😴',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getEmotionImageUrl('tired')
+      },
+      { 
+        id: 'loving', 
+        emoji: '🥰',
+        gradient: 'from-pink-400 to-red-500',
+        imageUrl: getEmotionImageUrl('loving')
+      },
+      { 
+        id: 'very-happy', 
+        emoji: '😄',
+        gradient: 'from-yellow-300 to-yellow-500',
+        imageUrl: getEmotionImageUrl('very-happy')
+      },
+      { 
+        id: 'very-sad', 
+        emoji: '😭',
+        gradient: 'from-blue-400 to-blue-600',
+        imageUrl: getEmotionImageUrl('very-sad')
+      },
+      { 
+        id: 'very-angry', 
+        emoji: '😡',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getEmotionImageUrl('very-angry')
+      },
+      { 
+        id: 'very-excited', 
+        emoji: '🤗',
+        gradient: 'from-yellow-400 to-orange-500',
+        imageUrl: getEmotionImageUrl('very-excited')
+      },
+      { 
+        id: 'very-scared', 
+        emoji: '😱',
+        gradient: 'from-purple-400 to-purple-600',
+        imageUrl: getEmotionImageUrl('very-scared')
+      },
+      { 
+        id: 'very-surprised', 
+        emoji: '😱',
+        gradient: 'from-yellow-400 to-yellow-600',
+        imageUrl: getEmotionImageUrl('very-surprised')
+      },
+      { 
+        id: 'very-silly', 
+        emoji: '🤣',
+        gradient: 'from-pink-300 to-pink-500',
+        imageUrl: getEmotionImageUrl('very-silly')
+      },
+      { 
+        id: 'very-tired', 
+        emoji: '😴',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getEmotionImageUrl('very-tired')
+      },
+      { 
+        id: 'very-loving', 
+        emoji: '😍',
+        gradient: 'from-pink-400 to-red-500',
+        imageUrl: getEmotionImageUrl('very-loving')
       }
     ]
   }

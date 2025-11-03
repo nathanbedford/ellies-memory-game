@@ -704,6 +704,92 @@ export const useMemoryGame = () => {
     });
   }, [checkForMatch, flipDuration]);
 
+  // Test function: Advance game to end state - flip all cards except last pair, mark them as matched, and distribute evenly between players
+  const flipAllExceptLastPair = useCallback(() => {
+    setGameState(prev => {
+      if (prev.cards.length === 0) return prev;
+      
+      // Find the last pair (cards with the same imageId that appear last)
+      const lastPairImageId = prev.cards[prev.cards.length - 1]?.imageId;
+      if (!lastPairImageId) return prev;
+      
+      // Get all cards that should be matched (all except the last pair)
+      const cardsToMatch: Card[] = [];
+      
+      prev.cards.forEach(card => {
+        if (card.imageId !== lastPairImageId && !card.isMatched) {
+          cardsToMatch.push(card);
+        }
+      });
+      
+      // Group cards by imageId to get pairs
+      const cardPairs: { [imageId: string]: Card[] } = {};
+      cardsToMatch.forEach(card => {
+        if (!cardPairs[card.imageId]) {
+          cardPairs[card.imageId] = [];
+        }
+        cardPairs[card.imageId].push(card);
+      });
+      
+      // Get complete pairs only (should be exactly 2 cards each)
+      const pairs = Object.values(cardPairs).filter(pair => pair.length === 2);
+      
+      // Create a map of card ID to assigned player ID
+      const cardToPlayerMap = new Map<string, number>();
+      
+      // Distribute pairs evenly between players
+      pairs.forEach((pair, index) => {
+        const assignedPlayer = (index % 2 === 0) ? 1 : 2;
+        // Assign both cards in the pair to the same player
+        pair.forEach(card => {
+          cardToPlayerMap.set(card.id, assignedPlayer);
+        });
+      });
+      
+      // Update cards
+      const newCards = prev.cards.map(card => {
+        // Keep the last pair unflipped and unmatched
+        if (card.imageId === lastPairImageId) {
+          return { ...card, isFlipped: false, isMatched: false };
+        }
+        
+        // If already matched, keep as is
+        if (card.isMatched) {
+          return card;
+        }
+        
+        // Check if this card should be matched
+        const matchedByPlayerId = cardToPlayerMap.get(card.id);
+        if (matchedByPlayerId !== undefined) {
+          return {
+            ...card,
+            isFlipped: true,
+            isMatched: true,
+            matchedByPlayerId
+          };
+        }
+        
+        return card;
+      });
+      
+      // Calculate new scores (count pairs, not individual cards)
+      const player1Matches = pairs.filter((pair, index) => index % 2 === 0).length;
+      const player2Matches = pairs.filter((pair, index) => index % 2 === 1).length;
+      
+      const newPlayers = prev.players.map(player => ({
+        ...player,
+        score: player.id === 1 ? player1Matches : player2Matches
+      }));
+      
+      return {
+        ...prev,
+        cards: newCards,
+        players: newPlayers,
+        selectedCards: []
+      };
+    });
+  }, []);
+
   return {
     gameState,
     showStartModal,
@@ -730,6 +816,7 @@ export const useMemoryGame = () => {
     flipCard,
     endTurn,
     resetGame,
-    isAnimatingCards
+    isAnimatingCards,
+    flipAllExceptLastPair
   };
 };

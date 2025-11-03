@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Card, Player } from '../types';
+import { Card } from '../types';
 import { Card as CardComponent } from './Card';
 import type { CardBackOption } from '../hooks/useCardBackSelector';
 import { CardLightbox } from './CardLightbox';
 
-interface PlayerMatchesModalProps {
+interface CardExplorerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  player: Player;
   cards: Card[];
   cardSize?: number;
   useWhiteCardBackground?: boolean;
@@ -15,35 +14,27 @@ interface PlayerMatchesModalProps {
   cardBack?: CardBackOption;
 }
 
-export const PlayerMatchesModal = ({
+export const CardExplorerModal = ({
   isOpen,
   onClose,
-  player,
   cards,
   cardSize = 100,
   useWhiteCardBackground = false,
   emojiSizePercentage = 72,
   cardBack
-}: PlayerMatchesModalProps) => {
+}: CardExplorerModalProps) => {
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
 
   if (!isOpen) return null;
 
-  // Get all cards matched by this player, grouped by imageId (pairs)
-  const matchedCards = cards.filter(c => c.isMatched && c.matchedByPlayerId === player.id);
-  
-  // Group cards by imageId to show pairs
-  const cardPairs: { [imageId: string]: Card[] } = {};
-  matchedCards.forEach(card => {
-    if (!cardPairs[card.imageId]) {
-      cardPairs[card.imageId] = [];
+  // Get unique cards (one per imageId)
+  const uniqueCardsMap = new Map<string, Card>();
+  cards.forEach(card => {
+    if (!uniqueCardsMap.has(card.imageId)) {
+      uniqueCardsMap.set(card.imageId, card);
     }
-    cardPairs[card.imageId].push(card);
   });
-
-  const pairs = Object.values(cardPairs);
-  // Get unique cards (one per pair) for navigation
-  const uniqueCards = pairs.map(pair => pair[0]);
+  const uniqueCards = Array.from(uniqueCardsMap.values());
 
   const handleCardClick = (index: number) => {
     setSelectedCardIndex(index);
@@ -74,8 +65,8 @@ export const PlayerMatchesModal = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">{player.name}'s Matches</h2>
-              <p className="text-sm text-gray-500 mt-1">{pairs.length} pair{pairs.length !== 1 ? 's' : ''} matched</p>
+              <h2 className="text-2xl font-bold text-gray-800">Explore All Cards</h2>
+              <p className="text-sm text-gray-500 mt-1">{uniqueCards.length} card{uniqueCards.length !== 1 ? 's' : ''} in deck</p>
             </div>
             <button
               onClick={(e) => {
@@ -94,18 +85,17 @@ export const PlayerMatchesModal = ({
           
           {/* Content */}
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-            {pairs.length === 0 ? (
+            {uniqueCards.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No matches yet!</p>
+                <p className="text-gray-500 text-lg">No cards available!</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                {pairs.map((pair, index) => (
+                {uniqueCards.map((card, index) => (
                   <div 
-                    key={index} 
+                    key={card.id} 
                     className="flex flex-col items-center gap-2"
                   >
-                    {/* Show only one card per match pair */}
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
@@ -115,7 +105,7 @@ export const PlayerMatchesModal = ({
                       title="Click to view card details"
                     >
                       <CardComponent
-                        card={pair[0]}
+                        card={card}
                         onClick={() => {}}
                         size={cardSize}
                         useWhiteBackground={useWhiteCardBackground}
