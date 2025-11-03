@@ -13,6 +13,7 @@ import { GameStartModal } from './components/GameStartModal';
 import { ResetConfirmationModal } from './components/ResetConfirmationModal';
 import { SettingsMenu } from './components/SettingsMenu';
 import { PlayerMatchesModal } from './components/PlayerMatchesModal';
+import { Pong } from './components/Pong';
 import screenfull from 'screenfull';
 
 type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
@@ -40,6 +41,12 @@ function App() {
   const [selectedPlayerForMatches, setSelectedPlayerForMatches] = useState<number | null>(null);
   const [glowingPlayer, setGlowingPlayer] = useState<number | null>(null);
   const prevCurrentPlayerRef = useRef<number | null>(null);
+  const [showPong, setShowPong] = useState(false);
+  const comboSequenceRef = useRef<string[]>([]);
+  const comboTimeoutRef = useRef<number | null>(null);
+  
+  // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
+  const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
 
   // Detect turn switches and trigger glow effect
   useEffect(() => {
@@ -223,6 +230,57 @@ function App() {
       document.body.style.overflow = 'unset';
     };
   }, [isAnimatingCards]);
+
+  // Keyboard combo detection for Pong
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Don't trigger if typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      
+      // Clear timeout if exists
+      if (comboTimeoutRef.current) {
+        clearTimeout(comboTimeoutRef.current);
+      }
+
+      // Add key to sequence
+      comboSequenceRef.current.push(key);
+      
+      // Keep only last 5 keys
+      if (comboSequenceRef.current.length > COMBO_SEQUENCE.length) {
+        comboSequenceRef.current.shift();
+      }
+
+      // Check if sequence matches
+      if (comboSequenceRef.current.length === COMBO_SEQUENCE.length) {
+        const matches = comboSequenceRef.current.every(
+          (k, i) => k === COMBO_SEQUENCE[i]
+        );
+        
+        if (matches) {
+          setShowPong(true);
+          comboSequenceRef.current = [];
+        }
+      }
+
+      // Reset sequence after 2 seconds of no keypress
+      comboTimeoutRef.current = window.setTimeout(() => {
+        comboSequenceRef.current = [];
+      }, 2000);
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      if (comboTimeoutRef.current) {
+        clearTimeout(comboTimeoutRef.current);
+      }
+    };
+  }, []);
 
 
   const currentBackground = getCurrentBackground();
@@ -577,6 +635,9 @@ function App() {
             cardBack={getCurrentCardBack()}
           />
         )}
+
+        {/* Hidden Pong Game */}
+        <Pong isOpen={showPong} onClose={() => setShowPong(false)} />
       </div>
     </div>
   );
