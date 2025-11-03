@@ -522,7 +522,13 @@ function App() {
               })()}
               >
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl text-gray-600 font-medium">{gameState.players.find(p => p.id === 1)?.name || 'Player 1'}:</span>
+                  <button
+                    onClick={() => setSelectedPlayerForMatches(1)}
+                    className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                    title="Click to view matches"
+                  >
+                    {gameState.players.find(p => p.id === 1)?.name || 'Player 1'}:
+                  </button>
                   <button
                     onClick={() => setSelectedPlayerForMatches(1)}
                     className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
@@ -578,7 +584,13 @@ function App() {
               })()}
               >
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl text-gray-600 font-medium">{gameState.players.find(p => p.id === 2)?.name || 'Player 2'}:</span>
+                  <button
+                    onClick={() => setSelectedPlayerForMatches(2)}
+                    className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                    title="Click to view matches"
+                  >
+                    {gameState.players.find(p => p.id === 2)?.name || 'Player 2'}:
+                  </button>
                   <button
                     onClick={() => setSelectedPlayerForMatches(2)}
                     className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
