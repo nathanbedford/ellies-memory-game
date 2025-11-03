@@ -10,7 +10,7 @@ interface BackgroundModalProps {
 }
 
 export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack, isResetting = false }: BackgroundModalProps) => {
-  const [activeTab, setActiveTab] = useState<'colors' | 'photos'>('colors');
+  const [activeTab, setActiveTab] = useState<'colors' | 'pictures'>('colors');
 
   const handleSelect = (backgroundId: string) => {
     onSelect(backgroundId);
@@ -18,7 +18,7 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
   };
 
   const colorOptions = BACKGROUND_OPTIONS.filter(option => option.gradient);
-  const photoOptions = BACKGROUND_OPTIONS.filter(option => option.imageUrl);
+  const pictureOptions = BACKGROUND_OPTIONS.filter(option => option.imageUrl);
 
   return (
     <div className="space-y-6">
@@ -35,20 +35,20 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
           Colors
         </button>
         <button
-          onClick={() => setActiveTab('photos')}
+          onClick={() => setActiveTab('pictures')}
           className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
-            activeTab === 'photos'
+            activeTab === 'pictures'
               ? 'border-purple-500 text-purple-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          Photos
+          Pictures
         </button>
       </div>
 
       {/* Background Options */}
       <div className="grid grid-cols-1 gap-4">
-        {(activeTab === 'colors' ? colorOptions : photoOptions).map((option) => (
+        {(activeTab === 'colors' ? colorOptions : pictureOptions).map((option) => (
           <button
             key={option.id}
             onClick={() => handleSelect(option.id)}
@@ -86,9 +86,9 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
                   {option.id === 'sunset' && '🌅 Warm and cozy with orange and red colors'}
                   {option.id === 'forest' && '🌲 Natural and peaceful with green shades'}
                   {option.id === 'galaxy' && '🌌 Mysterious and exciting with purple and pink'}
-                  {option.id === 'photo1' && '🎨 Beautiful abstract art photo'}
-                  {option.id === 'photo2' && '🚧 Construction site photo'}
-                  {option.id === 'photo3' && '🚂 Wooden boxcar photo'}
+                  {option.id === 'photo1' && '🎨 Beautiful abstract art picture'}
+                  {option.id === 'photo2' && '🚧 Construction site picture'}
+                  {option.id === 'photo3' && '🚂 Wooden boxcar picture'}
                   {option.id === 'photo4' && '🏔️ Beautiful mountain landscape in autumn'}
                 </div>
                 {selectedBackground === option.id && (

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CardPackOption } from '../types';
 import { CARD_DECKS } from '../data/cardDecks';
 
@@ -9,10 +10,26 @@ interface CardPackModalProps {
 }
 
 export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackModalProps) => {
+  // Determine initial tab based on selected pack
+  const getInitialTab = () => {
+    const picturePackIds = ['animals-real', 'ocean-real', 'emotions-real'];
+    return picturePackIds.includes(selectedPack) ? 'pictures' : 'emoji';
+  };
+  
+  const [activeTab, setActiveTab] = useState<'emoji' | 'pictures'>(getInitialTab());
+
   const handleSelect = (packId: string) => {
     onSelect(packId);
     // Don't call onClose here - let the parent handle navigation
   };
+
+  // Separate emoji and picture packs
+  const emojiPacks = cardPacks.filter(pack => 
+    ['animals', 'plants', 'buildings', 'colors', 'ocean', 'construction'].includes(pack.id)
+  );
+  const picturePacks = cardPacks.filter(pack => 
+    ['animals-real', 'ocean-real', 'emotions-real'].includes(pack.id)
+  );
 
   // Get preview images for animals-real deck
   const getAnimalsRealPreview = () => {
@@ -45,10 +62,39 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
   const oceanRealPreview = getOceanRealPreview();
   const emotionsRealPreview = getEmotionsRealPreview();
 
+  // Determine which packs to show based on active tab
+  const displayedPacks = activeTab === 'emoji' ? emojiPacks : picturePacks;
+
   return (
-    <div className="grid grid-cols-2 gap-6">
-      {cardPacks.map((pack) => (
+    <div className="space-y-6">
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
         <button
+          onClick={() => setActiveTab('emoji')}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            activeTab === 'emoji'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Emoji
+        </button>
+        <button
+          onClick={() => setActiveTab('pictures')}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            activeTab === 'pictures'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Pictures
+        </button>
+      </div>
+
+      {/* Card Pack Options */}
+      <div className="grid grid-cols-2 gap-6">
+        {displayedPacks.map((pack) => (
+          <button
           key={pack.id}
           onClick={() => handleSelect(pack.id)}
           className={`p-8 rounded-xl border-3 transition-all duration-200 transform hover:scale-105 ${
@@ -140,8 +186,9 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
               </div>
             )}
           </div>
-        </button>
-      ))}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
