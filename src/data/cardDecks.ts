@@ -16,6 +16,11 @@ const getEmotionImageUrl = (emotionId: string): string => {
   return `/deck-images/emotions/${emotionId}.jpg`;
 };
 
+// Helper function to get image URL for insects-real deck
+const getInsectImageUrl = (insectId: string): string => {
+  return `/deck-images/insects/${insectId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1051,6 +1056,133 @@ export const CARD_DECKS: CardDeck[] = [
         emoji: '😍',
         gradient: 'from-pink-400 to-red-500',
         imageUrl: getEmotionImageUrl('very-loving')
+      }
+    ]
+  },
+  {
+    id: 'insects-real',
+    name: 'Insects',
+    emoji: '🦋',
+    cards: [
+      { 
+        id: 'ant', 
+        emoji: '🐜',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getInsectImageUrl('ant')
+      },
+      { 
+        id: 'blue-morpho-butterfly', 
+        emoji: '🦋',
+        gradient: 'from-blue-400 to-blue-600',
+        imageUrl: getInsectImageUrl('blue-morpho-butterfly')
+      },
+      { 
+        id: 'caterpillar', 
+        emoji: '🐛',
+        gradient: 'from-green-500 to-green-700',
+        imageUrl: getInsectImageUrl('caterpillar')
+      },
+      { 
+        id: 'cricket', 
+        emoji: '🦗',
+        gradient: 'from-green-600 to-green-800',
+        imageUrl: getInsectImageUrl('cricket')
+      },
+      { 
+        id: 'dragonfly', 
+        emoji: '🪰',
+        gradient: 'from-blue-500 to-cyan-600',
+        imageUrl: getInsectImageUrl('dragonfly')
+      },
+      { 
+        id: 'firefly', 
+        emoji: '✨',
+        gradient: 'from-yellow-300 to-yellow-500',
+        imageUrl: getInsectImageUrl('firefly')
+      },
+      { 
+        id: 'grasshopper', 
+        emoji: '🦗',
+        gradient: 'from-green-400 to-green-600',
+        imageUrl: getInsectImageUrl('grasshopper')
+      },
+      { 
+        id: 'honeybee', 
+        emoji: '🐝',
+        gradient: 'from-yellow-400 to-amber-600',
+        imageUrl: getInsectImageUrl('honeybee')
+      },
+      { 
+        id: 'hornet', 
+        emoji: '🐝',
+        gradient: 'from-amber-600 to-orange-700',
+        imageUrl: getInsectImageUrl('hornet')
+      },
+      { 
+        id: 'inchworm', 
+        emoji: '🐛',
+        gradient: 'from-green-400 to-green-600',
+        imageUrl: getInsectImageUrl('inchworm')
+      },
+      { 
+        id: 'lacewing', 
+        emoji: '🦋',
+        gradient: 'from-green-300 to-green-500',
+        imageUrl: getInsectImageUrl('lacewing')
+      },
+      { 
+        id: 'ladybug', 
+        emoji: '🐞',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getInsectImageUrl('ladybug')
+      },
+      { 
+        id: 'monarch-butterfly', 
+        emoji: '🦋',
+        gradient: 'from-orange-500 to-amber-600',
+        imageUrl: getInsectImageUrl('monarch-butterfly')
+      },
+      { 
+        id: 'moth', 
+        emoji: '🦋',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getInsectImageUrl('moth')
+      },
+      { 
+        id: 'praying-mantis', 
+        emoji: '🦗',
+        gradient: 'from-green-500 to-green-700',
+        imageUrl: getInsectImageUrl('praying-mantis')
+      },
+      { 
+        id: 'rhinoceros-beetle', 
+        emoji: '🪲',
+        gradient: 'from-gray-700 to-gray-900',
+        imageUrl: getInsectImageUrl('rhinoceros-beetle')
+      },
+      { 
+        id: 'roly-poly', 
+        emoji: '🪲',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getInsectImageUrl('roly-poly')
+      },
+      { 
+        id: 'stink-bug', 
+        emoji: '🪲',
+        gradient: 'from-green-600 to-green-800',
+        imageUrl: getInsectImageUrl('stink-bug')
+      },
+      { 
+        id: 'swallowtail-butterfly', 
+        emoji: '🦋',
+        gradient: 'from-yellow-400 to-black',
+        imageUrl: getInsectImageUrl('swallowtail-butterfly')
+      },
+      { 
+        id: 'walking-stick', 
+        emoji: '🪲',
+        gradient: 'from-amber-600 to-amber-800',
+        imageUrl: getInsectImageUrl('walking-stick')
       }
     ]
   }
