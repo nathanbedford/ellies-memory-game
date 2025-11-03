@@ -38,7 +38,7 @@ export const CardLightbox = ({ isOpen, onClose, card }: CardLightboxProps) => {
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black bg-opacity-90 backdrop-blur-sm transition-opacity"
@@ -59,44 +59,39 @@ export const CardLightbox = ({ isOpen, onClose, card }: CardLightboxProps) => {
 
       {/* Card Display */}
       <div 
-        className="relative max-w-[90vw] max-h-[90vh] w-full h-full flex items-center justify-center"
+        className="relative w-full h-full flex items-center justify-center p-2"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Large card display */}
+        {/* Card container with rounded corners */}
         <div 
-          className={`rounded-2xl shadow-2xl overflow-hidden ${
-            card.gradient && !isImage
-              ? `bg-gradient-to-br ${card.gradient}`
-              : 'bg-white'
-          }`}
-          style={{
-            width: 'min(80vw, 80vh)',
-            height: 'min(80vw, 80vh)',
-            maxWidth: '600px',
-            maxHeight: '600px'
-          }}
+          className="relative flex items-center justify-center w-full h-full max-w-[95vmin] max-h-[95vmin] rounded-3xl overflow-hidden shadow-2xl"
         >
-          {/* Semi-transparent overlay for gradient backgrounds */}
-          {card.gradient && !isImage && (
-            <div className="absolute inset-0 bg-white opacity-30" />
-          )}
-          
-          <div className="relative w-full h-full flex items-center justify-center p-8">
-            {isImage ? (
-              <img 
-                src={card.imageUrl} 
-                alt="" 
-                className="w-full h-full object-contain"
-              />
-            ) : (
+          {isImage ? (
+            <img 
+              src={card.imageUrl} 
+              alt="" 
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <div 
+              className={`relative w-full h-full flex items-center justify-center ${
+                card.gradient
+                  ? `bg-gradient-to-br ${card.gradient}`
+                  : 'bg-white'
+              }`}
+            >
+              {/* Semi-transparent overlay for gradient backgrounds */}
+              {card.gradient && (
+                <div className="absolute inset-0 bg-white opacity-30" />
+              )}
               <div 
-                className="text-center"
+                className="text-center relative z-10"
                 style={{ fontSize: 'min(30vw, 30vh, 200px)' }}
               >
                 {card.imageUrl || '?'}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
