@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { CardPack, CardPackOption } from '../types';
 import { CARD_DECKS } from '../data/cardDecks';
 
@@ -10,7 +10,10 @@ export const CARD_PACKS: CardPackOption[] = CARD_DECKS.map(deck => ({
 }));
 
 export const useCardPacks = () => {
-  const [selectedPack, setSelectedPack] = useState<CardPack>('animals');
+  const [selectedPack, setSelectedPack] = useState<CardPack>(() => {
+    const saved = localStorage.getItem('cardPack');
+    return (saved as CardPack) || 'animals';
+  });
 
   const getCurrentPackImages = useMemo(() => {
     const deck = CARD_DECKS.find(d => d.id === selectedPack) || CARD_DECKS[0];
@@ -57,9 +60,14 @@ export const useCardPacks = () => {
     }
   }, [selectedPack]);
 
+  const setSelectedPackWithStorage = useCallback((pack: CardPack) => {
+    setSelectedPack(pack);
+    localStorage.setItem('cardPack', pack);
+  }, []);
+
   return {
     selectedPack,
-    setSelectedPack,
+    setSelectedPack: setSelectedPackWithStorage,
     getCurrentPackImages,
     cardPacks: CARD_PACKS
   };

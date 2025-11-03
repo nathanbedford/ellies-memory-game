@@ -25,7 +25,24 @@ function App() {
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [setupStep, setSetupStep] = useState<SetupStep>(null);
+  const [setupStep, setSetupStep] = useState<SetupStep>(() => {
+    // Only restore wizard state if no game is in progress
+    const savedGameState = sessionStorage.getItem('gameState');
+    if (savedGameState) {
+      try {
+        const parsed = JSON.parse(savedGameState);
+        // If we have cards, don't restore wizard state
+        if (parsed && parsed.cards && parsed.cards.length > 0) {
+          return null;
+        }
+      } catch (e) {
+        // Invalid saved state, continue to restore wizard
+      }
+    }
+    // Restore wizard step if no game in progress
+    const saved = sessionStorage.getItem('setupStep');
+    return (saved as SetupStep) || null;
+  });
   const [isResetting, setIsResetting] = useState(false);
   const [originalPack, setOriginalPack] = useState<string | null>(null);
   const [originalBackground, setOriginalBackground] = useState<BackgroundTheme | null>(null);
@@ -128,16 +145,19 @@ function App() {
   const handlePackChange = (newPack: string) => {
     setSelectedPack(newPack as any);
     setSetupStep('background');
+    sessionStorage.setItem('setupStep', 'background');
   };
 
   const handleBackgroundChange = (newBackground: BackgroundTheme) => {
     setSelectedBackground(newBackground);
     setSetupStep('cardBack');
+    sessionStorage.setItem('setupStep', 'cardBack');
   };
 
   const handleCardBackChange = (newCardBack: CardBackType) => {
     setSelectedCardBack(newCardBack);
     setSetupStep('startGame');
+    sessionStorage.setItem('setupStep', 'startGame');
   };
 
   const handleResetClick = () => {
@@ -171,6 +191,7 @@ function App() {
     setIsResetting(true);
     resetGame();
     setSetupStep('cardPack');
+    sessionStorage.setItem('setupStep', 'cardPack');
     setShowResetConfirmation(false);
   };
 
@@ -189,21 +210,25 @@ function App() {
       setIsResetting(false);
     }
     setSetupStep(null);
+    sessionStorage.removeItem('setupStep');
   };
 
   const handleStartModalBack = () => {
     // Go back to card back selection
     setSetupStep('cardBack');
+    sessionStorage.setItem('setupStep', 'cardBack');
   };
 
   const handleCardBackModalBack = () => {
     // Go back to background selection
     setSetupStep('background');
+    sessionStorage.setItem('setupStep', 'background');
   };
 
   const handleBackgroundModalBack = () => {
     // Go back to card pack selection
     setSetupStep('cardPack');
+    sessionStorage.setItem('setupStep', 'cardPack');
   };
 
   const handleStartGame = (firstPlayer: number) => {
@@ -212,6 +237,7 @@ function App() {
     initializeGame(images, true); // true = start playing with animation
     startGameWithFirstPlayer(firstPlayer);
     setSetupStep(null);
+    sessionStorage.removeItem('setupStep'); // Clear wizard state when game starts
     setIsResetting(false);
     localStorage.setItem('hasPlayedBefore', 'true');
     
@@ -445,7 +471,10 @@ function App() {
                 <h2 className="text-5xl font-bold text-gray-800 mb-4">Welcome!</h2>
                 <p className="text-xl text-gray-600 mb-8">Ready to play Ellie's Memory Game?</p>
                 <button
-                  onClick={() => setSetupStep('cardPack')}
+                  onClick={() => {
+                    setSetupStep('cardPack');
+                    sessionStorage.setItem('setupStep', 'cardPack');
+                  }}
                   className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
                 >
                   🎮 Start Game

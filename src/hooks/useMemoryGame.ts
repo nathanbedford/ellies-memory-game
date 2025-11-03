@@ -1,10 +1,42 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Card, Player, GameState } from '../types';
 import { useTextToSpeech } from './useTextToSpeech';
 
 export const useMemoryGame = () => {
   const [gameState, setGameState] = useState<GameState>(() => {
-    // Load player names from localStorage
+    // Try to load saved game state from sessionStorage
+    const savedGameState = sessionStorage.getItem('gameState');
+    if (savedGameState) {
+      try {
+        const parsed = JSON.parse(savedGameState);
+        // Validate that we have a valid game state with cards
+        if (parsed && parsed.cards && Array.isArray(parsed.cards) && parsed.cards.length > 0) {
+          // Clean up transient states that shouldn't persist (like animation states)
+          const cleanedCards = parsed.cards.map((card: Card) => ({
+            ...card,
+            isFlyingToPlayer: false, // Don't persist animation state
+            // Keep isFlipped and isMatched as they represent actual game state
+          }));
+          
+          return {
+            cards: cleanedCards,
+            players: parsed.players || [
+              { id: 1, name: 'Player 1', score: 0, color: '#3b82f6' },
+              { id: 2, name: 'Player 2', score: 0, color: '#10b981' }
+            ],
+            currentPlayer: parsed.currentPlayer || 1,
+            selectedCards: [], // Reset selected cards on reload
+            gameStatus: parsed.gameStatus || 'setup',
+            winner: parsed.winner || null,
+            isTie: parsed.isTie || false
+          };
+        }
+      } catch (e) {
+        console.warn('Failed to load saved game state:', e);
+      }
+    }
+    
+    // Load player names from localStorage (fallback)
     const savedPlayer1Name = localStorage.getItem('player1Name') || 'Player 1';
     const savedPlayer2Name = localStorage.getItem('player2Name') || 'Player 2';
     const savedPlayer1Color = localStorage.getItem('player1Color') || '#3b82f6'; // Default blue
@@ -62,6 +94,31 @@ export const useMemoryGame = () => {
   // Initialize text-to-speech
   const { speakPlayerTurn, speakMatchFound, isAvailable, cancel: cancelTTS } = useTextToSpeech();
   const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Save game state to sessionStorage whenever it changes
+  useEffect(() => {
+    // Only save if we have cards (game is in progress or finished)
+    if (gameState.cards.length > 0) {
+      // Create a clean state without transient animation properties
+      const stateToSave = {
+        ...gameState,
+        cards: gameState.cards.map(card => ({
+          id: card.id,
+          imageId: card.imageId,
+          imageUrl: card.imageUrl,
+          gradient: card.gradient,
+          isFlipped: card.isFlipped,
+          isMatched: card.isMatched,
+          matchedByPlayerId: card.matchedByPlayerId
+          // Exclude isFlyingToPlayer and flyingToPlayerId as they're transient
+        }))
+      };
+      sessionStorage.setItem('gameState', JSON.stringify(stateToSave));
+    } else {
+      // Clear saved state if no cards (game reset or not started)
+      sessionStorage.removeItem('gameState');
+    }
+  }, [gameState]);
 
   const initializeGame = useCallback((images: { id: string; url: string; gradient?: string }[], startPlaying: boolean = false) => {
     // Cancel any pending match check
@@ -232,6 +289,9 @@ export const useMemoryGame = () => {
     }
     cancelTTS();
     isCheckingMatchRef.current = false;
+    
+    // Clear saved game state from sessionStorage
+    sessionStorage.removeItem('gameState');
     
     // Reset clears cards and goes back to setup mode
     // The actual reset flow will be handled by App.tsx

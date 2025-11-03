@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 export type BackgroundTheme = 'rainbow' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'photo1' | 'photo2' | 'photo3' | 'photo4';
 
@@ -58,16 +58,24 @@ export const BACKGROUND_OPTIONS: BackgroundOption[] = [
 ];
 
 export const useBackgroundSelector = () => {
-  const [selectedBackground, setSelectedBackground] = useState<BackgroundTheme>('rainbow');
+  const [selectedBackground, setSelectedBackground] = useState<BackgroundTheme>(() => {
+    const saved = localStorage.getItem('background');
+    return (saved as BackgroundTheme) || 'rainbow';
+  });
 
   const getCurrentBackground = () => {
     const option = BACKGROUND_OPTIONS.find(bg => bg.id === selectedBackground);
     return option || BACKGROUND_OPTIONS[0];
   };
 
+  const setSelectedBackgroundWithStorage = useCallback((background: BackgroundTheme) => {
+    setSelectedBackground(background);
+    localStorage.setItem('background', background);
+  }, []);
+
   return {
     selectedBackground,
-    setSelectedBackground,
+    setSelectedBackground: setSelectedBackgroundWithStorage,
     getCurrentBackground,
     backgroundOptions: BACKGROUND_OPTIONS
   };
