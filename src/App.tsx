@@ -15,13 +15,14 @@ import { SettingsMenu } from './components/SettingsMenu';
 import { PlayerMatchesModal } from './components/PlayerMatchesModal';
 import { CardExplorerModal } from './components/CardExplorerModal';
 import { Pong } from './components/Pong';
+import { AdminSidebar } from './components/AdminSidebar';
 import screenfull from 'screenfull';
 
 type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, flipAllExceptLastPair } = useMemoryGame();
+  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, flipAllExceptLastPair, endGameEarly, toggleAllCardsFlipped } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -65,6 +66,8 @@ function App() {
   const testComboSequenceRef = useRef<string[]>([]);
   const testComboTimeoutRef = useRef<number | null>(null);
   const [showCardExplorer, setShowCardExplorer] = useState(false);
+  const [showAdminSidebar, setShowAdminSidebar] = useState(false);
+  const [adminEnabled, setAdminEnabled] = useState(false); // In-memory only, resets on refresh
   
   // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
   const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
@@ -326,7 +329,8 @@ function App() {
         );
         
         if (matches) {
-          flipAllExceptLastPair();
+          setAdminEnabled(true);
+          setShowAdminSidebar(true);
           testComboSequenceRef.current = [];
         }
       }
@@ -348,7 +352,7 @@ function App() {
         clearTimeout(testComboTimeoutRef.current);
       }
     };
-  }, [flipAllExceptLastPair]);
+  }, []);
 
 
   const currentBackground = getCurrentBackground();
@@ -399,7 +403,7 @@ function App() {
           <>
             {/* Fixed position controls */}
             {/* Left side - Reset Button */}
-            <div className="fixed top-5 left-5 z-10">
+            <div className="fixed top-5 left-5 z-10 flex flex-col gap-2">
               <button
                 onClick={handleResetClick}
                 className="p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
@@ -409,6 +413,23 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
+              
+              {/* Admin Toggle Button - only show if admin is enabled */}
+              {adminEnabled && (
+                <button
+                  onClick={() => setShowAdminSidebar(!showAdminSidebar)}
+                  className={`p-2 text-xs font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 ${
+                    showAdminSidebar
+                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                      : 'bg-gray-400 hover:bg-gray-500 text-white'
+                  }`}
+                  title={showAdminSidebar ? 'Hide Admin Panel' : 'Show Admin Panel'}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </button>
+              )}
             </div>
             
             {/* Right side - Settings Button */}
@@ -450,6 +471,10 @@ function App() {
                         isFullscreen={isFullscreen}
                         onEndTurn={endTurn}
                         gameStatus={gameState.gameStatus}
+                        onEnableAdmin={() => {
+                          setAdminEnabled(true);
+                          setShowAdminSidebar(true);
+                        }}
                       />
             </div>
             
@@ -748,6 +773,25 @@ function App() {
           emojiSizePercentage={emojiSizePercentage}
           cardBack={getCurrentCardBack()}
         />
+
+        {/* Admin Sidebar */}
+        {gameState.gameStatus === 'playing' && adminEnabled && (
+          <AdminSidebar
+            isOpen={showAdminSidebar}
+            onClose={() => setShowAdminSidebar(false)}
+            onEndGameEarly={() => {
+              endGameEarly();
+              setShowAdminSidebar(false);
+            }}
+            onToggleFlipAll={toggleAllCardsFlipped}
+            allCardsFlipped={
+              gameState.cards.length > 0 &&
+              gameState.cards
+                .filter(c => !c.isMatched && !c.isFlyingToPlayer)
+                .every(c => c.isFlipped)
+            }
+          />
+        )}
       </div>
     </div>
   );

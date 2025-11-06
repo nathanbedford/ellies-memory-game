@@ -17,9 +17,10 @@ interface SettingsMenuProps {
   isFullscreen: boolean;
   onEndTurn?: () => void;
   gameStatus?: 'setup' | 'playing' | 'finished';
+  onEnableAdmin?: () => void;
 }
 
-export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus }: SettingsMenuProps) => {
+export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin }: SettingsMenuProps) => {
   return (
     <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
@@ -215,6 +216,23 @@ export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, e
             <p className="text-xs text-gray-500 mt-2">
               Flip all cards face down and switch to the next player
             </p>
+          </div>
+        )}
+
+        {/* Admin link - placed at bottom with spacing to require scrolling */}
+        {onEnableAdmin && (
+          <div className="border-t border-gray-200 pt-6 pb-8 mt-8">
+            <div className="pt-16 pb-8">
+              <button
+                onClick={() => {
+                  onEnableAdmin();
+                  onClose();
+                }}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors duration-200 underline"
+              >
+                Admin
+              </button>
+            </div>
           </div>
         )}
 

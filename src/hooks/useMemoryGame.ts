@@ -105,6 +105,8 @@ export const useMemoryGame = () => {
     return saved === null ? true : saved === 'true';
   });
 
+  const [allCardsFlipped, setAllCardsFlipped] = useState(false);
+
   // Initialize text-to-speech
   const { speakPlayerTurn, speakMatchFound, isAvailable, cancel: cancelTTS } = useTextToSpeech();
   const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -305,6 +307,7 @@ export const useMemoryGame = () => {
     }
     cancelTTS();
     isCheckingMatchRef.current = false;
+    setAllCardsFlipped(false);
     
     // Clear saved game state from sessionStorage
     sessionStorage.removeItem('gameState');
@@ -788,6 +791,57 @@ export const useMemoryGame = () => {
     });
   }, [checkForMatch, flipDuration]);
 
+  const endGameEarly = useCallback(() => {
+    setGameState(prev => {
+      if (prev.gameStatus !== 'playing' || prev.cards.length === 0) {
+        return prev;
+      }
+
+      // Find the player with the highest score
+      const winner = prev.players.reduce((prevPlayer, currentPlayer) =>
+        currentPlayer.score > prevPlayer.score ? currentPlayer : prevPlayer
+      );
+
+      // Check if it's a tie
+      const isTie = prev.players.every(player => player.score === winner.score);
+
+      return {
+        ...prev,
+        gameStatus: 'finished' as const,
+        winner: isTie ? null : winner,
+        isTie,
+        selectedCards: []
+      };
+    });
+  }, []);
+
+  const toggleAllCardsFlipped = useCallback(() => {
+    setGameState(prev => {
+      if (prev.cards.length === 0) return prev;
+
+      // Check if all unmatched cards are currently flipped
+      const unmatchedCards = prev.cards.filter(c => !c.isMatched && !c.isFlyingToPlayer);
+      const allFlipped = unmatchedCards.length > 0 && unmatchedCards.every(c => c.isFlipped);
+      const newFlippedState = !allFlipped;
+      
+      setAllCardsFlipped(newFlippedState);
+
+      const newCards = prev.cards.map(card => {
+        // Don't flip matched cards or cards that are currently flying
+        if (card.isMatched || card.isFlyingToPlayer) {
+          return card;
+        }
+        return { ...card, isFlipped: newFlippedState };
+      });
+
+      return {
+        ...prev,
+        cards: newCards,
+        selectedCards: [] // Clear selected cards when toggling
+      };
+    });
+  }, []);
+
   // Test function: Advance game to end state - flip all cards except last pair, mark them as matched, and distribute evenly between players
   const flipAllExceptLastPair = useCallback(() => {
     setGameState(prev => {
@@ -901,6 +955,9 @@ export const useMemoryGame = () => {
     endTurn,
     resetGame,
     isAnimatingCards,
-    flipAllExceptLastPair
+    flipAllExceptLastPair,
+    endGameEarly,
+    toggleAllCardsFlipped,
+    allCardsFlipped
   };
 };

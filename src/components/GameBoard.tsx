@@ -21,6 +21,7 @@ interface CardAnimationData {
 
 export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack }: GameBoardProps) => {
   const boardRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
   // Monitor card state changes for debugging
   useEffect(() => {
@@ -111,18 +112,22 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       viewport: { width: window.innerWidth, height: window.innerHeight }
     });
     
-    const result = cards.map((card, index) => {
+    const result = cards.map((card) => {
       if (!card.isFlyingToPlayer) return null;
       
-      // Get card's current position in grid
-      const col = index % 8;
-      const row = Math.floor(index / 8);
-      const boardWidth = (cardSize * 8) + (8 * 7);
-      const boardLeft = (window.innerWidth - boardWidth) / 2;
+      // Get the actual DOM position of the card using the ref
+      const cardElement = cardRefs.current.get(card.id);
+      if (!cardElement) {
+        console.warn('[FLY DATA] Card element not found in refs', { cardId: card.id });
+        return null;
+      }
       
-      // Calculate card's center position
-      const cardCenterX = boardLeft + (col * (cardSize + 8)) + (cardSize / 2);
-      const cardCenterY = window.innerHeight / 2 + (row * (cardSize + 8)) - 100; // Approximate header offset
+      // Get the actual bounding rectangle
+      const rect = cardElement.getBoundingClientRect();
+      
+      // Calculate card's actual center position from DOM
+      const cardCenterX = rect.left + rect.width / 2;
+      const cardCenterY = rect.top + rect.height / 2;
       
       // Calculate target position (next to player name)
       // Player 1 is on the left, Player 2 is on the right
@@ -141,8 +146,8 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       const finalY = -cardSize - 50; // Off screen above
       
       const flyData = {
-        startX: cardCenterX - cardSize / 2,
-        startY: cardCenterY - cardSize / 2,
+        startX: rect.left,
+        startY: rect.top,
         endX: targetX - cardSize / 2,
         endY: headerY - cardSize / 2,
         finalY: finalY,
@@ -152,7 +157,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       
       console.log('[FLY DATA] Calculated fly data for card', {
         cardId: card.id,
-        gridPosition: { col, row },
+        actualRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
         positions: {
           start: { x: flyData.startX, y: flyData.startY },
           end: { x: flyData.endX, y: flyData.endY },
@@ -287,6 +292,13 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           ) : (
             <div
               key={card.id}
+              ref={(el) => {
+                if (el) {
+                  cardRefs.current.set(card.id, el);
+                } else {
+                  cardRefs.current.delete(card.id);
+                }
+              }}
               className={isAnimating ? 'card-fly-in' : ''}
               style={{
                 animationDelay: isAnimating ? `${index * 30}ms` : '0ms',
