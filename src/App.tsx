@@ -22,7 +22,7 @@ type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, flipAllExceptLastPair, endGameEarly, toggleAllCardsFlipped } = useMemoryGame();
+  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, endGameEarly, toggleAllCardsFlipped } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
