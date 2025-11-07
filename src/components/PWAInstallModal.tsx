@@ -61,6 +61,20 @@ export const PWAInstallModal = ({ isOpen, onClose }: PWAInstallModalProps) => {
         {/* Content */}
         <div className="p-6">
           <div className="space-y-4 mb-6">
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-lg font-bold mb-2">Highly Recommended!</p>
+                  <p className="text-sm opacity-95">
+                    The installed version prevents unwanted scrolling and handles fullscreen mode much better, giving you the best gameplay experience.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <p className="text-lg text-gray-700 font-medium">
               Install Matchimus on your iPad for a better experience!
             </p>
@@ -68,7 +82,7 @@ export const PWAInstallModal = ({ isOpen, onClose }: PWAInstallModalProps) => {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
               <p className="text-sm font-semibold text-blue-900">How to install:</p>
               <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
-                <li>Tap the <strong>Share</strong> button <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> in Safari (at the bottom of the screen)</li>
+                <li>Tap the <strong>Share</strong> button <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg> in Safari (at the top or bottom of the screen, depending on your iPad version)</li>
                 <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
                 <li>Tap <strong>"Add"</strong> in the top right corner</li>
                 <li>Enjoy Matchimus as a standalone app!</li>
