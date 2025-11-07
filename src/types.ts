@@ -29,7 +29,7 @@ export interface GameState {
   isTie: boolean;
 }
 
-export type CardPack = 'animals' | 'animals-real' | 'plants' | 'buildings' | 'colors' | 'ocean' | 'ocean-real' | 'construction' | 'emotions-real' | 'insects-real';
+export type CardPack = 'animals' | 'animals-real' | 'plants' | 'buildings' | 'colors' | 'ocean' | 'ocean-real' | 'construction' | 'emotions-real' | 'insects-real' | 'jungle-animals-real';
 
 export interface CardPackOption {
   id: CardPack;

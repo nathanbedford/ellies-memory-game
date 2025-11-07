@@ -12,7 +12,7 @@ interface CardPackModalProps {
 export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackModalProps) => {
   // Determine initial tab based on selected pack
   const getInitialTab = () => {
-    const picturePackIds = ['animals-real', 'ocean-real', 'emotions-real', 'insects-real'];
+    const picturePackIds = ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real'];
     return picturePackIds.includes(selectedPack) ? 'pictures' : 'emoji';
   };
   
@@ -28,7 +28,7 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
     ['animals', 'plants', 'buildings', 'colors', 'ocean', 'construction'].includes(pack.id)
   );
   const picturePacks = cardPacks.filter(pack => 
-    ['animals-real', 'ocean-real', 'emotions-real', 'insects-real'].includes(pack.id)
+    ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real'].includes(pack.id)
   );
 
   // Get preview images for animals-real deck
@@ -67,10 +67,20 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
     return deck.cards.filter(card => previewIds.includes(card.id)).slice(0, 4);
   };
 
+  // Get preview images for jungle-animals-real deck
+  const getJungleAnimalsRealPreview = () => {
+    const deck = CARD_DECKS.find(d => d.id === 'jungle-animals-real');
+    if (!deck) return [];
+    // Pick 4 images for preview: jaguar, toucan, sloth, macaw
+    const previewIds = ['jaguar', 'toucan', 'sloth', 'macaw'];
+    return deck.cards.filter(card => previewIds.includes(card.id)).slice(0, 4);
+  };
+
   const animalsRealPreview = getAnimalsRealPreview();
   const oceanRealPreview = getOceanRealPreview();
   const emotionsRealPreview = getEmotionsRealPreview();
   const insectsRealPreview = getInsectsRealPreview();
+  const jungleAnimalsRealPreview = getJungleAnimalsRealPreview();
 
   // Determine which packs to show based on active tab
   const displayedPacks = activeTab === 'emoji' ? emojiPacks : picturePacks;
@@ -166,6 +176,22 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
             <div className="mb-4">
               <div className="w-full h-40 rounded-lg bg-gradient-to-br from-green-400 to-yellow-500 grid grid-cols-2 grid-rows-2 gap-1 p-1">
                 {insectsRealPreview.map((card) => (
+                  card.imageUrl && (
+                    <div key={card.id} className="w-full h-full flex items-center justify-center bg-white bg-opacity-20 rounded overflow-hidden">
+                      <img
+                        src={card.imageUrl}
+                        alt={card.id}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          ) : pack.id === 'jungle-animals-real' ? (
+            <div className="mb-4">
+              <div className="w-full h-40 rounded-lg bg-gradient-to-br from-green-600 to-amber-600 grid grid-cols-2 grid-rows-2 gap-1 p-1">
+                {jungleAnimalsRealPreview.map((card) => (
                   card.imageUrl && (
                     <div key={card.id} className="w-full h-full flex items-center justify-center bg-white bg-opacity-20 rounded overflow-hidden">
                       <img

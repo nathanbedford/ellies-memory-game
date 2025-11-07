@@ -21,6 +21,11 @@ const getInsectImageUrl = (insectId: string): string => {
   return `/deck-images/insects/${insectId}.jpg`;
 };
 
+// Helper function to get image URL for jungle-animals-real deck
+const getJungleAnimalImageUrl = (jungleAnimalId: string): string => {
+  return `/deck-images/jungle-animals/${jungleAnimalId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1183,6 +1188,133 @@ export const CARD_DECKS: CardDeck[] = [
         emoji: '🪲',
         gradient: 'from-amber-600 to-amber-800',
         imageUrl: getInsectImageUrl('walking-stick')
+      }
+    ]
+  },
+  {
+    id: 'jungle-animals-real',
+    name: 'Jungle Animals',
+    emoji: '🦁',
+    cards: [
+      { 
+        id: 'anteater', 
+        emoji: '🐜',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getJungleAnimalImageUrl('anteater')
+      },
+      { 
+        id: 'armadillo', 
+        emoji: '🦔',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getJungleAnimalImageUrl('armadillo')
+      },
+      { 
+        id: 'boa-constrictor', 
+        emoji: '🐍',
+        gradient: 'from-green-600 to-green-800',
+        imageUrl: getJungleAnimalImageUrl('boa-constrictor')
+      },
+      { 
+        id: 'caiman', 
+        emoji: '🐊',
+        gradient: 'from-green-600 to-green-800',
+        imageUrl: getJungleAnimalImageUrl('caiman')
+      },
+      { 
+        id: 'capybara', 
+        emoji: '🐹',
+        gradient: 'from-amber-600 to-amber-800',
+        imageUrl: getJungleAnimalImageUrl('capybara')
+      },
+      { 
+        id: 'harpy-eagle', 
+        emoji: '🦅',
+        gradient: 'from-gray-600 to-gray-800',
+        imageUrl: getJungleAnimalImageUrl('harpy-eagle')
+      },
+      { 
+        id: 'howler-monkey', 
+        emoji: '🐵',
+        gradient: 'from-amber-500 to-amber-700',
+        imageUrl: getJungleAnimalImageUrl('howler-monkey')
+      },
+      { 
+        id: 'iguana', 
+        emoji: '🦎',
+        gradient: 'from-green-500 to-green-700',
+        imageUrl: getJungleAnimalImageUrl('iguana')
+      },
+      { 
+        id: 'jaguar', 
+        emoji: '🐆',
+        gradient: 'from-amber-600 to-orange-800',
+        imageUrl: getJungleAnimalImageUrl('jaguar')
+      },
+      { 
+        id: 'kinkajou', 
+        emoji: '🐻',
+        gradient: 'from-amber-500 to-amber-700',
+        imageUrl: getJungleAnimalImageUrl('kinkajou')
+      },
+      { 
+        id: 'macaw', 
+        emoji: '🦜',
+        gradient: 'from-red-500 to-blue-600',
+        imageUrl: getJungleAnimalImageUrl('macaw')
+      },
+      { 
+        id: 'ocelot', 
+        emoji: '🐆',
+        gradient: 'from-amber-500 to-orange-700',
+        imageUrl: getJungleAnimalImageUrl('ocelot')
+      },
+      { 
+        id: 'piranha', 
+        emoji: '🐟',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getJungleAnimalImageUrl('piranha')
+      },
+      { 
+        id: 'poison-dart-frog', 
+        emoji: '🐸',
+        gradient: 'from-yellow-400 to-blue-600',
+        imageUrl: getJungleAnimalImageUrl('poison-dart-frog')
+      },
+      { 
+        id: 'puma', 
+        emoji: '🐆',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getJungleAnimalImageUrl('puma')
+      },
+      { 
+        id: 'quetzal', 
+        emoji: '🦜',
+        gradient: 'from-green-400 to-red-500',
+        imageUrl: getJungleAnimalImageUrl('quetzal')
+      },
+      { 
+        id: 'sloth', 
+        emoji: '🦥',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getJungleAnimalImageUrl('sloth')
+      },
+      { 
+        id: 'tamarin', 
+        emoji: '🐵',
+        gradient: 'from-orange-400 to-orange-600',
+        imageUrl: getJungleAnimalImageUrl('tamarin')
+      },
+      { 
+        id: 'tarantula', 
+        emoji: '🕷️',
+        gradient: 'from-gray-700 to-gray-900',
+        imageUrl: getJungleAnimalImageUrl('tarantula')
+      },
+      { 
+        id: 'toucan', 
+        emoji: '🦜',
+        gradient: 'from-yellow-400 to-blue-600',
+        imageUrl: getJungleAnimalImageUrl('toucan')
       }
     ]
   }
