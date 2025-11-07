@@ -1,4 +1,4 @@
-# Ellie's Memory Game 🧠
+# Matchimus 🧠
 
 A beautiful, fully-featured memory card game built with React, TypeScript, and TailwindCSS.
 
@@ -51,4 +51,4 @@ This project is optimized for Vercel deployment with:
 5. Game ends when all pairs are matched
 6. Player with the most pairs wins!
 
-Enjoy playing Ellie's Memory Game! 🎉
+Enjoy playing Matchimus! 🎉

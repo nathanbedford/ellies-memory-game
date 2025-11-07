@@ -771,7 +771,7 @@ function App() {
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
               <div className="text-center space-y-6">
                 <h2 className="text-5xl font-bold text-gray-800 mb-4">Welcome!</h2>
-                <p className="text-xl text-gray-600 mb-8">Ready to play Ellie's Memory Game?</p>
+                <p className="text-xl text-gray-600 mb-8">Ready to play Matchimus?</p>
                 <button
                   onClick={() => {
                     guardedSetSetupStep('cardPack', 'welcome screen start button');
