@@ -164,8 +164,26 @@ function App() {
     return false;
   };
 
+  // Check if app is running as a PWA (standalone mode)
+  const isRunningAsPWA = () => {
+    // Check for standalone display mode (standard PWA detection)
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      return true;
+    }
+    // iOS Safari specific check
+    if ((window.navigator as any).standalone === true) {
+      return true;
+    }
+    return false;
+  };
+
   // Check on mount if iPad and show PWA install modal
   useEffect(() => {
+    // Don't show modal if already running as PWA
+    if (isRunningAsPWA()) {
+      return;
+    }
+    
     if (isIPad()) {
       const pwaInstallDismissed = localStorage.getItem('pwaInstallDismissed');
       if (!pwaInstallDismissed) {
@@ -790,7 +808,7 @@ function App() {
                           setAdminEnabled(true);
                           setShowAdminSidebar(true);
                         }}
-                        onShowPWAInstall={isIPad() ? handleShowPWAInstall : undefined}
+                        onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
                       />
             </div>
             
