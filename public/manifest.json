@@ -1,6 +1,6 @@
 {
-  "name": "Ellie's Memory Game",
-  "short_name": "Memory Game",
+  "name": "Matchimus",
+  "short_name": "Matchimus",
   "description": "A beautiful memory card game with emoji cards and multiple themes",
   "start_url": "/",
   "display": "standalone",
