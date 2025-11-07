@@ -17,6 +17,7 @@ import { PlayerMatchesModal } from './components/PlayerMatchesModal';
 import { CardExplorerModal } from './components/CardExplorerModal';
 import { Pong } from './components/Pong';
 import { MobileWarningModal } from './components/MobileWarningModal';
+import { PWAInstallModal } from './components/PWAInstallModal';
 import { AdminSidebar } from './components/AdminSidebar';
 import screenfull from 'screenfull';
 
@@ -76,6 +77,7 @@ function App() {
   const [showAdminSidebar, setShowAdminSidebar] = useState(false);
   const [adminEnabled, setAdminEnabled] = useState(false); // In-memory only, resets on refresh
   const [showMobileWarning, setShowMobileWarning] = useState(false);
+  const [showPWAInstall, setShowPWAInstall] = useState(false);
   const boardWrapperRef = useRef<HTMLDivElement>(null);
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const gameBoardContainerRef = useRef<HTMLDivElement>(null);
@@ -146,6 +148,42 @@ function App() {
   // Check if screen is mobile-sized (< 768px)
   const isMobileScreen = () => {
     return window.innerWidth < 768;
+  };
+
+  // Check if device is an iPad
+  const isIPad = () => {
+    const ua = navigator.userAgent.toLowerCase();
+    // Check for iPad in user agent (older iPads)
+    if (ua.includes('ipad')) {
+      return true;
+    }
+    // Check for newer iPads that report as Mac but have touch support
+    if (ua.includes('macintosh') && 'ontouchend' in document) {
+      return true;
+    }
+    return false;
+  };
+
+  // Check on mount if iPad and show PWA install modal
+  useEffect(() => {
+    if (isIPad()) {
+      const pwaInstallDismissed = localStorage.getItem('pwaInstallDismissed');
+      if (!pwaInstallDismissed) {
+        // Small delay to ensure page is loaded
+        setTimeout(() => {
+          setShowPWAInstall(true);
+        }, 500);
+      }
+    }
+  }, []);
+
+  const handlePWAInstallClose = () => {
+    setShowPWAInstall(false);
+    localStorage.setItem('pwaInstallDismissed', 'true');
+  };
+
+  const handleShowPWAInstall = () => {
+    setShowPWAInstall(true);
   };
   
   // Show mobile warning when game starts if on mobile
@@ -752,6 +790,7 @@ function App() {
                           setAdminEnabled(true);
                           setShowAdminSidebar(true);
                         }}
+                        onShowPWAInstall={isIPad() ? handleShowPWAInstall : undefined}
                       />
             </div>
             
@@ -1072,6 +1111,12 @@ function App() {
         <MobileWarningModal
           isOpen={showMobileWarning}
           onClose={handleMobileWarningClose}
+        />
+
+        {/* PWA Install Modal */}
+        <PWAInstallModal
+          isOpen={showPWAInstall}
+          onClose={handlePWAInstallClose}
         />
       </div>
     </div>

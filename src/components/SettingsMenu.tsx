@@ -20,9 +20,10 @@ interface SettingsMenuProps {
   onEndTurn?: () => void;
   gameStatus?: 'setup' | 'playing' | 'finished';
   onEnableAdmin?: () => void;
+  onShowPWAInstall?: () => void;
 }
 
-export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin }: SettingsMenuProps) => {
+export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin, onShowPWAInstall }: SettingsMenuProps) => {
   return (
     <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
@@ -59,6 +60,29 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
               </span>
             </div>
           </button>
+          
+          {/* PWA Install Instructions Button - only show on iPad */}
+          {onShowPWAInstall && (
+            <button
+              onClick={() => {
+                onShowPWAInstall();
+                onClose();
+              }}
+              className="w-full mt-3 flex items-center justify-between px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors duration-200 border border-blue-200"
+            >
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span className="text-base font-medium text-blue-800">
+                  Install as App
+                </span>
+              </div>
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Card Size Section */}
