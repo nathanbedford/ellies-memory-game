@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card } from '../types';
 import { CARD_DECKS } from '../data/cardDecks';
 
@@ -32,6 +32,16 @@ const formatCardName = (imageId: string): string => {
 };
 
 export const CardLightbox = ({ isOpen, onClose, card, cards = [], currentIndex = 0, onNavigate }: CardLightboxProps) => {
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  const cardContainerRef = useRef<HTMLDivElement>(null);
+
+  // Minimum swipe distance (in pixels)
+  const minSwipeDistance = 50;
+  
+  // Check if navigation is possible
+  const canNavigate = cards.length > 1 && onNavigate;
+  
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -56,9 +66,57 @@ export const CardLightbox = ({ isOpen, onClose, card, cards = [], currentIndex =
     };
   }, [isOpen, onClose, cards, currentIndex, onNavigate]);
 
-  if (!isOpen || !card) return null;
+  // Handle touch start
+  const onTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setTouchEnd(null);
+    setTouchStart({
+      x: touch.clientX,
+      y: touch.clientY
+    });
+  };
 
-  const canNavigate = cards.length > 1 && onNavigate;
+  // Handle touch move
+  const onTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setTouchEnd({
+      x: touch.clientX,
+      y: touch.clientY
+    });
+  };
+
+  // Handle touch end and detect swipe
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd || !canNavigate || !onNavigate) return;
+
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isLeftSwipe = distanceX > minSwipeDistance;
+    const isRightSwipe = distanceX < -minSwipeDistance;
+    const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
+
+    // Only handle horizontal swipes (ignore vertical swipes)
+    if (isVerticalSwipe) {
+      setTouchStart(null);
+      setTouchEnd(null);
+      return;
+    }
+
+    if (isLeftSwipe) {
+      // Swipe left - go to next card
+      const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
+      onNavigate(nextIndex);
+    } else if (isRightSwipe) {
+      // Swipe right - go to previous card
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
+      onNavigate(prevIndex);
+    }
+
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
+  if (!isOpen || !card) return null;
 
   const handlePrevious = () => {
     if (canNavigate) {
@@ -136,8 +194,12 @@ export const CardLightbox = ({ isOpen, onClose, card, cards = [], currentIndex =
 
       {/* Card Display */}
       <div 
+        ref={cardContainerRef}
         className="relative w-full h-full flex items-center justify-center p-2"
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         {/* Card container with rounded corners */}
         <div 

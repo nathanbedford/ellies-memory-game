@@ -1,11 +1,13 @@
 interface SettingsMenuProps {
   cardSize: number;
+  autoSizeEnabled: boolean;
   useWhiteCardBackground: boolean;
   flipDuration: number;
   emojiSizePercentage: number;
   ttsEnabled: boolean;
   onIncreaseSize: () => void;
   onDecreaseSize: () => void;
+  onToggleAutoSize: () => void;
   onToggleWhiteCardBackground: () => void;
   onIncreaseFlipDuration: () => void;
   onDecreaseFlipDuration: () => void;
@@ -20,7 +22,7 @@ interface SettingsMenuProps {
   onEnableAdmin?: () => void;
 }
 
-export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin }: SettingsMenuProps) => {
+export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin }: SettingsMenuProps) => {
   return (
     <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
@@ -61,13 +63,25 @@ export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, e
 
         {/* Card Size Section */}
         <div className="border-t border-gray-200 pt-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Card Size</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            Card Size {autoSizeEnabled && <span className="text-sm text-green-600 font-normal">(Auto)</span>}
+          </h3>
+          {autoSizeEnabled && (
+            <div className="mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-xs text-green-700">
+                <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Auto-sizing is enabled. Cards automatically adjust to fit your screen.
+              </p>
+            </div>
+          )}
           <div className="flex items-center gap-4">
             <button
               onClick={onDecreaseSize}
-              disabled={cardSize <= 60}
+              disabled={autoSizeEnabled || cardSize <= 60}
               className="px-6 py-3 text-base font-semibold bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 disabled:transform-none"
-              title="Make cards smaller"
+              title={autoSizeEnabled ? "Disable auto-size to use manual controls" : "Make cards smaller"}
             >
               −
             </button>
@@ -79,12 +93,35 @@ export const SettingsMenu = ({ cardSize, useWhiteCardBackground, flipDuration, e
             
             <button
               onClick={onIncreaseSize}
-              disabled={cardSize >= 300}
+              disabled={autoSizeEnabled || cardSize >= 300}
               className="px-6 py-3 text-base font-semibold bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 disabled:transform-none"
-              title="Make cards bigger"
+              title={autoSizeEnabled ? "Disable auto-size to use manual controls" : "Make cards bigger"}
             >
               +
             </button>
+          </div>
+          
+          {/* Auto-Size Toggle */}
+          <div className="mt-4">
+            <label className="flex items-center gap-3 px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoSizeEnabled}
+                onChange={onToggleAutoSize}
+                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+              />
+              <div className="flex items-center gap-3 flex-1">
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+                <span className="text-base font-medium text-gray-800">
+                  Auto-Size Cards
+                </span>
+              </div>
+            </label>
+            <p className="text-xs text-gray-500 mt-2 px-4">
+              Automatically adjust card size to fit your screen
+            </p>
           </div>
         </div>
 

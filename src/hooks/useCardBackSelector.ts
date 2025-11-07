@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type CardBackType = 'default' | 'emoji' | 'image';
+export type CardBackType = 'default' | 'emoji' | 'image' | 'blue';
 
 export interface CardBackOption {
   id: CardBackType;
@@ -8,6 +8,8 @@ export interface CardBackOption {
   emoji?: string;
   imageUrl?: string;
   gradient?: string;
+  radialGradient?: string;
+  solidColor?: string;
 }
 
 export const CARD_BACK_OPTIONS: CardBackOption[] = [
@@ -27,6 +29,11 @@ export const CARD_BACK_OPTIONS: CardBackOption[] = [
     name: 'Question Mark',
     emoji: '❓',
     gradient: 'from-indigo-500 to-purple-600'
+  },
+  {
+    id: 'blue',
+    name: 'Royal Blue',
+    solidColor: '#4169E1'
   }
 ];
 

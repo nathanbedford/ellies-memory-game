@@ -9,7 +9,9 @@ interface CardBackModalProps {
 }
 
 export const CardBackModal = ({ selectedCardBack, onSelect, onClose, onBack, isResetting = false }: CardBackModalProps) => {
-  const handleSelect = (cardBackId: string) => {
+  const handleSelect = (e: React.MouseEvent, cardBackId: string) => {
+    e.stopPropagation(); // Prevent event bubbling
+    console.log('[CardBackModal] Card back selected:', cardBackId);
     onSelect(cardBackId);
     // Don't call onClose here - let the parent handle navigation
   };
@@ -21,7 +23,7 @@ export const CardBackModal = ({ selectedCardBack, onSelect, onClose, onBack, isR
         {CARD_BACK_OPTIONS.map((option) => (
           <button
             key={option.id}
-            onClick={() => handleSelect(option.id)}
+            onClick={(e) => handleSelect(e, option.id)}
             className={`p-6 rounded-xl border-3 transition-all duration-200 transform hover:scale-[1.02] ${
               selectedCardBack === option.id
                 ? 'border-purple-500 bg-purple-50 shadow-lg'
@@ -34,13 +36,21 @@ export const CardBackModal = ({ selectedCardBack, onSelect, onClose, onBack, isR
                 <div 
                   className={`w-24 h-24 rounded-lg shadow-inner overflow-hidden flex items-center justify-center border-2 ${
                     option.gradient ? `bg-gradient-to-br ${option.gradient}` : ''
-                  } ${option.id === 'default' ? 'border-indigo-300' : option.id === 'emoji' ? 'border-purple-300' : 'border-gray-300'}`}
+                  } ${option.id === 'default' ? 'border-indigo-300' : option.id === 'emoji' ? 'border-purple-300' : option.id === 'blue' ? 'border-blue-300' : 'border-gray-300'}`}
                   style={
                     option.imageUrl
                       ? {
                           backgroundImage: `url(${option.imageUrl})`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center'
+                        }
+                      : option.radialGradient
+                      ? {
+                          background: option.radialGradient
+                        }
+                      : option.solidColor
+                      ? {
+                          backgroundColor: option.solidColor
                         }
                       : {}
                   }
@@ -62,6 +72,7 @@ export const CardBackModal = ({ selectedCardBack, onSelect, onClose, onBack, isR
                   {option.id === 'default' && '💜 Classic purple gradient with question mark'}
                   {option.id === 'emoji' && '❓ Emoji question mark on purple background'}
                   {option.id === 'image' && '🖼️ Custom image from your collection'}
+                  {option.id === 'blue' && '💙 Plain royal blue solid color'}
                 </div>
                 {selectedCardBack === option.id && (
                   <div className="text-sm font-semibold text-purple-600">

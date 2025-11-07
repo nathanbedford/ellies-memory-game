@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useMemoryGame } from './hooks/useMemoryGame';
 import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme } from './hooks/useBackgroundSelector';
@@ -15,6 +15,7 @@ import { SettingsMenu } from './components/SettingsMenu';
 import { PlayerMatchesModal } from './components/PlayerMatchesModal';
 import { CardExplorerModal } from './components/CardExplorerModal';
 import { Pong } from './components/Pong';
+import { MobileWarningModal } from './components/MobileWarningModal';
 import { AdminSidebar } from './components/AdminSidebar';
 import screenfull from 'screenfull';
 
@@ -22,7 +23,7 @@ type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, cardSize, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, endGameEarly, toggleAllCardsFlipped } = useMemoryGame();
+  const { gameState, cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, toggleAutoSize, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, endGameEarly, toggleAllCardsFlipped, updateAutoSizeMetrics, calculateOptimalCardSizeForCount } = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -68,6 +69,198 @@ function App() {
   const [showCardExplorer, setShowCardExplorer] = useState(false);
   const [showAdminSidebar, setShowAdminSidebar] = useState(false);
   const [adminEnabled, setAdminEnabled] = useState(false); // In-memory only, resets on refresh
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
+  const boardWrapperRef = useRef<HTMLDivElement>(null);
+  const scoreboardRef = useRef<HTMLDivElement>(null);
+  const gameBoardContainerRef = useRef<HTMLDivElement>(null);
+  const layoutMeasureRafRef = useRef<number | null>(null);
+  
+  // Track if we're in a back navigation to allow intentional backward steps
+  const isBackNavigationRef = useRef(false);
+  
+  // Define step order for guarding against backward navigation
+  // null appears at both start and end - start for initial state, end for closed state
+  const stepOrder: SetupStep[] = ['cardPack', 'background', 'cardBack', 'startGame'];
+  
+  // Guarded setSetupStep that prevents unintended backward navigation
+  const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
+    // Special case: allow closing the wizard (going to null) from any step
+    if (newStep === null) {
+      console.log('[Setup Wizard] Closing wizard:', { from: setupStep, reason });
+      setSetupStep(null);
+      sessionStorage.removeItem('setupStep');
+      return;
+    }
+    
+    // Special case: allow opening wizard (going from null to any step)
+    if (setupStep === null) {
+      console.log('[Setup Wizard] Opening wizard:', { to: newStep, reason });
+      setSetupStep(newStep);
+      sessionStorage.setItem('setupStep', newStep);
+      return;
+    }
+    
+    const currentIndex = stepOrder.indexOf(setupStep);
+    const newIndex = stepOrder.indexOf(newStep);
+    
+    console.log(`[Setup Wizard] Step change requested:`, {
+      from: setupStep,
+      to: newStep,
+      reason,
+      currentIndex,
+      newIndex,
+      isBackNavigation: isBackNavigationRef.current
+    });
+    
+    // Allow if it's intentional back navigation
+    if (isBackNavigationRef.current) {
+      console.log('[Setup Wizard] Allowing backward navigation (back button pressed)');
+      isBackNavigationRef.current = false; // Reset flag
+      setSetupStep(newStep);
+      sessionStorage.setItem('setupStep', newStep);
+      return;
+    }
+    
+    // Allow forward navigation or staying on same step
+    if (newIndex >= currentIndex) {
+      console.log('[Setup Wizard] Allowing forward navigation');
+      setSetupStep(newStep);
+      sessionStorage.setItem('setupStep', newStep);
+      return;
+    }
+    
+    // Prevent unintended backward navigation
+    console.warn('[Setup Wizard] BLOCKED unintended backward navigation!', {
+      from: setupStep,
+      to: newStep,
+      reason
+    });
+  }, [setupStep]);
+  
+  // Check if screen is mobile-sized (< 768px)
+  const isMobileScreen = () => {
+    return window.innerWidth < 768;
+  };
+  
+  // Show mobile warning when game starts if on mobile
+  useEffect(() => {
+    if (gameState.gameStatus === 'playing' && gameState.cards.length > 0) {
+      // Check if user has already dismissed the warning this session
+      const warningDismissed = sessionStorage.getItem('mobileWarningDismissed');
+      if (!warningDismissed && isMobileScreen()) {
+        setShowMobileWarning(true);
+      }
+    }
+  }, [gameState.gameStatus, gameState.cards.length]);
+  
+  // Also check when auto-size is enabled
+  useEffect(() => {
+    if (autoSizeEnabled && isMobileScreen()) {
+      const warningDismissed = sessionStorage.getItem('mobileWarningDismissed');
+      if (!warningDismissed) {
+        setShowMobileWarning(true);
+      }
+    }
+  }, [autoSizeEnabled]);
+  
+  // Check on window resize if auto-size is enabled
+  useEffect(() => {
+    if (!autoSizeEnabled) return;
+    
+    const handleResize = () => {
+      const warningDismissed = sessionStorage.getItem('mobileWarningDismissed');
+      if (!warningDismissed && isMobileScreen() && gameState.cards.length > 0) {
+        setShowMobileWarning(true);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [autoSizeEnabled, gameState.cards.length]);
+  
+  const handleMobileWarningClose = () => {
+    setShowMobileWarning(false);
+    // Remember that user dismissed it for this session
+    sessionStorage.setItem('mobileWarningDismissed', 'true');
+  };
+
+  // Calculate card size immediately when pack is selected or auto-size is enabled
+  // This happens before cards are created, ensuring correct size from the start
+  useEffect(() => {
+    if (!autoSizeEnabled || gameState.cards.length > 0) {
+      // Don't calculate if auto-size is disabled or game is already in progress
+      return;
+    }
+
+    // Get card count from selected pack
+    const images = getCurrentPackImages;
+    const cardCount = images.length * 2; // Each image becomes a pair
+
+    if (cardCount > 0) {
+      calculateOptimalCardSizeForCount(cardCount);
+    }
+  }, [selectedPack, autoSizeEnabled, getCurrentPackImages, calculateOptimalCardSizeForCount, gameState.cards.length]);
+
+  const computeLayoutMetrics = useCallback(() => {
+    if (!autoSizeEnabled) {
+      const emptyMetrics = { boardWidth: 0, boardAvailableHeight: 0, scoreboardHeight: 0 };
+      updateAutoSizeMetrics(emptyMetrics);
+      return emptyMetrics;
+    }
+
+    const wrapperWidth = boardWrapperRef.current?.getBoundingClientRect().width ?? 0;
+    const scoreboardHeight = scoreboardRef.current?.getBoundingClientRect().height ?? 0;
+    const boardRect = gameBoardContainerRef.current?.getBoundingClientRect();
+    const bottomPadding = 24;
+    const boardAvailableHeight = boardRect
+      ? Math.max(window.innerHeight - boardRect.top - bottomPadding, 0)
+      : Math.max(window.innerHeight - (scoreboardHeight + bottomPadding), 0);
+
+    const metrics = {
+      boardWidth: wrapperWidth,
+      boardAvailableHeight,
+      scoreboardHeight
+    };
+
+    // Update state for future use
+    updateAutoSizeMetrics(metrics);
+
+    // Return metrics synchronously for immediate use
+    return metrics;
+  }, [autoSizeEnabled, updateAutoSizeMetrics]);
+
+  useEffect(() => {
+    if (!autoSizeEnabled) {
+      updateAutoSizeMetrics({ boardWidth: 0, boardAvailableHeight: 0, scoreboardHeight: 0 });
+      return;
+    }
+
+    const triggerMeasure = () => {
+      if (layoutMeasureRafRef.current) {
+        cancelAnimationFrame(layoutMeasureRafRef.current);
+      }
+      layoutMeasureRafRef.current = requestAnimationFrame(() => {
+        computeLayoutMetrics();
+      });
+    };
+
+    triggerMeasure();
+
+    const resizeObserver = new ResizeObserver(triggerMeasure);
+    if (boardWrapperRef.current) resizeObserver.observe(boardWrapperRef.current);
+    if (scoreboardRef.current) resizeObserver.observe(scoreboardRef.current);
+    if (gameBoardContainerRef.current) resizeObserver.observe(gameBoardContainerRef.current);
+
+    window.addEventListener('resize', triggerMeasure);
+
+    return () => {
+      if (layoutMeasureRafRef.current) {
+        cancelAnimationFrame(layoutMeasureRafRef.current);
+      }
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', triggerMeasure);
+    };
+  }, [autoSizeEnabled, computeLayoutMetrics, updateAutoSizeMetrics]);
   
   // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
   const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
@@ -139,6 +332,81 @@ function App() {
     }
   }, []);
 
+  // Prevent scrolling when in fullscreen mode
+  useEffect(() => {
+    if (!isFullscreen) {
+      // Restore normal scrolling when exiting fullscreen
+      document.documentElement.style.position = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.width = '';
+      document.documentElement.style.height = '';
+      document.body.style.position = '';
+      document.body.style.overflow = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.body.style.touchAction = '';
+      return;
+    }
+
+    // Prevent scrolling in fullscreen
+    const html = document.documentElement;
+    const body = document.body;
+    
+    // Store original values
+    const scrollY = window.scrollY;
+    
+    // Apply styles to prevent scrolling
+    html.style.position = 'fixed';
+    html.style.overflow = 'hidden';
+    html.style.width = '100%';
+    html.style.height = '100%';
+    html.style.top = `-${scrollY}px`;
+    
+    body.style.position = 'fixed';
+    body.style.overflow = 'hidden';
+    body.style.width = '100%';
+    body.style.height = '100%';
+    body.style.top = `-${scrollY}px`;
+    body.style.touchAction = 'none';
+
+    // Prevent touchmove events that could cause scrolling (except on interactive elements)
+    const preventScroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      // Allow touchmove on cards and other interactive elements
+      if (target.closest('[data-allow-touchmove]') || 
+          target.closest('button') || 
+          target.closest('input') || 
+          target.closest('textarea') ||
+          target.closest('[role="button"]')) {
+        return;
+      }
+      e.preventDefault();
+    };
+
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+
+    return () => {
+      // Restore scrolling
+      html.style.position = '';
+      html.style.overflow = '';
+      html.style.width = '';
+      html.style.height = '';
+      html.style.top = '';
+      
+      body.style.position = '';
+      body.style.overflow = '';
+      body.style.width = '';
+      body.style.height = '';
+      body.style.top = '';
+      body.style.touchAction = '';
+      
+      // Restore scroll position
+      window.scrollTo(0, scrollY);
+      
+      document.removeEventListener('touchmove', preventScroll);
+    };
+  }, [isFullscreen]);
+
   const toggleFullscreen = () => {
     if (screenfull.isEnabled) {
       screenfull.toggle();
@@ -147,20 +415,17 @@ function App() {
 
   const handlePackChange = (newPack: string) => {
     setSelectedPack(newPack as any);
-    setSetupStep('background');
-    sessionStorage.setItem('setupStep', 'background');
+    guardedSetSetupStep('background', 'pack selected');
   };
 
   const handleBackgroundChange = (newBackground: BackgroundTheme) => {
     setSelectedBackground(newBackground);
-    setSetupStep('cardBack');
-    sessionStorage.setItem('setupStep', 'cardBack');
+    guardedSetSetupStep('cardBack', 'background selected');
   };
 
   const handleCardBackChange = (newCardBack: CardBackType) => {
     setSelectedCardBack(newCardBack);
-    setSetupStep('startGame');
-    sessionStorage.setItem('setupStep', 'startGame');
+    guardedSetSetupStep('startGame', 'card back selected');
   };
 
   const handleResetClick = () => {
@@ -193,8 +458,7 @@ function App() {
     setOriginalCardBack(selectedCardBack);
     setIsResetting(true);
     resetGame();
-    setSetupStep('cardPack');
-    sessionStorage.setItem('setupStep', 'cardPack');
+    guardedSetSetupStep('cardPack', 'new game clicked');
     setShowResetConfirmation(false);
   };
 
@@ -212,26 +476,25 @@ function App() {
       }
       setIsResetting(false);
     }
-    setSetupStep(null);
-    sessionStorage.removeItem('setupStep');
+    guardedSetSetupStep(null, 'cancel setup flow');
   };
 
   const handleStartModalBack = () => {
-    // Go back to card back selection
-    setSetupStep('cardBack');
-    sessionStorage.setItem('setupStep', 'cardBack');
+    // Go back to card back selection (intentional backward navigation)
+    isBackNavigationRef.current = true;
+    guardedSetSetupStep('cardBack', 'back button from start modal');
   };
 
   const handleCardBackModalBack = () => {
-    // Go back to background selection
-    setSetupStep('background');
-    sessionStorage.setItem('setupStep', 'background');
+    // Go back to background selection (intentional backward navigation)
+    isBackNavigationRef.current = true;
+    guardedSetSetupStep('background', 'back button from card back modal');
   };
 
   const handleBackgroundModalBack = () => {
-    // Go back to card pack selection
-    setSetupStep('cardPack');
-    sessionStorage.setItem('setupStep', 'cardPack');
+    // Go back to card pack selection (intentional backward navigation)
+    isBackNavigationRef.current = true;
+    guardedSetSetupStep('cardPack', 'back button from background modal');
   };
 
   const handleStartGame = (firstPlayer: number) => {
@@ -239,10 +502,24 @@ function App() {
     const images = getCurrentPackImages;
     initializeGame(images, true); // true = start playing with animation
     startGameWithFirstPlayer(firstPlayer);
-    setSetupStep(null);
-    sessionStorage.removeItem('setupStep'); // Clear wizard state when game starts
+    guardedSetSetupStep(null, 'game started');
     setIsResetting(false);
     localStorage.setItem('hasPlayedBefore', 'true');
+    
+    // Measure layout metrics after modal closes and calculate card size
+    // Wait 100ms for DOM elements to be fully rendered and positioned
+    if (autoSizeEnabled) {
+      setTimeout(() => {
+        const measuredMetrics = computeLayoutMetrics();
+        console.log('[handleStartGame] Measured metrics after delay:', measuredMetrics);
+        
+        const cardCount = images.length * 2;
+        if (cardCount > 0 && measuredMetrics) {
+          console.log('[handleStartGame] Calculating card size with metrics for', cardCount, 'cards');
+          calculateOptimalCardSizeForCount(cardCount, measuredMetrics);
+        }
+      }, 100);
+    }
     
     // Store configuration for replay
     setLastConfig({
@@ -253,18 +530,18 @@ function App() {
     });
   };
 
-  // Prevent scrollbars during card animation
+  // Set overflow hidden to prevent page scrolling
+  // Settings sidebar will still scroll due to overflow-y-auto on its inner content
   useEffect(() => {
-    if (isAnimatingCards) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     
     return () => {
-      document.body.style.overflow = 'unset';
+      // Cleanup on unmount
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     };
-  }, [isAnimatingCards]);
+  }, []);
 
   // Keyboard combo detection for Pong
   useEffect(() => {
@@ -377,9 +654,6 @@ function App() {
       <div className="container mx-auto px-4 max-w-full">
         {gameState.gameStatus === 'setup' ? (
           <header className="text-center mb-8 relative">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">Ellie's Memory Game</h1>
-            <p className="text-gray-600">Two players take turns finding matching pairs!</p>
-            
             {/* Fullscreen Button */}
             {screenfull.isEnabled && (
               <button
@@ -454,12 +728,14 @@ function App() {
             >
                       <SettingsMenu
                         cardSize={cardSize}
+                        autoSizeEnabled={autoSizeEnabled}
                         useWhiteCardBackground={useWhiteCardBackground}
                         flipDuration={flipDuration}
                         emojiSizePercentage={emojiSizePercentage}
                         ttsEnabled={ttsEnabled}
                         onIncreaseSize={increaseCardSize}
                         onDecreaseSize={decreaseCardSize}
+                        onToggleAutoSize={toggleAutoSize}
                         onToggleWhiteCardBackground={toggleWhiteCardBackground}
                         onIncreaseFlipDuration={increaseFlipDuration}
                         onDecreaseFlipDuration={decreaseFlipDuration}
@@ -497,8 +773,7 @@ function App() {
                 <p className="text-xl text-gray-600 mb-8">Ready to play Ellie's Memory Game?</p>
                 <button
                   onClick={() => {
-                    setSetupStep('cardPack');
-                    sessionStorage.setItem('setupStep', 'cardPack');
+                    guardedSetSetupStep('cardPack', 'welcome screen start button');
                   }}
                   className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
                 >
@@ -509,9 +784,9 @@ function App() {
           )}
 
           {gameState.gameStatus === 'playing' && (
-            <div className="flex flex-col gap-6 items-center w-full max-w-full">
+            <div ref={boardWrapperRef} className="flex flex-col gap-6 items-center w-full max-w-full">
               {/* Compact Header - Players Points and Current Player */}
-              <div className="w-full max-w-2xl mx-auto">
+              <div ref={scoreboardRef} className="w-full max-w-2xl mx-auto">
                 <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-lg shadow-lg p-3 overflow-visible">
                   <div className="flex items-center justify-between overflow-visible">
               {/* Player 1 */}
@@ -639,7 +914,7 @@ function App() {
               </div>
 
               {/* Center Game Area - Full Width Below */}
-              <div className="w-full flex justify-center">
+              <div ref={gameBoardContainerRef} className="w-full flex justify-center">
                 <GameBoard 
                   cards={gameState.cards} 
                   onCardClick={flipCard}
@@ -663,8 +938,7 @@ function App() {
             onExploreCards={() => setShowCardExplorer(true)}
             onClose={() => {
               resetGame();
-              setSetupStep(null);
-              sessionStorage.removeItem('setupStep');
+              guardedSetSetupStep(null, 'game over close');
             }}
           />
         )}
@@ -792,6 +1066,12 @@ function App() {
             }
           />
         )}
+
+        {/* Mobile Warning Modal */}
+        <MobileWarningModal
+          isOpen={showMobileWarning}
+          onClose={handleMobileWarningClose}
+        />
       </div>
     </div>
   );

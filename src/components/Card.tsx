@@ -42,6 +42,7 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, em
   
   return (
     <div
+      data-allow-touchmove
       onPointerDown={card.isMatched ? undefined : (e) => {
         e.preventDefault(); // Prevent text selection and other default behaviors
         onClick();
@@ -61,7 +62,7 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, em
       <div
         className={`absolute inset-0 w-full h-full rounded-lg shadow-lg flex items-center justify-center border-2 ${
           activeCardBack.gradient ? `bg-gradient-to-br ${activeCardBack.gradient}` : ''
-        } ${activeCardBack.id === 'default' ? 'border-indigo-300' : activeCardBack.id === 'emoji' ? 'border-purple-300' : 'border-gray-300'}`}
+        } ${activeCardBack.id === 'default' ? 'border-indigo-300' : activeCardBack.id === 'emoji' ? 'border-purple-300' : activeCardBack.id === 'blue' ? 'border-blue-300' : 'border-gray-300'}`}
         style={{ 
           backfaceVisibility: 'hidden', 
           transform: 'rotateY(0deg)',
@@ -69,6 +70,10 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, em
             backgroundImage: `url(${activeCardBack.imageUrl})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center'
+          } : activeCardBack.radialGradient ? {
+            background: activeCardBack.radialGradient
+          } : activeCardBack.solidColor ? {
+            backgroundColor: activeCardBack.solidColor
           } : {})
         }}
       >

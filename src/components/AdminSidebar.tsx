@@ -13,7 +13,7 @@ export const AdminSidebar = ({
   onClose, 
   onEndGameEarly, 
   onToggleFlipAll,
-  allCardsFlipped 
+  allCardsFlipped
 }: AdminSidebarProps) => {
   // Handle Escape key to close sidebar
   useEffect(() => {

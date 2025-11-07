@@ -79,6 +79,16 @@ export const useMemoryGame = () => {
     const savedCardSize = localStorage.getItem('cardSize');
     return savedCardSize ? parseInt(savedCardSize, 10) : 100;
   });
+  const [autoSizeEnabled, setAutoSizeEnabled] = useState(() => {
+    // Load auto-size preference from localStorage, default to true
+    const saved = localStorage.getItem('autoSizeEnabled');
+    return saved === null ? true : saved === 'true';
+  });
+  const [layoutMetrics, setLayoutMetrics] = useState({
+    boardWidth: 0,
+    boardAvailableHeight: 0,
+    scoreboardHeight: 0
+  });
   const [useWhiteCardBackground, setUseWhiteCardBackground] = useState(() => {
     // Load white card background preference from localStorage
     const saved = localStorage.getItem('useWhiteCardBackground');
@@ -110,6 +120,122 @@ export const useMemoryGame = () => {
   // Initialize text-to-speech
   const { speakPlayerTurn, speakMatchFound, isAvailable, cancel: cancelTTS } = useTextToSpeech();
   const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateAutoSizeMetrics = useCallback((metrics: { boardWidth: number; boardAvailableHeight: number; scoreboardHeight: number }) => {
+    setLayoutMetrics(prev => {
+      const roundedPrev = {
+        boardWidth: Math.round(prev.boardWidth),
+        boardAvailableHeight: Math.round(prev.boardAvailableHeight),
+        scoreboardHeight: Math.round(prev.scoreboardHeight)
+      };
+      const roundedNext = {
+        boardWidth: Math.round(metrics.boardWidth),
+        boardAvailableHeight: Math.round(metrics.boardAvailableHeight),
+        scoreboardHeight: Math.round(metrics.scoreboardHeight)
+      };
+
+      if (
+        roundedPrev.boardWidth === roundedNext.boardWidth &&
+        roundedPrev.boardAvailableHeight === roundedNext.boardAvailableHeight &&
+        roundedPrev.scoreboardHeight === roundedNext.scoreboardHeight
+      ) {
+        return prev;
+      }
+
+      return metrics;
+    });
+  }, []);
+
+  const calculateOptimalCardSize = useCallback((cardCount: number, metricsOverride?: { boardWidth: number; boardAvailableHeight: number; scoreboardHeight: number }) => {
+    if (!autoSizeEnabled || cardCount === 0) {
+      return Math.min(Math.max(cardSize, 60), 300);
+    }
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    const horizontalPadding = 80;
+    const gapSize = 8;
+    const totalHorizontalGaps = 7 * gapSize;
+
+    // Use provided metrics override, or fall back to state layoutMetrics
+    const metrics = metricsOverride || layoutMetrics;
+
+    // Use measured width if available, otherwise calculate from viewport
+    const measuredBoardWidth = metrics.boardWidth > 0 ? metrics.boardWidth : 0;
+    const effectiveBoardWidth = Math.max(measuredBoardWidth || viewportWidth - horizontalPadding, 0);
+
+    const actualRows = Math.max(Math.ceil(cardCount / 8), 1);
+    const widthForCards = Math.max(effectiveBoardWidth - totalHorizontalGaps, actualRows);
+    const maxWidthBasedSize = Math.floor(widthForCards / 8);
+
+    const totalVerticalGaps = (actualRows - 1) * gapSize;
+    const safetyMargin = 10;
+
+    // Use measured metrics if available, otherwise use viewport-based fallback
+    // Scoreboard is typically ~90px + padding + gap, so reserve ~150px to be safe
+    const scoreboardReserve = metrics.scoreboardHeight > 0
+      ? metrics.scoreboardHeight + 50
+      : 150;
+    
+    // Calculate available height: use measured if available, otherwise viewport minus reserve
+    // When measured metrics aren't available, be more conservative with the reserve
+    const measuredAvailableHeight = metrics.boardAvailableHeight > 0
+      ? metrics.boardAvailableHeight
+      : Math.max(viewportHeight - scoreboardReserve - 20, actualRows); // Extra 20px buffer when using fallback
+    
+    const effectiveAvailableHeight = Math.max(measuredAvailableHeight - safetyMargin, actualRows);
+    const heightForCards = Math.max(effectiveAvailableHeight - totalVerticalGaps, actualRows);
+    const maxHeightBasedSize = Math.floor(heightForCards / actualRows);
+
+    const optimalSize = Math.min(
+      300,
+      Math.max(60, Math.min(maxWidthBasedSize, maxHeightBasedSize))
+    );
+
+    console.log('[AUTO-SIZE] Calculated optimal size', {
+      cardCount,
+      actualRows,
+      viewportWidth,
+      viewportHeight,
+      availableWidth: effectiveBoardWidth,
+      availableHeight: effectiveAvailableHeight,
+      totalVerticalGaps,
+      maxWidthBasedSize,
+      maxHeightBasedSize,
+      optimalSize,
+      verticalReserved: scoreboardReserve,
+      usingMeasuredMetrics: metrics.boardWidth > 0 || metrics.boardAvailableHeight > 0,
+      metricsOverrideProvided: !!metricsOverride
+    });
+
+    return optimalSize;
+  }, [autoSizeEnabled, cardSize, layoutMetrics]);
+
+  // Exported function for calculating card size based on card count
+  // Can be called externally (e.g., when pack is selected) before cards are created
+  // Optional metricsOverride allows passing measured metrics directly to bypass state timing issues
+  const calculateOptimalCardSizeForCount = useCallback((cardCount: number, metricsOverride?: { boardWidth: number; boardAvailableHeight: number; scoreboardHeight: number }) => {
+    if (!autoSizeEnabled || cardCount === 0) {
+      return;
+    }
+
+    const optimalSize = calculateOptimalCardSize(cardCount, metricsOverride);
+    if (optimalSize !== cardSize) {
+      setCardSize(optimalSize);
+      localStorage.setItem('cardSize', optimalSize.toString());
+    }
+  }, [autoSizeEnabled, calculateOptimalCardSize, cardSize]);
+
+  useEffect(() => {
+    if (!autoSizeEnabled || gameState.cards.length === 0) return;
+
+    const optimalSize = calculateOptimalCardSize(gameState.cards.length);
+    if (optimalSize !== cardSize) {
+      setCardSize(optimalSize);
+      localStorage.setItem('cardSize', optimalSize.toString());
+    }
+  }, [autoSizeEnabled, calculateOptimalCardSize, cardSize, gameState.cards.length]);
 
   // Save game state to sessionStorage whenever it changes
   useEffect(() => {
@@ -147,6 +273,9 @@ export const useMemoryGame = () => {
     
     const cards: Card[] = [];
     
+    // Note: Card size is calculated in handleStartGame before initializeGame is called
+    // with measured metrics passed directly to avoid state timing issues
+
     // Create pairs of cards
     images.forEach((image, index) => {
       cards.push({
@@ -266,6 +395,14 @@ export const useMemoryGame = () => {
     setUseWhiteCardBackground(prev => {
       const newValue = !prev;
       localStorage.setItem('useWhiteCardBackground', newValue.toString());
+      return newValue;
+    });
+  }, []);
+
+  const toggleAutoSize = useCallback(() => {
+    setAutoSizeEnabled(prev => {
+      const newValue = !prev;
+      localStorage.setItem('autoSizeEnabled', newValue.toString());
       return newValue;
     });
   }, []);
@@ -933,6 +1070,7 @@ export const useMemoryGame = () => {
     showStartModal,
     setShowStartModal,
     cardSize,
+    autoSizeEnabled,
     useWhiteCardBackground,
     flipDuration,
     emojiSizePercentage,
@@ -946,6 +1084,7 @@ export const useMemoryGame = () => {
     increaseCardSize,
     decreaseCardSize,
     toggleWhiteCardBackground,
+    toggleAutoSize,
     increaseFlipDuration,
     decreaseFlipDuration,
     increaseEmojiSize,
@@ -958,6 +1097,8 @@ export const useMemoryGame = () => {
     flipAllExceptLastPair,
     endGameEarly,
     toggleAllCardsFlipped,
-    allCardsFlipped
+    allCardsFlipped,
+    updateAutoSizeMetrics,
+    calculateOptimalCardSizeForCount
   };
 };

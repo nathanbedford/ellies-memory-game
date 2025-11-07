@@ -93,3 +93,16 @@
     #dbeafe 100%     /* sky blue */
   );
 }
+
+/* Prevent scrolling when in fullscreen mode */
+:fullscreen,
+:-webkit-full-screen,
+:-moz-full-screen,
+:-ms-fullscreen {
+  overflow: hidden !important;
+}
+
+/* Ensure cards remain interactive in fullscreen */
+[data-allow-touchmove] {
+  touch-action: manipulation;
+}

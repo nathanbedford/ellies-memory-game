@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { CardPackOption } from '../types';
+import { CardPackOption, Card } from '../types';
 import { CARD_DECKS } from '../data/cardDecks';
+import { CardExplorerModal } from './CardExplorerModal';
+import { useCardBackSelector } from '../hooks/useCardBackSelector';
 
 interface CardPackModalProps {
   cardPacks: CardPackOption[];
@@ -17,6 +19,8 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
   };
   
   const [activeTab, setActiveTab] = useState<'emoji' | 'pictures'>(getInitialTab());
+  const [previewPackId, setPreviewPackId] = useState<string | null>(null);
+  const { getCurrentCardBack } = useCardBackSelector();
 
   const handleSelect = (packId: string) => {
     onSelect(packId);
@@ -85,6 +89,28 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
   // Determine which packs to show based on active tab
   const displayedPacks = activeTab === 'emoji' ? emojiPacks : picturePacks;
 
+  // Helper function to convert deck cards to Card[] format for CardExplorerModal
+  const getCardsForPack = (packId: string): Card[] => {
+    const deck = CARD_DECKS.find(d => d.id === packId);
+    if (!deck) return [];
+    
+    return deck.cards.map((cardData, index) => ({
+      id: `preview-card-${index}`,
+      imageId: cardData.id,
+      imageUrl: cardData.imageUrl || cardData.emoji,
+      gradient: cardData.gradient,
+      isFlipped: false,
+      isMatched: false
+    }));
+  };
+
+  const handlePreviewClick = (e: React.MouseEvent, packId: string) => {
+    e.stopPropagation(); // Prevent pack selection
+    setPreviewPackId(packId);
+  };
+
+  const previewCards = previewPackId ? getCardsForPack(previewPackId) : [];
+
   return (
     <div className="space-y-6">
       {/* Tabs */}
@@ -114,15 +140,34 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
       {/* Card Pack Options */}
       <div className="grid grid-cols-2 gap-6">
         {displayedPacks.map((pack) => (
-          <button
+          <div
           key={pack.id}
-          onClick={() => handleSelect(pack.id)}
-          className={`p-8 rounded-xl border-3 transition-all duration-200 transform hover:scale-105 ${
+          className={`relative p-8 rounded-xl border-3 transition-all duration-200 transform hover:scale-105 ${
             selectedPack === pack.id
               ? 'border-blue-500 bg-blue-50 shadow-lg'
               : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
           }`}
         >
+          {/* Preview Icon Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePreviewClick(e, pack.id);
+            }}
+            className="absolute top-2 right-2 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors z-10"
+            type="button"
+            title="Preview cards"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+          
+          <button
+            onClick={() => handleSelect(pack.id)}
+            className="w-full"
+          >
           {/* Preview Section */}
           {pack.id === 'animals-real' ? (
             <div className="mb-4">
@@ -239,8 +284,20 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
             )}
           </div>
           </button>
+        </div>
         ))}
       </div>
+
+      {/* Card Explorer Modal for Preview */}
+      <CardExplorerModal
+        isOpen={previewPackId !== null}
+        onClose={() => setPreviewPackId(null)}
+        cards={previewCards}
+        cardSize={100}
+        useWhiteCardBackground={false}
+        emojiSizePercentage={72}
+        cardBack={getCurrentCardBack()}
+      />
     </div>
   );
 };

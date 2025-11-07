@@ -12,7 +12,9 @@ interface BackgroundModalProps {
 export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack, isResetting = false }: BackgroundModalProps) => {
   const [activeTab, setActiveTab] = useState<'colors' | 'pictures'>('colors');
 
-  const handleSelect = (backgroundId: string) => {
+  const handleSelect = (e: React.MouseEvent, backgroundId: string) => {
+    e.stopPropagation(); // Prevent event bubbling
+    console.log('[BackgroundModal] Background selected:', backgroundId);
     onSelect(backgroundId);
     // Don't call onClose here - let the parent handle navigation
   };
@@ -51,7 +53,7 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
         {(activeTab === 'colors' ? colorOptions : pictureOptions).map((option) => (
           <button
             key={option.id}
-            onClick={() => handleSelect(option.id)}
+            onClick={(e) => handleSelect(e, option.id)}
             className={`p-6 rounded-xl border-3 transition-all duration-200 transform hover:scale-[1.02] ${
               selectedBackground === option.id
                 ? 'border-purple-500 bg-purple-50 shadow-lg'

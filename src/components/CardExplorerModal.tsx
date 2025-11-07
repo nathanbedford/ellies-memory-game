@@ -27,11 +27,14 @@ export const CardExplorerModal = ({
 
   if (!isOpen) return null;
 
-  // Get unique cards (one per imageId)
+  // Get unique cards (one per imageId) and ensure they're flipped to show faces
   const uniqueCardsMap = new Map<string, Card>();
   cards.forEach(card => {
     if (!uniqueCardsMap.has(card.imageId)) {
-      uniqueCardsMap.set(card.imageId, card);
+      uniqueCardsMap.set(card.imageId, {
+        ...card,
+        isFlipped: true // Show card faces in explorer
+      });
     }
   });
   const uniqueCards = Array.from(uniqueCardsMap.values());
@@ -50,7 +53,7 @@ export const CardExplorerModal = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-8">
         {/* Backdrop */}
         <div 
           className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
