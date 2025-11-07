@@ -3,6 +3,7 @@ import { useMemoryGame } from './hooks/useMemoryGame';
 import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme } from './hooks/useBackgroundSelector';
 import { useCardBackSelector, CardBackType } from './hooks/useCardBackSelector';
+import { CardPack } from './types';
 import { GameBoard } from './components/GameBoard';
 import { GameOver } from './components/GameOver';
 import { Modal } from './components/Modal';
@@ -21,6 +22,11 @@ import screenfull from 'screenfull';
 
 type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
+// Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
+const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
+// Test combo: 1, 2, 2, 5, 1, 2, 2, 5 (to advance game to end state)
+const TEST_COMBO_SEQUENCE = ['1', '2', '2', '5', '1', '2', '2', '5'];
+
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
   const { gameState, cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, toggleAutoSize, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, endGameEarly, toggleAllCardsFlipped, updateAutoSizeMetrics, calculateOptimalCardSizeForCount } = useMemoryGame();
@@ -37,7 +43,7 @@ function App() {
         if (parsed && parsed.cards && parsed.cards.length > 0) {
           return null;
         }
-      } catch (e) {
+      } catch {
         // Invalid saved state, continue to restore wizard
       }
     }
@@ -78,12 +84,12 @@ function App() {
   // Track if we're in a back navigation to allow intentional backward steps
   const isBackNavigationRef = useRef(false);
   
-  // Define step order for guarding against backward navigation
-  // null appears at both start and end - start for initial state, end for closed state
-  const stepOrder: SetupStep[] = ['cardPack', 'background', 'cardBack', 'startGame'];
-  
   // Guarded setSetupStep that prevents unintended backward navigation
   const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
+    // Define step order for guarding against backward navigation
+    // null appears at both start and end - start for initial state, end for closed state
+    const stepOrder: SetupStep[] = ['cardPack', 'background', 'cardBack', 'startGame'];
+    
     // Special case: allow closing the wizard (going to null) from any step
     if (newStep === null) {
       console.log('[Setup Wizard] Closing wizard:', { from: setupStep, reason });
@@ -261,11 +267,6 @@ function App() {
       window.removeEventListener('resize', triggerMeasure);
     };
   }, [autoSizeEnabled, computeLayoutMetrics, updateAutoSizeMetrics]);
-  
-  // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
-  const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
-  // Test combo: 1, 2, 2, 5, 1, 2, 2, 5 (to advance game to end state)
-  const TEST_COMBO_SEQUENCE = ['1', '2', '2', '5', '1', '2', '2', '5'];
 
   // Detect turn switches and trigger glow effect
   useEffect(() => {
@@ -414,7 +415,7 @@ function App() {
   };
 
   const handlePackChange = (newPack: string) => {
-    setSelectedPack(newPack as any);
+    setSelectedPack(newPack as CardPack);
     guardedSetSetupStep('background', 'pack selected');
   };
 
@@ -444,7 +445,7 @@ function App() {
     if (!lastConfig) return;
     
     resetGame();
-    setSelectedPack(lastConfig.pack as any);
+    setSelectedPack(lastConfig.pack as CardPack);
     setSelectedBackground(lastConfig.background);
     setSelectedCardBack(lastConfig.cardBack);
     setShowResetConfirmation(false);
@@ -466,7 +467,7 @@ function App() {
     // Restore original state if resetting
     if (isResetting) {
       if (originalPack !== null) {
-        setSelectedPack(originalPack as any);
+        setSelectedPack(originalPack as CardPack);
       }
       if (originalBackground !== null) {
         setSelectedBackground(originalBackground);

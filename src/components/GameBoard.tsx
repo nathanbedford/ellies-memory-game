@@ -95,7 +95,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         rotation
       };
     });
-  }, [cards.length, isAnimating, cardSize]);
+  }, [isAnimating, cardSize, cards]);
 
   // Calculate fly-to-player animation data
   const flyToPlayerData = useMemo(() => {

@@ -696,7 +696,7 @@ export const useMemoryGame = () => {
 
       return newState;
     });
-  }, [speakPlayerTurn, speakMatchFound, isAvailable, flipDuration, cancelTTS, ttsEnabled]);
+  }, [speakPlayerTurn, speakMatchFound, isAvailable, ttsEnabled]);
 
   const endTurn = useCallback(() => {
     // Cancel any pending match check
