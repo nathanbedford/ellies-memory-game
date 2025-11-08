@@ -1,5 +1,12 @@
 import { CARD_BACK_OPTIONS } from '../hooks/useCardBackSelector';
 
+const ENABLE_SETUP_DEBUG_LOGS = true;
+
+const logWizardInteraction = (...args: unknown[]) => {
+  if (!ENABLE_SETUP_DEBUG_LOGS) return;
+  console.log('[Setup Wizard Interaction]', ...args);
+};
+
 interface CardBackModalProps {
   selectedCardBack: string;
   onSelect: (cardBackId: string) => void;
@@ -8,10 +15,10 @@ interface CardBackModalProps {
   isResetting?: boolean;
 }
 
-export const CardBackModal = ({ selectedCardBack, onSelect, onClose, onBack, isResetting = false }: CardBackModalProps) => {
+export const CardBackModal = ({ selectedCardBack, onSelect, onClose: _onClose, onBack: _onBack, isResetting: _isResetting = false }: CardBackModalProps) => {
   const handleSelect = (e: React.MouseEvent, cardBackId: string) => {
     e.stopPropagation(); // Prevent event bubbling
-    console.log('[CardBackModal] Card back selected:', cardBackId);
+    logWizardInteraction('Card back selected', { cardBackId, currentCardBack: selectedCardBack });
     onSelect(cardBackId);
     // Don't call onClose here - let the parent handle navigation
   };
@@ -84,25 +91,6 @@ export const CardBackModal = ({ selectedCardBack, onSelect, onClose, onBack, isR
           </button>
         ))}
       </div>
-
-      {/* Navigation Buttons for Reset Flow */}
-      {isResetting && (
-        <div className="flex gap-4 pt-4 border-t border-gray-200">
-          <button
-            onClick={onBack}
-            className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
-          >
-            ← Back to Background
-          </button>
-          
-          <button
-            onClick={onClose}
-            className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
-          >
-            Continue →
-          </button>
-        </div>
-      )}
     </div>
   );
 };

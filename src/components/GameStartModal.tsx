@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { Player } from '../types';
 
+const ENABLE_SETUP_DEBUG_LOGS = true;
+
+const logWizardInteraction = (...args: unknown[]) => {
+  if (!ENABLE_SETUP_DEBUG_LOGS) return;
+  console.log('[Setup Wizard Interaction]', ...args);
+};
+
 interface GameStartModalProps {
   players: Player[];
   currentPlayer: number;
@@ -11,7 +18,7 @@ interface GameStartModalProps {
   isResetting?: boolean;
 }
 
-export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNameChange, onPlayerColorChange, onBack, isResetting = false }: GameStartModalProps) => {
+export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNameChange, onPlayerColorChange, onBack: _onBack, isResetting = false }: GameStartModalProps) => {
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2>(currentPlayer as 1 | 2);
   const [editingPlayer, setEditingPlayer] = useState<1 | 2 | null>(null);
   const player1 = players.find(p => p.id === 1);
@@ -40,6 +47,12 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
   ];
 
   const handleStart = () => {
+    logWizardInteraction('Start game clicked', {
+      selectedPlayer,
+      tempNames,
+      tempColors,
+      isResetting,
+    });
     const currentPlayer1 = players.find(p => p.id === 1);
     const currentPlayer2 = players.find(p => p.id === 2);
     // Apply any name changes before starting
@@ -78,6 +91,15 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
     if (onPlayerColorChange) {
       onPlayerColorChange(playerId, newColor);
     }
+  };
+
+  const handlePlayerSelection = (playerId: 1 | 2) => {
+    logWizardInteraction('Player selection toggled', {
+      playerId,
+      previousSelection: selectedPlayer,
+      isResetting,
+    });
+    setSelectedPlayer(playerId);
   };
 
   const handleNameSubmit = (e: React.FormEvent) => {
@@ -206,7 +228,7 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
         </div>
         ) : (
           <button
-            onClick={() => setSelectedPlayer(1)}
+            onClick={() => handlePlayerSelection(1)}
             className={`p-8 rounded-xl border-3 transition-all duration-300 transform hover:scale-105 ${
               selectedPlayer === 1
                 ? 'shadow-xl ring-4 ring-opacity-30'
@@ -351,7 +373,7 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
         </div>
         ) : (
           <button
-            onClick={() => setSelectedPlayer(2)}
+            onClick={() => handlePlayerSelection(2)}
             className={`p-8 rounded-xl border-3 transition-all duration-300 transform hover:scale-105 ${
               selectedPlayer === 2
                 ? 'shadow-xl ring-4 ring-opacity-30'
@@ -399,25 +421,12 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
         )}
       </div>
 
-      <div className="flex gap-4">
-        {isResetting && onBack && (
-          <button
-            onClick={onBack}
-            className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
-          >
-            ← Back
-          </button>
-        )}
-        
-        <button
-          onClick={handleStart}
-          className={`font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02] ${
-            isResetting && onBack ? 'flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700' : 'w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'
-          } text-white`}
-        >
-          🎮 Start Game
-        </button>
-      </div>
+      <button
+        onClick={handleStart}
+        className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
+      >
+        🎮 Start Game
+      </button>
     </div>
   );
 };

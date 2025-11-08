@@ -4,6 +4,13 @@ import { CARD_DECKS } from '../data/cardDecks';
 import { CardExplorerModal } from './CardExplorerModal';
 import { useCardBackSelector } from '../hooks/useCardBackSelector';
 
+const ENABLE_SETUP_DEBUG_LOGS = true;
+
+const logWizardInteraction = (...args: unknown[]) => {
+  if (!ENABLE_SETUP_DEBUG_LOGS) return;
+  console.log('[Setup Wizard Interaction]', ...args);
+};
+
 interface CardPackModalProps {
   cardPacks: CardPackOption[];
   selectedPack: string;
@@ -23,6 +30,7 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
   const { getCurrentCardBack } = useCardBackSelector();
 
   const handleSelect = (packId: string) => {
+    logWizardInteraction('Card pack selected', { packId, selectedPack });
     onSelect(packId);
     // Don't call onClose here - let the parent handle navigation
   };

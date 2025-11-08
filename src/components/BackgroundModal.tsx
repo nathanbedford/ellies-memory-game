@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { BACKGROUND_OPTIONS } from '../hooks/useBackgroundSelector';
 
+const ENABLE_SETUP_DEBUG_LOGS = true;
+
+const logWizardInteraction = (...args: unknown[]) => {
+  if (!ENABLE_SETUP_DEBUG_LOGS) return;
+  console.log('[Setup Wizard Interaction]', ...args);
+};
+
 interface BackgroundModalProps {
   selectedBackground: string;
   onSelect: (backgroundId: string) => void;
@@ -9,12 +16,12 @@ interface BackgroundModalProps {
   isResetting?: boolean;
 }
 
-export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack, isResetting = false }: BackgroundModalProps) => {
+export const BackgroundModal = ({ selectedBackground, onSelect, onClose: _onClose, onBack: _onBack, isResetting: _isResetting = false }: BackgroundModalProps) => {
   const [activeTab, setActiveTab] = useState<'colors' | 'pictures'>('colors');
 
   const handleSelect = (e: React.MouseEvent, backgroundId: string) => {
     e.stopPropagation(); // Prevent event bubbling
-    console.log('[BackgroundModal] Background selected:', backgroundId);
+    logWizardInteraction('Background selected', { backgroundId, currentBackground: selectedBackground });
     onSelect(backgroundId);
     // Don't call onClose here - let the parent handle navigation
   };
@@ -103,25 +110,6 @@ export const BackgroundModal = ({ selectedBackground, onSelect, onClose, onBack,
           </button>
         ))}
       </div>
-
-      {/* Navigation Buttons for Reset Flow */}
-      {isResetting && (
-        <div className="flex gap-4 pt-4 border-t border-gray-200">
-          <button
-            onClick={onBack}
-            className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
-          >
-            ← Back to Cards
-          </button>
-          
-          <button
-            onClick={onClose}
-            className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
-          >
-            Continue →
-          </button>
-        </div>
-      )}
     </div>
   );
 };

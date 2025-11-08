@@ -23,6 +23,18 @@ import screenfull from 'screenfull';
 
 type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
+const ENABLE_SETUP_DEBUG_LOGS = true;
+
+const setupWizardLog = (...args: unknown[]) => {
+  if (!ENABLE_SETUP_DEBUG_LOGS) return;
+  console.log('[Setup Wizard]', ...args);
+};
+
+const setupWizardWarn = (...args: unknown[]) => {
+  if (!ENABLE_SETUP_DEBUG_LOGS) return;
+  console.warn('[Setup Wizard]', ...args);
+};
+
 // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
 const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
 // Test combo: 1, 2, 2, 5, 1, 2, 2, 5 (to advance game to end state)
@@ -88,60 +100,58 @@ function App() {
   
   // Guarded setSetupStep that prevents unintended backward navigation
   const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
-    // Define step order for guarding against backward navigation
-    // null appears at both start and end - start for initial state, end for closed state
     const stepOrder: SetupStep[] = ['cardPack', 'background', 'cardBack', 'startGame'];
-    
-    // Special case: allow closing the wizard (going to null) from any step
+    const diagnosticBase = {
+      from: setupStep,
+      to: newStep,
+      reason,
+      isBackNavigation: isBackNavigationRef.current,
+    };
+
     if (newStep === null) {
-      console.log('[Setup Wizard] Closing wizard:', { from: setupStep, reason });
+      setupWizardLog('Closing wizard', diagnosticBase);
       setSetupStep(null);
       sessionStorage.removeItem('setupStep');
       return;
     }
-    
-    // Special case: allow opening wizard (going from null to any step)
+
     if (setupStep === null) {
-      console.log('[Setup Wizard] Opening wizard:', { to: newStep, reason });
+      setupWizardLog('Opening wizard', diagnosticBase);
       setSetupStep(newStep);
       sessionStorage.setItem('setupStep', newStep);
       return;
     }
-    
+
     const currentIndex = stepOrder.indexOf(setupStep);
     const newIndex = stepOrder.indexOf(newStep);
-    
-    console.log(`[Setup Wizard] Step change requested:`, {
-      from: setupStep,
-      to: newStep,
-      reason,
+    const diagnostic = {
+      ...diagnosticBase,
       currentIndex,
       newIndex,
-      isBackNavigation: isBackNavigationRef.current
-    });
-    
-    // Allow if it's intentional back navigation
+      stepOrder,
+    };
+
+    setupWizardLog('Step change requested', diagnostic);
+
     if (isBackNavigationRef.current) {
-      console.log('[Setup Wizard] Allowing backward navigation (back button pressed)');
-      isBackNavigationRef.current = false; // Reset flag
+      setupWizardLog('Allowing backward navigation (explicit back trigger)', diagnostic);
+      isBackNavigationRef.current = false;
       setSetupStep(newStep);
       sessionStorage.setItem('setupStep', newStep);
       return;
     }
-    
-    // Allow forward navigation or staying on same step
+
     if (newIndex >= currentIndex) {
-      console.log('[Setup Wizard] Allowing forward navigation');
+      setupWizardLog('Allowing forward navigation', diagnostic);
       setSetupStep(newStep);
       sessionStorage.setItem('setupStep', newStep);
       return;
     }
-    
-    // Prevent unintended backward navigation
-    console.warn('[Setup Wizard] BLOCKED unintended backward navigation!', {
-      from: setupStep,
-      to: newStep,
-      reason
+
+    const error = new Error('guardedSetSetupStep blocked navigation');
+    setupWizardWarn('BLOCKED unintended backward navigation', {
+      ...diagnostic,
+      stack: error.stack,
     });
   }, [setupStep]);
   
