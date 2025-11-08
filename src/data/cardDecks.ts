@@ -26,6 +26,11 @@ const getJungleAnimalImageUrl = (jungleAnimalId: string): string => {
   return `/deck-images/jungle-animals/${jungleAnimalId}.jpg`;
 };
 
+// Helper function to get image URL for plush-cute-animals-real deck
+const getPlushAnimalImageUrl = (plushAnimalId: string): string => {
+  return `/deck-images/plush-cute-animals/${plushAnimalId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1315,6 +1320,133 @@ export const CARD_DECKS: CardDeck[] = [
         emoji: '🦜',
         gradient: 'from-yellow-400 to-blue-600',
         imageUrl: getJungleAnimalImageUrl('toucan')
+      }
+    ]
+  },
+  {
+    id: 'plush-cute-animals-real',
+    name: 'Plush Cute Animals',
+    emoji: '🧸',
+    cards: [
+      { 
+        id: 'baby-elephant', 
+        emoji: '🐘',
+        gradient: 'from-gray-300 to-gray-500',
+        imageUrl: getPlushAnimalImageUrl('baby-elephant')
+      },
+      { 
+        id: 'baby-giraffe', 
+        emoji: '🦒',
+        gradient: 'from-yellow-300 to-amber-500',
+        imageUrl: getPlushAnimalImageUrl('baby-giraffe')
+      },
+      { 
+        id: 'baby-tiger', 
+        emoji: '🐯',
+        gradient: 'from-orange-400 to-orange-600',
+        imageUrl: getPlushAnimalImageUrl('baby-tiger')
+      },
+      { 
+        id: 'bunny', 
+        emoji: '🐰',
+        gradient: 'from-gray-100 to-gray-300',
+        imageUrl: getPlushAnimalImageUrl('bunny')
+      },
+      { 
+        id: 'chick', 
+        emoji: '🐤',
+        gradient: 'from-yellow-300 to-yellow-500',
+        imageUrl: getPlushAnimalImageUrl('chick')
+      },
+      { 
+        id: 'chipmunk', 
+        emoji: '🐿️',
+        gradient: 'from-amber-500 to-amber-700',
+        imageUrl: getPlushAnimalImageUrl('chipmunk')
+      },
+      { 
+        id: 'duckling', 
+        emoji: '🦆',
+        gradient: 'from-yellow-300 to-yellow-500',
+        imageUrl: getPlushAnimalImageUrl('duckling')
+      },
+      { 
+        id: 'fawn', 
+        emoji: '🦌',
+        gradient: 'from-amber-400 to-amber-600',
+        imageUrl: getPlushAnimalImageUrl('fawn')
+      },
+      { 
+        id: 'fox', 
+        emoji: '🦊',
+        gradient: 'from-orange-400 to-red-600',
+        imageUrl: getPlushAnimalImageUrl('fox')
+      },
+      { 
+        id: 'hedgehog', 
+        emoji: '🦔',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getPlushAnimalImageUrl('hedgehog')
+      },
+      { 
+        id: 'kitten', 
+        emoji: '🐱',
+        gradient: 'from-orange-300 to-orange-500',
+        imageUrl: getPlushAnimalImageUrl('kitten')
+      },
+      { 
+        id: 'koala', 
+        emoji: '🐨',
+        gradient: 'from-gray-200 to-gray-400',
+        imageUrl: getPlushAnimalImageUrl('koala')
+      },
+      { 
+        id: 'lamb', 
+        emoji: '🐑',
+        gradient: 'from-white to-gray-200',
+        imageUrl: getPlushAnimalImageUrl('lamb')
+      },
+      { 
+        id: 'otter', 
+        emoji: '🦦',
+        gradient: 'from-amber-400 to-amber-600',
+        imageUrl: getPlushAnimalImageUrl('otter')
+      },
+      { 
+        id: 'panda', 
+        emoji: '🐼',
+        gradient: 'from-gray-200 to-gray-400',
+        imageUrl: getPlushAnimalImageUrl('panda')
+      },
+      { 
+        id: 'penguin', 
+        emoji: '🐧',
+        gradient: 'from-gray-600 to-gray-800',
+        imageUrl: getPlushAnimalImageUrl('penguin')
+      },
+      { 
+        id: 'puppy', 
+        emoji: '🐶',
+        gradient: 'from-amber-500 to-amber-700',
+        imageUrl: getPlushAnimalImageUrl('puppy')
+      },
+      { 
+        id: 'red-panda', 
+        emoji: '🐼',
+        gradient: 'from-red-500 to-orange-600',
+        imageUrl: getPlushAnimalImageUrl('red-panda')
+      },
+      { 
+        id: 'seal-pup', 
+        emoji: '🦭',
+        gradient: 'from-gray-300 to-gray-500',
+        imageUrl: getPlushAnimalImageUrl('seal-pup')
+      },
+      { 
+        id: 'sloth', 
+        emoji: '🦥',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getPlushAnimalImageUrl('sloth')
       }
     ]
   }

@@ -171,7 +171,7 @@ function App() {
       return true;
     }
     // iOS Safari specific check
-    if ((window.navigator as any).standalone === true) {
+    if ('standalone' in window.navigator && (window.navigator as Navigator & { standalone?: boolean }).standalone === true) {
       return true;
     }
     return false;
