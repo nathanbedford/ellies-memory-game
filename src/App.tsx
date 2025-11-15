@@ -610,6 +610,19 @@ function App() {
     };
   }, []);
 
+  // Disable context menu globally
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu);
+    
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, []);
+
   // Keyboard combo detection for Pong
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
