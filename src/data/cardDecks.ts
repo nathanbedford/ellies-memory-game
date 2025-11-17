@@ -31,6 +31,11 @@ const getPlushAnimalImageUrl = (plushAnimalId: string): string => {
   return `/deck-images/plush-cute-animals/${plushAnimalId}.jpg`;
 };
 
+// Helper function to get image URL for construction-real deck
+const getConstructionImageUrl = (constructionId: string): string => {
+  return `/deck-images/construction/${constructionId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1447,6 +1452,133 @@ export const CARD_DECKS: CardDeck[] = [
         emoji: '🦥',
         gradient: 'from-gray-400 to-gray-600',
         imageUrl: getPlushAnimalImageUrl('sloth')
+      }
+    ]
+  },
+  {
+    id: 'construction-real',
+    name: 'Construction',
+    emoji: '🔨',
+    cards: [
+      { 
+        id: 'asphalt-paver', 
+        emoji: '🚧',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getConstructionImageUrl('asphalt-paver')
+      },
+      { 
+        id: 'barricades', 
+        emoji: '🚧',
+        gradient: 'from-orange-500 to-orange-700',
+        imageUrl: getConstructionImageUrl('barricades')
+      },
+      { 
+        id: 'boom-lift', 
+        emoji: '🏗️',
+        gradient: 'from-yellow-500 to-orange-600',
+        imageUrl: getConstructionImageUrl('boom-lift')
+      },
+      { 
+        id: 'bulldozer', 
+        emoji: '🚜',
+        gradient: 'from-yellow-500 to-yellow-700',
+        imageUrl: getConstructionImageUrl('bulldozer')
+      },
+      { 
+        id: 'cement-mixer-truck', 
+        emoji: '🚛',
+        gradient: 'from-gray-400 to-gray-600',
+        imageUrl: getConstructionImageUrl('cement-mixer-truck')
+      },
+      { 
+        id: 'concrete-pump-truck', 
+        emoji: '🚛',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getConstructionImageUrl('concrete-pump-truck')
+      },
+      { 
+        id: 'dump-truck', 
+        emoji: '🚛',
+        gradient: 'from-yellow-600 to-orange-700',
+        imageUrl: getConstructionImageUrl('dump-truck')
+      },
+      { 
+        id: 'excavator', 
+        emoji: '🚜',
+        gradient: 'from-yellow-500 to-yellow-700',
+        imageUrl: getConstructionImageUrl('excavator')
+      },
+      { 
+        id: 'forklift', 
+        emoji: '🚜',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getConstructionImageUrl('forklift')
+      },
+      { 
+        id: 'front-loader', 
+        emoji: '🚜',
+        gradient: 'from-yellow-500 to-orange-600',
+        imageUrl: getConstructionImageUrl('front-loader')
+      },
+      { 
+        id: 'hard-hat', 
+        emoji: '👷',
+        gradient: 'from-yellow-400 to-yellow-600',
+        imageUrl: getConstructionImageUrl('hard-hat')
+      },
+      { 
+        id: 'jackhammer', 
+        emoji: '🔨',
+        gradient: 'from-gray-600 to-gray-800',
+        imageUrl: getConstructionImageUrl('jackhammer')
+      },
+      { 
+        id: 'road-roller', 
+        emoji: '🚜',
+        gradient: 'from-yellow-500 to-yellow-700',
+        imageUrl: getConstructionImageUrl('road-roller')
+      },
+      { 
+        id: 'scraper', 
+        emoji: '🚜',
+        gradient: 'from-yellow-600 to-orange-700',
+        imageUrl: getConstructionImageUrl('scraper')
+      },
+      { 
+        id: 'snowplow-truck', 
+        emoji: '🚛',
+        gradient: 'from-blue-400 to-blue-600',
+        imageUrl: getConstructionImageUrl('snowplow-truck')
+      },
+      { 
+        id: 'stop-slow-sign', 
+        emoji: '🛑',
+        gradient: 'from-red-500 to-orange-600',
+        imageUrl: getConstructionImageUrl('stop-slow-sign')
+      },
+      { 
+        id: 'telehandler', 
+        emoji: '🏗️',
+        gradient: 'from-yellow-500 to-orange-600',
+        imageUrl: getConstructionImageUrl('telehandler')
+      },
+      { 
+        id: 'toolbox', 
+        emoji: '🧰',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getConstructionImageUrl('toolbox')
+      },
+      { 
+        id: 'tower-crane', 
+        emoji: '🏗️',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getConstructionImageUrl('tower-crane')
+      },
+      { 
+        id: 'traffic-cones', 
+        emoji: '🚧',
+        gradient: 'from-orange-500 to-orange-700',
+        imageUrl: getConstructionImageUrl('traffic-cones')
       }
     ]
   }
