@@ -36,6 +36,11 @@ const getConstructionImageUrl = (constructionId: string): string => {
   return `/deck-images/construction/${constructionId}.jpg`;
 };
 
+// Helper function to get image URL for animals-from-china deck
+const getAnimalsFromChinaImageUrl = (animalId: string): string => {
+  return `/deck-images/animals-from-china/${animalId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1579,6 +1584,133 @@ export const CARD_DECKS: CardDeck[] = [
         emoji: '🚧',
         gradient: 'from-orange-500 to-orange-700',
         imageUrl: getConstructionImageUrl('traffic-cones')
+      }
+    ]
+  },
+  {
+    id: 'animals-from-china-real',
+    name: 'Animals from China',
+    emoji: '🐼',
+    cards: [
+      {
+        id: 'asiatic-black-bear',
+        emoji: '🐻',
+        gradient: 'from-zinc-700 to-zinc-900',
+        imageUrl: getAnimalsFromChinaImageUrl('asiatic-black-bear')
+      },
+      {
+        id: 'chinese-bamboo-rat',
+        emoji: '🐀',
+        gradient: 'from-stone-400 to-stone-600',
+        imageUrl: getAnimalsFromChinaImageUrl('chinese-bamboo-rat')
+      },
+      {
+        id: 'chinese-pangolin',
+        emoji: '🦎',
+        gradient: 'from-amber-600 to-amber-800',
+        imageUrl: getAnimalsFromChinaImageUrl('chinese-pangolin')
+      },
+      {
+        id: 'chinese-water-deer',
+        emoji: '🦌',
+        gradient: 'from-amber-700 to-amber-900',
+        imageUrl: getAnimalsFromChinaImageUrl('chinese-water-deer')
+      },
+      {
+        id: 'chinese-white-dolphin',
+        emoji: '🐬',
+        gradient: 'from-pink-100 to-pink-300',
+        imageUrl: getAnimalsFromChinaImageUrl('chinese-white-dolphin')
+      },
+      {
+        id: 'clouded-leopard',
+        emoji: '🐆',
+        gradient: 'from-yellow-600 to-stone-700',
+        imageUrl: getAnimalsFromChinaImageUrl('clouded-leopard')
+      },
+      {
+        id: 'crested-ibis',
+        emoji: '🐦',
+        gradient: 'from-red-400 to-white',
+        imageUrl: getAnimalsFromChinaImageUrl('crested-ibis')
+      },
+      {
+        id: 'giant-panda',
+        emoji: '🐼',
+        gradient: 'from-gray-800 to-white',
+        imageUrl: getAnimalsFromChinaImageUrl('giant-panda')
+      },
+      {
+        id: 'golden-pheasant',
+        emoji: '🐦',
+        gradient: 'from-yellow-500 to-red-600',
+        imageUrl: getAnimalsFromChinaImageUrl('golden-pheasant')
+      },
+      {
+        id: 'golden-snub-nosed-monkey',
+        emoji: '🐵',
+        gradient: 'from-orange-400 to-orange-600',
+        imageUrl: getAnimalsFromChinaImageUrl('golden-snub-nosed-monkey')
+      },
+      {
+        id: 'himalayan-monal',
+        emoji: '🐦',
+        gradient: 'from-blue-500 to-purple-600',
+        imageUrl: getAnimalsFromChinaImageUrl('himalayan-monal')
+      },
+      {
+        id: 'mandarin-duck',
+        emoji: '🦆',
+        gradient: 'from-red-500 to-blue-600',
+        imageUrl: getAnimalsFromChinaImageUrl('mandarin-duck')
+      },
+      {
+        id: 'pere-davids-deer',
+        emoji: '🦌',
+        gradient: 'from-stone-500 to-stone-700',
+        imageUrl: getAnimalsFromChinaImageUrl('pere-davids-deer')
+      },
+      {
+        id: 'przewalskis-horse',
+        emoji: '🐴',
+        gradient: 'from-amber-200 to-amber-400',
+        imageUrl: getAnimalsFromChinaImageUrl('przewalskis-horse')
+      },
+      {
+        id: 'red-panda',
+        emoji: '🦊',
+        gradient: 'from-red-600 to-orange-700',
+        imageUrl: getAnimalsFromChinaImageUrl('red-panda')
+      },
+      {
+        id: 'siberian-tiger',
+        emoji: '🐯',
+        gradient: 'from-orange-500 to-orange-700',
+        imageUrl: getAnimalsFromChinaImageUrl('siberian-tiger')
+      },
+      {
+        id: 'snow-leopard',
+        emoji: '🐆',
+        gradient: 'from-gray-200 to-gray-400',
+        imageUrl: getAnimalsFromChinaImageUrl('snow-leopard')
+      },
+      {
+        id: 'tibetan-fox',
+        emoji: '🦊',
+        gradient: 'from-orange-300 to-orange-500',
+        imageUrl: getAnimalsFromChinaImageUrl('tibetan-fox')
+      },
+      {
+        id: 'yak',
+        emoji: '🐂',
+        gradient: 'from-zinc-700 to-black',
+        imageUrl: getAnimalsFromChinaImageUrl('yak')
+      },
+      {
+        id: 'yangtze-finless-porpoise',
+        emoji: '🐬',
+        gradient: 'from-gray-300 to-gray-500',
+        imageUrl: getAnimalsFromChinaImageUrl('yangtze-finless-porpoise')
       }
     ]
   }
