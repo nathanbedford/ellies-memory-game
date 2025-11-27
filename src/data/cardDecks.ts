@@ -41,6 +41,11 @@ const getAnimalsFromChinaImageUrl = (animalId: string): string => {
   return `/deck-images/animals-from-china/${animalId}.jpg`;
 };
 
+// Helper function to get image URL for thanksgiving deck
+const getThanksgivingImageUrl = (itemId: string): string => {
+  return `/deck-images/thanksgiving/${itemId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1711,6 +1716,133 @@ export const CARD_DECKS: CardDeck[] = [
         emoji: '🐬',
         gradient: 'from-gray-300 to-gray-500',
         imageUrl: getAnimalsFromChinaImageUrl('yangtze-finless-porpoise')
+      }
+    ]
+  },
+  {
+    id: 'thanksgiving',
+    name: 'Thanksgiving',
+    emoji: '🦃',
+    cards: [
+      {
+        id: 'acorn',
+        emoji: '🌰',
+        gradient: 'from-amber-600 to-amber-800',
+        imageUrl: getThanksgivingImageUrl('acorn')
+      },
+      {
+        id: 'apple-cider-jug',
+        emoji: '🍶',
+        gradient: 'from-amber-500 to-amber-700',
+        imageUrl: getThanksgivingImageUrl('apple-cider-jug')
+      },
+      {
+        id: 'corn-on-the-cob',
+        emoji: '🌽',
+        gradient: 'from-yellow-400 to-yellow-600',
+        imageUrl: getThanksgivingImageUrl('corn-on-the-cob')
+      },
+      {
+        id: 'cornucopia',
+        emoji: '🧺',
+        gradient: 'from-amber-500 to-orange-600',
+        imageUrl: getThanksgivingImageUrl('cornucopia')
+      },
+      {
+        id: 'football',
+        emoji: '🏈',
+        gradient: 'from-amber-700 to-amber-900',
+        imageUrl: getThanksgivingImageUrl('football')
+      },
+      {
+        id: 'fox',
+        emoji: '🦊',
+        gradient: 'from-orange-500 to-red-600',
+        imageUrl: getThanksgivingImageUrl('fox')
+      },
+      {
+        id: 'live-turkey',
+        emoji: '🦃',
+        gradient: 'from-amber-600 to-red-700',
+        imageUrl: getThanksgivingImageUrl('live-turkey')
+      },
+      {
+        id: 'maple-leaf',
+        emoji: '🍁',
+        gradient: 'from-red-500 to-orange-600',
+        imageUrl: getThanksgivingImageUrl('maple-leaf')
+      },
+      {
+        id: 'mayflower-ship',
+        emoji: '⛵',
+        gradient: 'from-amber-700 to-stone-600',
+        imageUrl: getThanksgivingImageUrl('mayflower-ship')
+      },
+      {
+        id: 'native-american-headdress',
+        emoji: '🪶',
+        gradient: 'from-red-600 to-amber-600',
+        imageUrl: getThanksgivingImageUrl('native-american-headdress')
+      },
+      {
+        id: 'owl',
+        emoji: '🦉',
+        gradient: 'from-amber-700 to-stone-700',
+        imageUrl: getThanksgivingImageUrl('owl')
+      },
+      {
+        id: 'pilgrim-hat',
+        emoji: '🎩',
+        gradient: 'from-gray-800 to-gray-900',
+        imageUrl: getThanksgivingImageUrl('pilgrim-hat')
+      },
+      {
+        id: 'pumpkin-pie',
+        emoji: '🥧',
+        gradient: 'from-orange-500 to-amber-600',
+        imageUrl: getThanksgivingImageUrl('pumpkin-pie')
+      },
+      {
+        id: 'pumpkin',
+        emoji: '🎃',
+        gradient: 'from-orange-500 to-orange-700',
+        imageUrl: getThanksgivingImageUrl('pumpkin')
+      },
+      {
+        id: 'rake-leaf-pile',
+        emoji: '🍂',
+        gradient: 'from-orange-400 to-red-500',
+        imageUrl: getThanksgivingImageUrl('rake-leaf-pile')
+      },
+      {
+        id: 'red-apple',
+        emoji: '🍎',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getThanksgivingImageUrl('red-apple')
+      },
+      {
+        id: 'scarecrow',
+        emoji: '🧑‍🌾',
+        gradient: 'from-amber-500 to-stone-600',
+        imageUrl: getThanksgivingImageUrl('scarecrow')
+      },
+      {
+        id: 'squirrel',
+        emoji: '🐿️',
+        gradient: 'from-amber-600 to-amber-800',
+        imageUrl: getThanksgivingImageUrl('squirrel')
+      },
+      {
+        id: 'sunflower',
+        emoji: '🌻',
+        gradient: 'from-yellow-400 to-amber-500',
+        imageUrl: getThanksgivingImageUrl('sunflower')
+      },
+      {
+        id: 'wheat-stalks',
+        emoji: '🌾',
+        gradient: 'from-yellow-500 to-amber-600',
+        imageUrl: getThanksgivingImageUrl('wheat-stalks')
       }
     ]
   }

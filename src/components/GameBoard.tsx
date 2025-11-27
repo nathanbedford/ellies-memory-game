@@ -1,4 +1,5 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
+import { CardLightbox } from './CardLightbox';
 import { Card } from './Card';
 import { Card as CardType } from '../types';
 import type { CardBackOption } from '../hooks/useCardBackSelector';
@@ -20,6 +21,7 @@ interface CardAnimationData {
 }
 
 export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack }: GameBoardProps) => {
+  const [lightboxCardId, setLightboxCardId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
@@ -231,7 +233,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         return (
           <div
             key={`flying-${card.id}`}
-            className="fixed z-50 pointer-events-none card-fly-to-player"
+            className="fixed z-50 card-fly-to-player"
             style={{
               left: `${flyData.startX}px`,
               top: `${flyData.startY}px`,
@@ -248,7 +250,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           >
             <Card
               card={card}
-              onClick={() => {}}
+              onClick={() => setLightboxCardId(card.id)}
               size={cardSize}
               useWhiteBackground={useWhiteCardBackground}
               emojiSizePercentage={emojiSizePercentage}
@@ -258,6 +260,12 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         );
       })}
       
+      <CardLightbox
+        isOpen={!!lightboxCardId}
+        onClose={() => setLightboxCardId(null)}
+        card={lightboxCardId ? cards.find(c => c.id === lightboxCardId) || null : null}
+      />
+
       <div 
         ref={boardRef}
         className="grid grid-cols-8 gap-2 max-w-none mx-auto justify-center"

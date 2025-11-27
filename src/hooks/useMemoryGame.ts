@@ -620,7 +620,7 @@ export const useMemoryGame = () => {
               selectedCards: filteredSelectedCards
             };
           });
-        }, 1000); // Match animation duration (matches CSS animation length)
+        }, 3000); // Match animation duration (matches CSS animation length)
       } else {
         // Flip cards back and switch player
         console.log('[MATCH CHECK] ✗ NO MATCH - Flipping cards back', JSON.stringify({
