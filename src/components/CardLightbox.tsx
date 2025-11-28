@@ -146,9 +146,8 @@ export const CardLightbox = ({ isOpen, onClose, card, cards = [], currentIndex =
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black bg-opacity-90 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
       />
       
       {/* Close button */}

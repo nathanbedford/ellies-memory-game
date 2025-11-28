@@ -1112,6 +1112,7 @@ function App() {
             useWhiteCardBackground={useWhiteCardBackground}
             emojiSizePercentage={emojiSizePercentage}
             cardBack={getCurrentCardBack()}
+            onPlayerNameChange={updatePlayerName}
           />
         )}
 

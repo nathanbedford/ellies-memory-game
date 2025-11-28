@@ -13,6 +13,7 @@ interface PlayerMatchesModalProps {
   useWhiteCardBackground?: boolean;
   emojiSizePercentage?: number;
   cardBack?: CardBackOption;
+  onPlayerNameChange?: (playerId: 1 | 2, newName: string) => void;
 }
 
 export const PlayerMatchesModal = ({
@@ -23,9 +24,12 @@ export const PlayerMatchesModal = ({
   cardSize = 100,
   useWhiteCardBackground = false,
   emojiSizePercentage = 72,
-  cardBack
+  cardBack,
+  onPlayerNameChange
 }: PlayerMatchesModalProps) => {
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState(player.name);
 
   if (!isOpen) return null;
 
@@ -61,9 +65,8 @@ export const PlayerMatchesModal = ({
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         {/* Backdrop */}
-        <div 
+        <div
           className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
-          onClick={onClose}
         />
         
         {/* Modal */}
@@ -74,7 +77,51 @@ export const PlayerMatchesModal = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">{player.name}'s Matches</h2>
+              <div className="flex items-center gap-2">
+                {isEditingName ? (
+                  <input
+                    type="text"
+                    value={editNameValue}
+                    onChange={(e) => setEditNameValue(e.target.value)}
+                    onBlur={() => {
+                      if (editNameValue.trim() && onPlayerNameChange) {
+                        onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
+                      }
+                      setIsEditingName(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (editNameValue.trim() && onPlayerNameChange) {
+                          onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
+                        }
+                        setIsEditingName(false);
+                      } else if (e.key === 'Escape') {
+                        setEditNameValue(player.name);
+                        setIsEditingName(false);
+                      }
+                    }}
+                    autoFocus
+                    className="text-2xl font-bold text-gray-800 border-b-2 border-blue-500 outline-none bg-transparent"
+                  />
+                ) : (
+                  <h2 className="text-2xl font-bold text-gray-800">{player.name}'s Matches</h2>
+                )}
+                {onPlayerNameChange && !isEditingName && (
+                  <button
+                    onClick={() => {
+                      setEditNameValue(player.name);
+                      setIsEditingName(true);
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    type="button"
+                    title="Edit player name"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <p className="text-sm text-gray-500 mt-1">{pairs.length} pair{pairs.length !== 1 ? 's' : ''} matched</p>
             </div>
             <button
