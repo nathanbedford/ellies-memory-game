@@ -1866,7 +1866,7 @@ export const CARD_DECKS: CardDeck[] = [
         id: 'baby-jesus-manger',
         emoji: '👶',
         gradient: 'from-amber-400 to-amber-600',
-        imageUrl: getChristmasImageUrl('baby-jesus-manger')
+        imageUrl: getChristmasImageUrl('baby-jesus')
       },
       {
         id: 'camels',
@@ -1920,7 +1920,7 @@ export const CARD_DECKS: CardDeck[] = [
         id: 'present-gift-box',
         emoji: '🎁',
         gradient: 'from-red-500 to-green-600',
-        imageUrl: getChristmasImageUrl('present-gift-box')
+        imageUrl: getChristmasImageUrl('gift')
       },
       {
         id: 'reindeer',
@@ -1938,7 +1938,7 @@ export const CARD_DECKS: CardDeck[] = [
         id: 'sheep-lamb',
         emoji: '🐑',
         gradient: 'from-white to-gray-200',
-        imageUrl: getChristmasImageUrl('sheep-lamb')
+        imageUrl: getChristmasImageUrl('lamb')
       },
       {
         id: 'shepherd',
@@ -1974,7 +1974,7 @@ export const CARD_DECKS: CardDeck[] = [
         id: 'wise-men-three-kings',
         emoji: '👑',
         gradient: 'from-purple-500 to-yellow-600',
-        imageUrl: getChristmasImageUrl('wise-men-three-kings')
+        imageUrl: getChristmasImageUrl('three-kings')
       }
     ]
   }
