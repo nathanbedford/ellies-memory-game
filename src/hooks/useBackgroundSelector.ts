@@ -3,7 +3,8 @@ import { useState, useCallback } from 'react';
 // Local background images from public/backgrounds/ folder
 // Add new background images here - they will be automatically included
 const LOCAL_BACKGROUND_FILES = [
-  'snowy-mountain-village.jpg'
+  'snowy-mountain-village.jpg',
+  'smokey-mountain-fall.jpg'
 ] as const;
 
 // Extract background IDs from local files (remove extension)
