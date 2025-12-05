@@ -21,7 +21,7 @@ interface CardPackModalProps {
 export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackModalProps) => {
   // Determine initial tab based on selected pack
   const getInitialTab = () => {
-    const picturePackIds = ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real', 'plush-cute-animals-real', 'construction-real', 'animals-from-china-real', 'thanksgiving'];
+    const picturePackIds = ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real', 'plush-cute-animals-real', 'construction-real', 'animals-from-china-real', 'thanksgiving', 'christmas'];
     return picturePackIds.includes(selectedPack) ? 'pictures' : 'emoji';
   };
   
@@ -39,8 +39,8 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
   const emojiPacks = cardPacks.filter(pack => 
     ['animals', 'plants', 'buildings', 'colors', 'ocean', 'construction'].includes(pack.id)
   );
-  const picturePacks = cardPacks.filter(pack => 
-    ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real', 'plush-cute-animals-real', 'construction-real', 'animals-from-china-real', 'thanksgiving'].includes(pack.id)
+  const picturePacks = cardPacks.filter(pack =>
+    ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real', 'plush-cute-animals-real', 'construction-real', 'animals-from-china-real', 'thanksgiving', 'christmas'].includes(pack.id)
   );
 
   // Get preview images for animals-real deck
@@ -124,6 +124,15 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
     return deck.cards.filter(card => previewIds.includes(card.id)).slice(0, 4);
   };
 
+  // Get preview images for christmas deck
+  const getChristmasPreview = () => {
+    const deck = CARD_DECKS.find(d => d.id === 'christmas');
+    if (!deck) return [];
+    // Pick 4 images for preview: christmas-tree, santa-claus, reindeer, present-gift-box
+    const previewIds = ['christmas-tree', 'santa-claus', 'reindeer', 'present-gift-box'];
+    return deck.cards.filter(card => previewIds.includes(card.id)).slice(0, 4);
+  };
+
   const animalsRealPreview = getAnimalsRealPreview();
   const oceanRealPreview = getOceanRealPreview();
   const emotionsRealPreview = getEmotionsRealPreview();
@@ -133,6 +142,7 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
   const constructionRealPreview = getConstructionRealPreview();
   const animalsFromChinaRealPreview = getAnimalsFromChinaRealPreview();
   const thanksgivingPreview = getThanksgivingPreview();
+  const christmasPreview = getChristmasPreview();
 
   // Determine which packs to show based on active tab
   const displayedPacks = activeTab === 'emoji' ? emojiPacks : picturePacks;
@@ -349,6 +359,22 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
             <div className="mb-4">
               <div className="w-full h-40 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 grid grid-cols-2 grid-rows-2 gap-1 p-1">
                 {thanksgivingPreview.map((card) => (
+                  card.imageUrl && (
+                    <div key={card.id} className="w-full h-full flex items-center justify-center bg-white bg-opacity-20 rounded overflow-hidden">
+                      <img
+                        src={card.imageUrl}
+                        alt={card.id}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          ) : pack.id === 'christmas' ? (
+            <div className="mb-4">
+              <div className="w-full h-40 rounded-lg bg-gradient-to-br from-red-500 to-green-600 grid grid-cols-2 grid-rows-2 gap-1 p-1">
+                {christmasPreview.map((card) => (
                   card.imageUrl && (
                     <div key={card.id} className="w-full h-full flex items-center justify-center bg-white bg-opacity-20 rounded overflow-hidden">
                       <img

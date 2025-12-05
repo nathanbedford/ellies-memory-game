@@ -1,6 +1,25 @@
 import { useState, useCallback } from 'react';
 
-export type BackgroundTheme = 'rainbow' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'photo1' | 'photo2' | 'photo3' | 'photo4';
+// Local background images from public/backgrounds/ folder
+// Add new background images here - they will be automatically included
+const LOCAL_BACKGROUND_FILES = [
+  'snowy-mountain-village.jpg'
+] as const;
+
+// Extract background IDs from local files (remove extension)
+type LocalBackgroundId = typeof LOCAL_BACKGROUND_FILES[number] extends `${infer Name}.${string}` ? Name : never;
+
+export type BackgroundTheme = 
+  | 'rainbow' 
+  | 'ocean' 
+  | 'sunset' 
+  | 'forest' 
+  | 'galaxy' 
+  | 'photo1' 
+  | 'photo2' 
+  | 'photo3' 
+  | 'photo4' 
+  | LocalBackgroundId;
 
 export interface BackgroundOption {
   id: BackgroundTheme;
@@ -8,6 +27,26 @@ export interface BackgroundOption {
   gradient?: string;
   imageUrl?: string;
 }
+
+// Helper function to convert filename to display name
+// e.g., "snowy-mountain-village.jpg" -> "Snowy Mountain Village"
+const filenameToDisplayName = (filename: string): string => {
+  return filename
+    .replace(/\.(jpg|jpeg|png|gif|webp)$/i, '')
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Generate background options from local files
+const generateLocalBackgroundOptions = (): BackgroundOption[] => {
+  return LOCAL_BACKGROUND_FILES.map(filename => {
+    const id = filename.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '') as BackgroundTheme;
+    const name = filenameToDisplayName(filename);
+    const imageUrl = `/backgrounds/${filename}`;
+    return { id, name, imageUrl };
+  });
+};
 
 export const BACKGROUND_OPTIONS: BackgroundOption[] = [
   {
@@ -54,7 +93,9 @@ export const BACKGROUND_OPTIONS: BackgroundOption[] = [
     id: 'photo4',
     name: 'Mountains in Fall',
     imageUrl: 'https://images.unsplash.com/photo-1631941461005-a915d514ef03?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2070'
-  }
+  },
+  // Local backgrounds from public/backgrounds/ folder
+  ...generateLocalBackgroundOptions()
 ];
 
 export const useBackgroundSelector = () => {

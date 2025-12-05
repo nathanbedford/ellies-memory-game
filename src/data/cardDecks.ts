@@ -46,6 +46,11 @@ const getThanksgivingImageUrl = (itemId: string): string => {
   return `/deck-images/thanksgiving/${itemId}.jpg`;
 };
 
+// Helper function to get image URL for christmas deck
+const getChristmasImageUrl = (itemId: string): string => {
+  return `/deck-images/christmas/${itemId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1843,6 +1848,133 @@ export const CARD_DECKS: CardDeck[] = [
         emoji: '🌾',
         gradient: 'from-yellow-500 to-amber-600',
         imageUrl: getThanksgivingImageUrl('wheat-stalks')
+      }
+    ]
+  },
+  {
+    id: 'christmas',
+    name: 'Christmas',
+    emoji: '🎄',
+    cards: [
+      {
+        id: 'angel',
+        emoji: '👼',
+        gradient: 'from-yellow-100 to-yellow-300',
+        imageUrl: getChristmasImageUrl('angel')
+      },
+      {
+        id: 'baby-jesus-manger',
+        emoji: '👶',
+        gradient: 'from-amber-400 to-amber-600',
+        imageUrl: getChristmasImageUrl('baby-jesus-manger')
+      },
+      {
+        id: 'camels',
+        emoji: '🐪',
+        gradient: 'from-amber-500 to-amber-700',
+        imageUrl: getChristmasImageUrl('camels')
+      },
+      {
+        id: 'candy-cane',
+        emoji: '🍬',
+        gradient: 'from-red-500 to-red-300',
+        imageUrl: getChristmasImageUrl('candy-cane')
+      },
+      {
+        id: 'christmas-lights',
+        emoji: '💡',
+        gradient: 'from-green-500 to-red-500',
+        imageUrl: getChristmasImageUrl('christmas-lights')
+      },
+      {
+        id: 'christmas-tree',
+        emoji: '🎄',
+        gradient: 'from-green-600 to-green-800',
+        imageUrl: getChristmasImageUrl('christmas-tree')
+      },
+      {
+        id: 'donkey',
+        emoji: '🫏',
+        gradient: 'from-gray-500 to-gray-700',
+        imageUrl: getChristmasImageUrl('donkey')
+      },
+      {
+        id: 'joseph',
+        emoji: '👨',
+        gradient: 'from-amber-600 to-amber-800',
+        imageUrl: getChristmasImageUrl('joseph')
+      },
+      {
+        id: 'mary',
+        emoji: '👩',
+        gradient: 'from-blue-400 to-blue-600',
+        imageUrl: getChristmasImageUrl('mary')
+      },
+      {
+        id: 'ornament',
+        emoji: '🎊',
+        gradient: 'from-red-500 to-yellow-500',
+        imageUrl: getChristmasImageUrl('ornament')
+      },
+      {
+        id: 'present-gift-box',
+        emoji: '🎁',
+        gradient: 'from-red-500 to-green-600',
+        imageUrl: getChristmasImageUrl('present-gift-box')
+      },
+      {
+        id: 'reindeer',
+        emoji: '🦌',
+        gradient: 'from-amber-600 to-amber-800',
+        imageUrl: getChristmasImageUrl('reindeer')
+      },
+      {
+        id: 'santa-claus',
+        emoji: '🎅',
+        gradient: 'from-red-500 to-red-700',
+        imageUrl: getChristmasImageUrl('santa-claus')
+      },
+      {
+        id: 'sheep-lamb',
+        emoji: '🐑',
+        gradient: 'from-white to-gray-200',
+        imageUrl: getChristmasImageUrl('sheep-lamb')
+      },
+      {
+        id: 'shepherd',
+        emoji: '🧑‍🌾',
+        gradient: 'from-amber-500 to-stone-600',
+        imageUrl: getChristmasImageUrl('shepherd')
+      },
+      {
+        id: 'snowflake',
+        emoji: '❄️',
+        gradient: 'from-blue-200 to-blue-400',
+        imageUrl: getChristmasImageUrl('snowflake')
+      },
+      {
+        id: 'snowman',
+        emoji: '⛄',
+        gradient: 'from-white to-blue-200',
+        imageUrl: getChristmasImageUrl('snowman')
+      },
+      {
+        id: 'star-of-bethlehem',
+        emoji: '⭐',
+        gradient: 'from-yellow-400 to-yellow-600',
+        imageUrl: getChristmasImageUrl('star-of-bethlehem')
+      },
+      {
+        id: 'stocking',
+        emoji: '🧦',
+        gradient: 'from-red-500 to-green-600',
+        imageUrl: getChristmasImageUrl('stocking')
+      },
+      {
+        id: 'wise-men-three-kings',
+        emoji: '👑',
+        gradient: 'from-purple-500 to-yellow-600',
+        imageUrl: getChristmasImageUrl('wise-men-three-kings')
       }
     ]
   }
