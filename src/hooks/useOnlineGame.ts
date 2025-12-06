@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { getFirestoreSyncAdapter } from '../services/sync/FirestoreSyncAdapter';
-import type { Card, Player, GameState, OnlineGameState } from '../types';
+import type { Player, GameState, OnlineGameState } from '../types';
 
 // Helper to sort players by ID
 const sortPlayersByID = (players: Player[]): Player[] => {

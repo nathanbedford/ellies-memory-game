@@ -98,7 +98,7 @@ function App() {
   const [showPWAInstall, setShowPWAInstall] = useState(false);
 
   // Online multiplayer state
-  const { roomCode, room, odahId, updatePlayerName: onlineUpdatePlayerName, leaveRoom, subscribeToPresence } = useOnlineStore();
+  const { roomCode, room, odahId, leaveRoom, subscribeToPresence } = useOnlineStore();
   // Get local player slot directly to avoid creating new objects that cause re-renders
   const localPlayerSlot = room && odahId ? (room.players[odahId]?.slot ?? null) : null;
 
