@@ -14,6 +14,7 @@ interface PlayerMatchesModalProps {
   emojiSizePercentage?: number;
   cardBack?: CardBackOption;
   onPlayerNameChange?: (playerId: 1 | 2, newName: string) => void;
+  canEditName?: boolean; // Controls whether name editing is allowed (for online mode)
 }
 
 export const PlayerMatchesModal = ({
@@ -25,7 +26,8 @@ export const PlayerMatchesModal = ({
   useWhiteCardBackground = false,
   emojiSizePercentage = 72,
   cardBack,
-  onPlayerNameChange
+  onPlayerNameChange,
+  canEditName = true // Default to true for backwards compatibility
 }: PlayerMatchesModalProps) => {
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -106,7 +108,7 @@ export const PlayerMatchesModal = ({
                 ) : (
                   <h2 className="text-2xl font-bold text-gray-800">{player.name}'s Matches</h2>
                 )}
-                {onPlayerNameChange && !isEditingName && (
+                {onPlayerNameChange && canEditName && !isEditingName && (
                   <button
                     onClick={() => {
                       setEditNameValue(player.name);

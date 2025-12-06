@@ -36,3 +36,63 @@ export interface CardPackOption {
   name: string;
   emoji: string;
 }
+
+// ============================================
+// Online Multiplayer Types
+// ============================================
+
+export type GameMode = 'local' | 'online';
+
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+
+export type RoomStatus = 'waiting' | 'playing' | 'finished';
+
+export interface OnlinePlayer extends Player {
+  odahId: string;          // Firebase anonymous auth UID
+  isHost: boolean;
+  isConnected: boolean;
+  lastSeen: number;        // Timestamp
+}
+
+export interface RoomConfig {
+  roomCode: string;
+  hostId: string;
+  status: RoomStatus;
+  cardPack: CardPack;
+  background: string;
+  cardBack: string;
+  createdAt: number;
+  lastActivity: number;
+}
+
+export interface OnlineGameState extends GameState {
+  syncVersion: number;       // For optimistic concurrency control
+  lastUpdatedBy?: number;    // Player slot (1 or 2) who made the last update - used to skip self-updates
+}
+
+export interface Room {
+  roomCode: string;
+  hostId: string;
+  status: RoomStatus;
+  config: {
+    cardPack: CardPack;
+    background: string;
+    cardBack: string;
+  } | null;
+  players: Record<string, {
+    slot: 1 | 2;
+    name: string;
+    color: string;
+  }>;
+  gameState: OnlineGameState | null;
+  createdAt: number;
+  lastActivity: number;
+}
+
+// RTDB Presence
+export interface PresenceData {
+  odahId: string;
+  name: string;
+  online: boolean;
+  lastSeen: number;
+}

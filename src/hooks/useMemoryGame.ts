@@ -1065,8 +1065,14 @@ export const useMemoryGame = () => {
     });
   }, []);
 
+  // Set full game state (for online multiplayer sync)
+  const setFullGameState = useCallback((newState: GameState) => {
+    setGameState(newState);
+  }, []);
+
   return {
     gameState,
+    setFullGameState,
     showStartModal,
     setShowStartModal,
     cardSize,

@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useMemoryGame } from './hooks/useMemoryGame';
 import { useCardPacks } from './hooks/useCardPacks';
-import { useBackgroundSelector, BackgroundTheme } from './hooks/useBackgroundSelector';
-import { useCardBackSelector, CardBackType } from './hooks/useCardBackSelector';
-import { CardPack } from './types';
+import { useBackgroundSelector, BackgroundTheme, BACKGROUND_OPTIONS } from './hooks/useBackgroundSelector';
+import { useCardBackSelector, CardBackType, CARD_BACK_OPTIONS } from './hooks/useCardBackSelector';
+import { useOnlineGame } from './hooks/useOnlineGame';
+import { useOnlineStore } from './stores/onlineStore';
+import { CardPack, GameMode } from './types';
 import { GameBoard } from './components/GameBoard';
 import { GameOver } from './components/GameOver';
 import { Modal } from './components/Modal';
@@ -19,9 +21,11 @@ import { Pong } from './components/Pong';
 import { MobileWarningModal } from './components/MobileWarningModal';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { AdminSidebar } from './components/AdminSidebar';
+import { ModeSelector, OnlineLobby, OpponentDisconnectOverlay } from './components/online';
+import { useOpponentDisconnect } from './hooks/useOpponentDisconnect';
 import screenfull from 'screenfull';
 
-type SetupStep = 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
+type SetupStep = 'modeSelect' | 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 const ENABLE_SETUP_DEBUG_LOGS = true;
 
@@ -42,7 +46,8 @@ const TEST_COMBO_SEQUENCE = ['1', '2', '2', '5', '1', '2', '2', '5'];
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
-  const { gameState, cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer, updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize, toggleWhiteCardBackground, toggleAutoSize, increaseFlipDuration, decreaseFlipDuration, increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, flipCard, endTurn, resetGame, isAnimatingCards, endGameEarly, toggleAllCardsFlipped, updateAutoSizeMetrics, calculateOptimalCardSizeForCount } = useMemoryGame();
+  // Local game hook - always used for settings, and for game logic in local mode
+  const localGame = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -89,7 +94,63 @@ function App() {
   const [showAdminSidebar, setShowAdminSidebar] = useState(false);
   const [adminEnabled, setAdminEnabled] = useState(false); // In-memory only, resets on refresh
   const [showMobileWarning, setShowMobileWarning] = useState(false);
+  const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [showPWAInstall, setShowPWAInstall] = useState(false);
+
+  // Online multiplayer state
+  const { roomCode, room, odahId, updatePlayerName: onlineUpdatePlayerName, leaveRoom, subscribeToPresence } = useOnlineStore();
+  // Get local player slot directly to avoid creating new objects that cause re-renders
+  const localPlayerSlot = room && odahId ? (room.players[odahId]?.slot ?? null) : null;
+
+  // Online game hook - only meaningful when in online mode with valid room
+  const onlineGame = useOnlineGame({
+    roomCode: roomCode || '',
+    localPlayerSlot: localPlayerSlot || 1,
+    flipDuration: localGame.flipDuration,
+    initialGameState: room?.gameState || localGame.gameState,
+  });
+
+  // Select which game interface to use based on mode
+  // In online mode: use onlineGame for state/actions, localGame for settings
+  const isOnlineMode = gameMode === 'online' && roomCode && localPlayerSlot !== null;
+
+  // Disconnect detection for online mode
+  const disconnectState = useOpponentDisconnect({ timeoutSeconds: 60 });
+
+  const gameState = isOnlineMode ? onlineGame.gameState : localGame.gameState;
+
+  // Subscribe to presence during online gameplay
+  // OnlineLobby handles presence in the waiting room, but unmounts when game starts
+  // This subscription takes over to track presence during the actual game
+  useEffect(() => {
+    // Only subscribe when we're actively playing an online game
+    // During waiting room phase, OnlineLobby handles the subscription
+    const shouldSubscribe = isOnlineMode && roomCode && gameState.gameStatus === 'playing';
+
+    if (!shouldSubscribe) return;
+
+    console.log('[App] Subscribing to presence for gameplay, room:', roomCode);
+    const unsubPresence = subscribeToPresence(roomCode);
+
+    return () => {
+      console.log('[App] Unsubscribing from gameplay presence');
+      unsubPresence();
+    };
+  }, [isOnlineMode, roomCode, gameState.gameStatus, subscribeToPresence]);
+  const setFullGameState = isOnlineMode ? onlineGame.setFullGameState : localGame.setFullGameState;
+  const flipCard = isOnlineMode ? onlineGame.flipCard : localGame.flipCard;
+  const endTurn = isOnlineMode ? onlineGame.endTurn : localGame.endTurn;
+
+  // Settings and other functions always come from localGame
+  const {
+    cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration,
+    emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer,
+    updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize,
+    toggleWhiteCardBackground, toggleAutoSize, increaseFlipDuration, decreaseFlipDuration,
+    increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, resetGame, isAnimatingCards,
+    endGameEarly, toggleAllCardsFlipped, updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
+  } = localGame;
+
   const boardWrapperRef = useRef<HTMLDivElement>(null);
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const gameBoardContainerRef = useRef<HTMLDivElement>(null);
@@ -100,7 +161,7 @@ function App() {
   
   // Guarded setSetupStep that prevents unintended backward navigation
   const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
-    const stepOrder: SetupStep[] = ['cardPack', 'background', 'cardBack', 'startGame'];
+    const stepOrder: SetupStep[] = ['modeSelect', 'cardPack', 'background', 'cardBack', 'startGame'];
     const diagnosticBase = {
       from: setupStep,
       to: newStep,
@@ -546,6 +607,20 @@ function App() {
     guardedSetSetupStep(null, 'cancel setup flow');
   };
 
+  // Handler for leaving an online game (e.g., when opponent disconnects)
+  const handleLeaveOnlineGame = useCallback(async () => {
+    try {
+      await leaveRoom();
+    } catch (error) {
+      console.error('Error leaving room:', error);
+    }
+
+    // Reset local game state
+    resetGame();
+    setGameMode(null);
+    guardedSetSetupStep('modeSelect', 'left online game after disconnect');
+  }, [leaveRoom, resetGame, guardedSetSetupStep]);
+
   const handleStartModalBack = () => {
     // Go back to card back selection (intentional backward navigation)
     isBackNavigationRef.current = true;
@@ -711,8 +786,29 @@ function App() {
     };
   }, []);
 
+  // Note: Turn enforcement and sync are now handled inside useOnlineGame hook
+  // The hook manages authority checking and Firestore sync internally
 
-  const currentBackground = getCurrentBackground();
+  // Get background - use room config for online mode, local settings for local mode
+  const currentBackground = (() => {
+    if (isOnlineMode && room?.config?.background) {
+      // Find background option by room config
+      const roomBg = BACKGROUND_OPTIONS.find(bg => bg.id === room.config?.background);
+      if (roomBg) return roomBg;
+    }
+    return getCurrentBackground();
+  })();
+
+  // Get card back - use room config for online mode, local settings for local mode
+  const effectiveCardBack = (() => {
+    if (isOnlineMode && room?.config?.cardBack) {
+      // Find card back option by room config
+      const roomCb = CARD_BACK_OPTIONS.find(cb => cb.id === room.config?.cardBack);
+      if (roomCb) return roomCb;
+    }
+    return getCurrentCardBack();
+  })();
+
   // Only show custom background when playing the game (when cards exist)
   const shouldShowCustomBackground = gameState.cards.length > 0;
   const backgroundStyle = shouldShowCustomBackground && currentBackground.imageUrl
@@ -854,13 +950,46 @@ function App() {
                 <p className="text-xl text-gray-600 mb-8">Ready to play Matchimus?</p>
                 <button
                   onClick={() => {
-                    guardedSetSetupStep('cardPack', 'welcome screen start button');
+                    guardedSetSetupStep('modeSelect', 'welcome screen start button');
                   }}
                   className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
                 >
-                  🎮 Start Game
+                  Start Game
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Mode Selection Screen */}
+          {setupStep === 'modeSelect' && gameMode !== 'online' && (
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+              <div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
+                <ModeSelector
+                  onSelectMode={(mode: GameMode) => {
+                    setGameMode(mode);
+                    if (mode === 'local') {
+                      guardedSetSetupStep('cardPack', 'local mode selected');
+                    }
+                    // For online mode, stay on modeSelect but render OnlineLobby
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Online Lobby */}
+          {setupStep === 'modeSelect' && gameMode === 'online' && (
+            <div className="flex flex-col items-center min-h-[60vh] overflow-y-auto max-h-[calc(100vh-4rem)] py-4">
+              <OnlineLobby
+                onBack={() => {
+                  setGameMode(null);
+                }}
+                onGameStart={(onlineGameState) => {
+                  // Set the game state from online lobby
+                  setFullGameState(onlineGameState);
+                  guardedSetSetupStep(null, 'online game started');
+                }}
+              />
             </div>
           )}
 
@@ -924,7 +1053,11 @@ function App() {
                     <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-xs">Turn</span>
+                    <span className="text-xs">
+                      {gameMode === 'online'
+                        ? (localPlayerSlot === 1 ? 'Your Turn!' : 'Waiting...')
+                        : 'Turn'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -986,7 +1119,11 @@ function App() {
                     <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-xs">Turn</span>
+                    <span className="text-xs">
+                      {gameMode === 'online'
+                        ? (localPlayerSlot === 2 ? 'Your Turn!' : 'Waiting...')
+                        : 'Turn'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -996,19 +1133,29 @@ function App() {
 
               {/* Center Game Area - Full Width Below */}
               <div ref={gameBoardContainerRef} className="w-full flex justify-center">
-                <GameBoard 
-                  cards={gameState.cards} 
+                <GameBoard
+                  cards={gameState.cards}
                   onCardClick={flipCard}
                   cardSize={cardSize}
                   isAnimating={isAnimatingCards}
                   useWhiteCardBackground={useWhiteCardBackground}
                   emojiSizePercentage={emojiSizePercentage}
-                  cardBack={getCurrentCardBack()}
+                  cardBack={effectiveCardBack}
                 />
               </div>
             </div>
           )}
         </main>
+
+        {/* Opponent Disconnect Overlay - Online Mode Only */}
+        {isOnlineMode && gameState.gameStatus === 'playing' && disconnectState.isDisconnected && (
+          <OpponentDisconnectOverlay
+            isVisible={true}
+            opponentName={disconnectState.opponentName}
+            secondsRemaining={disconnectState.secondsRemaining}
+            onLeaveGame={handleLeaveOnlineGame}
+          />
+        )}
 
         {gameState.gameStatus === 'finished' && (gameState.winner || gameState.isTie) && (
           <GameOver 
@@ -1111,8 +1258,21 @@ function App() {
             cardSize={cardSize}
             useWhiteCardBackground={useWhiteCardBackground}
             emojiSizePercentage={emojiSizePercentage}
-            cardBack={getCurrentCardBack()}
-            onPlayerNameChange={updatePlayerName}
+            cardBack={effectiveCardBack}
+            onPlayerNameChange={(playerId, name) => {
+              if (isOnlineMode) {
+                // In online mode, use the online game's updatePlayerName which syncs to Firestore
+                onlineGame.updatePlayerName(playerId as 1 | 2, name);
+              } else {
+                // In local mode, use the local game's updatePlayerName
+                updatePlayerName(playerId, name);
+              }
+            }}
+            canEditName={
+              gameMode === 'local' || // Local mode: can edit both
+              localPlayerSlot === 1 || // Host (slot 1): can edit both
+              selectedPlayerForMatches === localPlayerSlot // Guest: can only edit own name
+            }
           />
         )}
 
@@ -1127,7 +1287,7 @@ function App() {
           cardSize={cardSize}
           useWhiteCardBackground={useWhiteCardBackground}
           emojiSizePercentage={emojiSizePercentage}
-          cardBack={getCurrentCardBack()}
+          cardBack={effectiveCardBack}
         />
 
         {/* Admin Sidebar */}
