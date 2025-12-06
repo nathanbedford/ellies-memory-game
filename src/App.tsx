@@ -395,6 +395,23 @@ function App() {
     };
   }, [autoSizeEnabled, computeLayoutMetrics, updateAutoSizeMetrics]);
 
+  // Auto-size when cards appear (works for both local and online modes)
+  // This is needed because useMemoryGame's internal effect only sees its own gameState,
+  // but in online mode the cards are in onlineGame.gameState
+  useEffect(() => {
+    if (!autoSizeEnabled || gameState.cards.length === 0) {
+      return;
+    }
+
+    // Small delay to ensure layout is rendered
+    const timeoutId = setTimeout(() => {
+      const metrics = computeLayoutMetrics();
+      calculateOptimalCardSizeForCount(gameState.cards.length, metrics);
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [autoSizeEnabled, gameState.cards.length, computeLayoutMetrics, calculateOptimalCardSizeForCount]);
+
   // Detect turn switches and trigger glow effect
   useEffect(() => {
     if (gameState.gameStatus === 'playing' && gameState.currentPlayer !== prevCurrentPlayerRef.current) {
@@ -589,6 +606,26 @@ function App() {
     guardedSetSetupStep('cardPack', 'new game clicked');
     setShowResetConfirmation(false);
   };
+
+  const handleBackToModeSelect = useCallback(async () => {
+    // Full reset - go back to "How would you like to play?"
+    setShowResetConfirmation(false);
+
+    // If in online mode, leave the room
+    if (gameMode === 'online') {
+      try {
+        await leaveRoom();
+      } catch (error) {
+        console.error('Error leaving room:', error);
+      }
+    }
+
+    // Reset all game state
+    resetGame();
+    setGameMode(null);
+    setIsResetting(false);
+    guardedSetSetupStep('modeSelect', 'back to mode select');
+  }, [gameMode, leaveRoom, resetGame, guardedSetSetupStep]);
 
   const cancelSetupFlow = () => {
     // Restore original state if resetting
@@ -1062,8 +1099,21 @@ function App() {
                 )}
               </div>
 
-                    {/* VS Divider */}
-                    <div className="text-gray-400 font-semibold px-3 text-sm">VS</div>
+                    {/* VS Divider with Room Code (online mode) */}
+                    <div className="flex flex-col items-center px-3">
+                      {isOnlineMode && roomCode && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(roomCode);
+                          }}
+                          className="text-xs text-blue-500 hover:text-blue-600 font-mono mb-1 cursor-pointer transition-colors"
+                          title="Click to copy room code"
+                        >
+                          {roomCode}
+                        </button>
+                      )}
+                      <div className="text-gray-400 font-semibold text-sm">VS</div>
+                    </div>
 
               {/* Player 2 */}
               <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
@@ -1180,6 +1230,7 @@ function App() {
           <ResetConfirmationModal
             onReplay={handleReplay}
             onNewGame={handleNewGame}
+            onChangeMode={handleBackToModeSelect}
             onCancel={() => setShowResetConfirmation(false)}
           />
         </Modal>
