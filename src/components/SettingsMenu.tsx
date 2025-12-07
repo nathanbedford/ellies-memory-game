@@ -25,7 +25,7 @@ interface SettingsMenuProps {
 
 export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin, onShowPWAInstall }: SettingsMenuProps) => {
   return (
-    <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto">
+    <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto flex flex-col">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Settings</h2>
         <button
@@ -39,7 +39,7 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
         </button>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 flex-1">
         {/* Fullscreen Section */}
         <div>
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Display</h3>
@@ -296,8 +296,19 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
             </div>
           </div>
         )}
+      </div>
 
-
+      {/* Reload App Button - pinned to bottom */}
+      <div className="pt-4 mt-4 border-t border-gray-200">
+        <button
+          onClick={() => window.location.reload()}
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors duration-200"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span className="font-medium">Reload App</span>
+        </button>
       </div>
     </div>
   );

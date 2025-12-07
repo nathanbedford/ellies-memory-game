@@ -23,6 +23,7 @@
     "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.6.0",
+    "posthog-js": "^1.302.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "screenfull": "^6.0.2",
