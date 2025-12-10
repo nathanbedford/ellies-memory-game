@@ -6,6 +6,9 @@ import { useCardBackSelector, CardBackType, CARD_BACK_OPTIONS } from './hooks/us
 import { useOnlineGame } from './hooks/useOnlineGame';
 import { useOnlineStore } from './stores/onlineStore';
 import { CardPack, GameMode } from './types';
+import { CARD_DECKS } from './data/cardDecks';
+import { initializeCards, createInitialState, startGameWithCards } from './services/game/GameEngine';
+import { getFirestoreSyncAdapter } from './services/sync/FirestoreSyncAdapter';
 import { GameBoard } from './components/GameBoard';
 import { GameOver } from './components/GameOver';
 import { Modal } from './components/Modal';
@@ -76,7 +79,7 @@ function App() {
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const [showReloadConfirmation, setShowReloadConfirmation] = useState(false);
   const [lastConfig, setLastConfig] = useState<{
-    pack: string;
+    pack: CardPack;
     background: BackgroundTheme;
     cardBack: CardBackType;
     firstPlayer: number;
@@ -99,7 +102,7 @@ function App() {
   const [showPWAInstall, setShowPWAInstall] = useState(false);
 
   // Online multiplayer state
-  const { roomCode, room, odahId, leaveRoom, subscribeToPresence } = useOnlineStore();
+  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, subscribeToRoom, isHost, updateRoomConfig, setPlayerNamePreference } = useOnlineStore();
   // Get local player slot directly to avoid creating new objects that cause re-renders
   const localPlayerSlot = room && odahId ? (room.players[odahId]?.slot ?? null) : null;
 
@@ -111,6 +114,59 @@ function App() {
     initialGameState: room?.gameState || localGame.gameState,
   });
 
+  const getPackImagesById = useCallback((packId: CardPack) => {
+    const deck = CARD_DECKS.find(d => d.id === packId) || CARD_DECKS[0];
+    return deck.cards.map(card => ({
+      id: card.id,
+      url: card.imageUrl || card.emoji,
+      gradient: card.gradient,
+    }));
+  }, []);
+
+  const startOnlineRound = useCallback(
+    async (options: { firstPlayer: 1 | 2; pack: CardPack; background: BackgroundTheme; cardBack: CardBackType }) => {
+      if (!roomCode || !room || !isHost) {
+        console.warn('[Online] Only the host can start a new round');
+        return;
+      }
+
+      try {
+        const adapter = getFirestoreSyncAdapter();
+        const players = Object.values(room.players);
+        const hostPlayer = players.find(p => p.slot === 1);
+        const guestPlayer = players.find(p => p.slot === 2);
+
+        if (!hostPlayer || !guestPlayer) {
+          console.warn('[Online] Cannot start new round without two players');
+          return;
+        }
+
+        const cards = initializeCards(getPackImagesById(options.pack));
+        const initialState = createInitialState(
+          hostPlayer.name,
+          guestPlayer.name,
+          hostPlayer.color,
+          guestPlayer.color,
+          options.firstPlayer
+        );
+        const nextState = startGameWithCards(initialState, cards);
+
+        await adapter.setState(nextState);
+
+        const configUpdates: { cardPack?: CardPack; background?: string; cardBack?: string } = {};
+        if (room.config?.cardPack !== options.pack) configUpdates.cardPack = options.pack;
+        if (room.config?.background !== options.background) configUpdates.background = options.background;
+        if (room.config?.cardBack !== options.cardBack) configUpdates.cardBack = options.cardBack;
+        if (Object.keys(configUpdates).length > 0) {
+          await updateRoomConfig(configUpdates);
+        }
+      } catch (error) {
+        console.error('Failed to start online round', error);
+      }
+    },
+    [roomCode, room, isHost, getPackImagesById, updateRoomConfig]
+  );
+
   // Select which game interface to use based on mode
   // In online mode: use onlineGame for state/actions, localGame for settings
   const isOnlineMode = gameMode === 'online' && roomCode && localPlayerSlot !== null;
@@ -119,6 +175,18 @@ function App() {
   const disconnectState = useOpponentDisconnect({ timeoutSeconds: 60 });
 
   const gameState = isOnlineMode ? onlineGame.gameState : localGame.gameState;
+
+  // Keep room subscription active outside of the lobby so config/player updates propagate
+  useEffect(() => {
+    if (!roomCode) {
+      return;
+    }
+
+    const unsubscribe = subscribeToRoom(roomCode);
+    return () => {
+      unsubscribe();
+    };
+  }, [roomCode, subscribeToRoom]);
 
   // Subscribe to presence during online gameplay
   // OnlineLobby handles presence in the waiting room, but unmounts when game starts
@@ -153,14 +221,41 @@ function App() {
     endGameEarly, updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
   } = localGame;
 
+  const getActiveConfig = useCallback(() => {
+    if (isOnlineMode) {
+      return {
+        pack: (room?.config?.cardPack as CardPack) || selectedPack,
+        background: (room?.config?.background as BackgroundTheme) || selectedBackground,
+        cardBack: (room?.config?.cardBack as CardBackType) || selectedCardBack,
+      };
+    }
+
+    return {
+      pack: selectedPack,
+      background: selectedBackground,
+      cardBack: selectedCardBack,
+    };
+  }, [isOnlineMode, room, selectedPack, selectedBackground, selectedCardBack]);
+
+  const handlePlayerNameChange = useCallback((playerId: 1 | 2, name: string) => {
+    if (isOnlineMode) {
+      onlineGame.updatePlayerName(playerId, name);
+      if (localPlayerSlot === playerId) {
+        setPlayerNamePreference(name);
+      }
+    } else {
+      updatePlayerName(playerId, name);
+    }
+  }, [isOnlineMode, onlineGame, localPlayerSlot, setPlayerNamePreference, updatePlayerName]);
+
   const boardWrapperRef = useRef<HTMLDivElement>(null);
   const scoreboardRef = useRef<HTMLDivElement>(null);
   const gameBoardContainerRef = useRef<HTMLDivElement>(null);
   const layoutMeasureRafRef = useRef<number | null>(null);
-  
+
   // Track if we're in a back navigation to allow intentional backward steps
   const isBackNavigationRef = useRef(false);
-  
+
   // Guarded setSetupStep that prevents unintended backward navigation
   const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
     const stepOrder: SetupStep[] = ['modeSelect', 'cardPack', 'background', 'cardBack', 'startGame'];
@@ -217,7 +312,7 @@ function App() {
       stack: error.stack,
     });
   }, [setupStep]);
-  
+
   // Check if screen is mobile-sized (< 768px)
   const isMobileScreen = () => {
     return window.innerWidth < 768;
@@ -256,7 +351,7 @@ function App() {
     if (isRunningAsPWA()) {
       return;
     }
-    
+
     if (isIPad()) {
       const pwaInstallDismissed = localStorage.getItem('pwaInstallDismissed');
       if (!pwaInstallDismissed) {
@@ -276,7 +371,7 @@ function App() {
   const handleShowPWAInstall = () => {
     setShowPWAInstall(true);
   };
-  
+
   // Show mobile warning when game starts if on mobile
   useEffect(() => {
     if (gameState.gameStatus === 'playing' && gameState.cards.length > 0) {
@@ -287,7 +382,7 @@ function App() {
       }
     }
   }, [gameState.gameStatus, gameState.cards.length]);
-  
+
   // Also check when auto-size is enabled
   useEffect(() => {
     if (autoSizeEnabled && isMobileScreen()) {
@@ -297,22 +392,22 @@ function App() {
       }
     }
   }, [autoSizeEnabled]);
-  
+
   // Check on window resize if auto-size is enabled
   useEffect(() => {
     if (!autoSizeEnabled) return;
-    
+
     const handleResize = () => {
       const warningDismissed = sessionStorage.getItem('mobileWarningDismissed');
       if (!warningDismissed && isMobileScreen() && gameState.cards.length > 0) {
         setShowMobileWarning(true);
       }
     };
-    
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [autoSizeEnabled, gameState.cards.length]);
-  
+
   const handleMobileWarningClose = () => {
     setShowMobileWarning(false);
     // Remember that user dismissed it for this session
@@ -328,7 +423,7 @@ function App() {
     }
 
     // Get card count from selected pack
-    const images = getCurrentPackImages;
+    const images = getCurrentPackImages();
     const cardCount = images.length * 2; // Each image becomes a pair
 
     if (cardCount > 0) {
@@ -432,7 +527,7 @@ function App() {
       // Update ref even when not showing glow (initial game start)
       prevCurrentPlayerRef.current = gameState.currentPlayer;
     }
-    
+
     // Reset glow when game status changes
     if (gameState.gameStatus !== 'playing') {
       setGlowingPlayer(null);
@@ -445,17 +540,17 @@ function App() {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result
       ? {
-          r: parseInt(result[1], 16),
-          g: parseInt(result[2], 16),
-          b: parseInt(result[3], 16),
-        }
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
       : { r: 59, g: 130, b: 246 }; // Default blue
   };
 
   // Handle replay initialization when pack changes
   useEffect(() => {
     if (isReplaying && lastConfig && selectedPack === lastConfig.pack) {
-      const images = getCurrentPackImages;
+      const images = getCurrentPackImages();
       initializeGame(images, true);
       startGameWithFirstPlayer(lastConfig.firstPlayer);
       setIsReplaying(false);
@@ -498,17 +593,17 @@ function App() {
     // Prevent scrolling in fullscreen
     const html = document.documentElement;
     const body = document.body;
-    
+
     // Store original values
     const scrollY = window.scrollY;
-    
+
     // Apply styles to prevent scrolling
     html.style.position = 'fixed';
     html.style.overflow = 'hidden';
     html.style.width = '100%';
     html.style.height = '100%';
     html.style.top = `-${scrollY}px`;
-    
+
     body.style.position = 'fixed';
     body.style.overflow = 'hidden';
     body.style.width = '100%';
@@ -520,11 +615,11 @@ function App() {
     const preventScroll = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
       // Allow touchmove on cards and other interactive elements
-      if (target.closest('[data-allow-touchmove]') || 
-          target.closest('button') || 
-          target.closest('input') || 
-          target.closest('textarea') ||
-          target.closest('[role="button"]')) {
+      if (target.closest('[data-allow-touchmove]') ||
+        target.closest('button') ||
+        target.closest('input') ||
+        target.closest('textarea') ||
+        target.closest('[role="button"]')) {
         return;
       }
       e.preventDefault();
@@ -539,17 +634,17 @@ function App() {
       html.style.width = '';
       html.style.height = '';
       html.style.top = '';
-      
+
       body.style.position = '';
       body.style.overflow = '';
       body.style.width = '';
       body.style.height = '';
       body.style.top = '';
       body.style.touchAction = '';
-      
+
       // Restore scroll position
       window.scrollTo(0, scrollY);
-      
+
       document.removeEventListener('touchmove', preventScroll);
     };
   }, [isFullscreen]);
@@ -576,33 +671,75 @@ function App() {
   };
 
   const handleResetClick = () => {
+    const activeConfig = getActiveConfig();
+
     // Store current configuration as last config
     setLastConfig({
-      pack: selectedPack,
-      background: selectedBackground,
-      cardBack: selectedCardBack,
+      ...activeConfig,
       firstPlayer: gameState.currentPlayer
     });
     setShowResetConfirmation(true);
   };
 
-  const handleReplay = () => {
-    // Replay with last configuration
+  const handleReplay = useCallback(async () => {
+    if (isOnlineMode) {
+      setShowResetConfirmation(false);
+      if (!isHost) {
+        console.warn('[Online] Only the host can restart the game');
+        return;
+      }
+
+      const activeConfig = getActiveConfig();
+      const configSource = lastConfig || {
+        ...activeConfig,
+        firstPlayer: (room?.gameState?.currentPlayer as 1 | 2) || 1,
+      };
+
+      const normalizedConfig = {
+        pack: configSource.pack as CardPack,
+        background: configSource.background,
+        cardBack: configSource.cardBack,
+        firstPlayer: (configSource.firstPlayer === 2 ? 2 : 1) as 1 | 2,
+      };
+
+      await startOnlineRound(normalizedConfig);
+      setLastConfig({
+        pack: normalizedConfig.pack,
+        background: normalizedConfig.background,
+        cardBack: normalizedConfig.cardBack,
+        firstPlayer: normalizedConfig.firstPlayer,
+      });
+      return;
+    }
+
     if (!lastConfig) return;
-    
+
     resetGame();
-    setSelectedPack(lastConfig.pack as CardPack);
+    setSelectedPack(lastConfig.pack);
     setSelectedBackground(lastConfig.background);
     setSelectedCardBack(lastConfig.cardBack);
     setShowResetConfirmation(false);
     setIsReplaying(true);
-  };
+  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig]);
 
   const handleNewGame = () => {
-    // Start new game setup flow
-    setOriginalPack(selectedPack);
-    setOriginalBackground(selectedBackground);
-    setOriginalCardBack(selectedCardBack);
+    // Start new game setup flow using the current game configuration as the baseline
+    const activeConfig = getActiveConfig();
+
+    setOriginalPack(activeConfig.pack);
+    setOriginalBackground(activeConfig.background);
+    setOriginalCardBack(activeConfig.cardBack);
+
+    if (selectedPack !== activeConfig.pack) {
+      setSelectedPack(activeConfig.pack);
+    }
+    if (selectedBackground !== activeConfig.background) {
+      setSelectedBackground(activeConfig.background);
+    }
+    if (selectedCardBack !== activeConfig.cardBack) {
+      setSelectedCardBack(activeConfig.cardBack);
+    }
+
     setIsResetting(true);
     resetGame();
     guardedSetSetupStep('cardPack', 'new game clicked');
@@ -679,21 +816,45 @@ function App() {
   };
 
   const handleStartGame = (firstPlayer: number) => {
-    // Initialize game with animation and start playing
-    const images = getCurrentPackImages;
+    const normalizedFirstPlayer = (firstPlayer === 2 ? 2 : 1) as 1 | 2;
+
+    if (isOnlineMode) {
+      if (!isHost) {
+        console.warn('[Online] Only the host can start the game');
+        return;
+      }
+
+      void startOnlineRound({
+        firstPlayer: normalizedFirstPlayer,
+        pack: selectedPack,
+        background: selectedBackground,
+        cardBack: selectedCardBack,
+      });
+
+      guardedSetSetupStep(null, 'game started');
+      setIsResetting(false);
+      localStorage.setItem('hasPlayedBefore', 'true');
+      setLastConfig({
+        pack: selectedPack,
+        background: selectedBackground,
+        cardBack: selectedCardBack,
+        firstPlayer: normalizedFirstPlayer,
+      });
+      return;
+    }
+
+    const images = getCurrentPackImages();
     initializeGame(images, true); // true = start playing with animation
     startGameWithFirstPlayer(firstPlayer);
     guardedSetSetupStep(null, 'game started');
     setIsResetting(false);
     localStorage.setItem('hasPlayedBefore', 'true');
-    
-    // Measure layout metrics after modal closes and calculate card size
-    // Wait 100ms for DOM elements to be fully rendered and positioned
+
     if (autoSizeEnabled) {
       setTimeout(() => {
         const measuredMetrics = computeLayoutMetrics();
         console.log('[handleStartGame] Measured metrics after delay:', measuredMetrics);
-        
+
         const cardCount = images.length * 2;
         if (cardCount > 0 && measuredMetrics) {
           console.log('[handleStartGame] Calculating card size with metrics for', cardCount, 'cards');
@@ -701,13 +862,12 @@ function App() {
         }
       }, 100);
     }
-    
-    // Store configuration for replay
+
     setLastConfig({
       pack: selectedPack,
       background: selectedBackground,
       cardBack: selectedCardBack,
-      firstPlayer
+      firstPlayer,
     });
   };
 
@@ -716,7 +876,7 @@ function App() {
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
-    
+
     return () => {
       // Cleanup on unmount
       document.body.style.overflow = '';
@@ -731,7 +891,7 @@ function App() {
     };
 
     window.addEventListener('contextmenu', handleContextMenu);
-    
+
     return () => {
       window.removeEventListener('contextmenu', handleContextMenu);
     };
@@ -746,7 +906,7 @@ function App() {
       }
 
       const key = e.key.toLowerCase();
-      
+
       // Handle Pong combo
       // Clear timeout if exists
       if (comboTimeoutRef.current) {
@@ -755,7 +915,7 @@ function App() {
 
       // Add key to sequence
       comboSequenceRef.current.push(key);
-      
+
       // Keep only last 5 keys
       if (comboSequenceRef.current.length > COMBO_SEQUENCE.length) {
         comboSequenceRef.current.shift();
@@ -766,7 +926,7 @@ function App() {
         const matches = comboSequenceRef.current.every(
           (k, i) => k === COMBO_SEQUENCE[i]
         );
-        
+
         if (matches) {
           setShowPong(true);
           comboSequenceRef.current = [];
@@ -787,7 +947,7 @@ function App() {
       // Add key to test sequence (use exact key, not lowercase)
       const testKey = e.key;
       testComboSequenceRef.current.push(testKey);
-      
+
       // Keep only last 8 keys
       if (testComboSequenceRef.current.length > TEST_COMBO_SEQUENCE.length) {
         testComboSequenceRef.current.shift();
@@ -798,7 +958,7 @@ function App() {
         const matches = testComboSequenceRef.current.every(
           (k, i) => k === TEST_COMBO_SEQUENCE[i]
         );
-        
+
         if (matches) {
           setAdminEnabled(true);
           setShowAdminSidebar(true);
@@ -813,7 +973,7 @@ function App() {
     };
 
     window.addEventListener('keydown', handleKeyPress);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
       if (comboTimeoutRef.current) {
@@ -852,17 +1012,17 @@ function App() {
   const shouldShowCustomBackground = gameState.cards.length > 0;
   const backgroundStyle = shouldShowCustomBackground && currentBackground.imageUrl
     ? {
-        backgroundImage: `url(${currentBackground.imageUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }
+      backgroundImage: `url(${currentBackground.imageUrl})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat'
+    }
     : {};
   const backgroundClass = shouldShowCustomBackground && currentBackground.imageUrl
     ? 'min-h-screen'
     : shouldShowCustomBackground && currentBackground.gradient
-    ? `min-h-screen bg-gradient-to-br ${currentBackground.gradient}`
-    : 'min-h-screen bg-rainbow-gradient'; // Rainbow gradient for welcome screen
+      ? `min-h-screen bg-gradient-to-br ${currentBackground.gradient}`
+      : 'min-h-screen bg-rainbow-gradient'; // Rainbow gradient for welcome screen
 
   return (
     <div className={`${backgroundClass} ${gameState.gameStatus === 'playing' ? 'pt-4' : 'py-8'}`} style={backgroundStyle}>
@@ -914,16 +1074,15 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
-              
+
               {/* Admin Toggle Button - only show if admin is enabled */}
               {adminEnabled && (
                 <button
                   onClick={() => setShowAdminSidebar(!showAdminSidebar)}
-                  className={`p-2 text-xs font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 ${
-                    showAdminSidebar
+                  className={`p-2 text-xs font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 ${showAdminSidebar
                       ? 'bg-blue-500 hover:bg-blue-600 text-white'
                       : 'bg-gray-400 hover:bg-gray-500 text-white'
-                  }`}
+                    }`}
                   title={showAdminSidebar ? 'Hide Admin Panel' : 'Show Admin Panel'}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -932,7 +1091,7 @@ function App() {
                 </button>
               )}
             </div>
-            
+
             {/* Right side - Settings Button */}
             <div className="fixed top-5 right-5 z-10">
               <button
@@ -946,43 +1105,42 @@ function App() {
                 </svg>
               </button>
             </div>
-            
+
             {/* Settings Slide-over Menu */}
             <div
-              className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
-                isSettingsOpen ? 'translate-x-0' : 'translate-x-full'
-              }`}
+              className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'
+                }`}
             >
-                      <SettingsMenu
-                        cardSize={cardSize}
-                        autoSizeEnabled={autoSizeEnabled}
-                        useWhiteCardBackground={useWhiteCardBackground}
-                        flipDuration={flipDuration}
-                        emojiSizePercentage={emojiSizePercentage}
-                        ttsEnabled={ttsEnabled}
-                        onIncreaseSize={increaseCardSize}
-                        onDecreaseSize={decreaseCardSize}
-                        onToggleAutoSize={toggleAutoSize}
-                        onToggleWhiteCardBackground={toggleWhiteCardBackground}
-                        onIncreaseFlipDuration={increaseFlipDuration}
-                        onDecreaseFlipDuration={decreaseFlipDuration}
-                        onIncreaseEmojiSize={increaseEmojiSize}
-                        onDecreaseEmojiSize={decreaseEmojiSize}
-                        onToggleTtsEnabled={toggleTtsEnabled}
-                        onClose={() => setIsSettingsOpen(false)}
-                        onToggleFullscreen={toggleFullscreen}
-                        isFullscreen={isFullscreen}
-                        onEndTurn={endTurn}
-                        gameStatus={gameState.gameStatus}
-                        onEnableAdmin={() => {
-                          setAdminEnabled(true);
-                          setShowAdminSidebar(true);
-                        }}
-                        onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
-                        onReloadApp={() => setShowReloadConfirmation(true)}
-                      />
+              <SettingsMenu
+                cardSize={cardSize}
+                autoSizeEnabled={autoSizeEnabled}
+                useWhiteCardBackground={useWhiteCardBackground}
+                flipDuration={flipDuration}
+                emojiSizePercentage={emojiSizePercentage}
+                ttsEnabled={ttsEnabled}
+                onIncreaseSize={increaseCardSize}
+                onDecreaseSize={decreaseCardSize}
+                onToggleAutoSize={toggleAutoSize}
+                onToggleWhiteCardBackground={toggleWhiteCardBackground}
+                onIncreaseFlipDuration={increaseFlipDuration}
+                onDecreaseFlipDuration={decreaseFlipDuration}
+                onIncreaseEmojiSize={increaseEmojiSize}
+                onDecreaseEmojiSize={decreaseEmojiSize}
+                onToggleTtsEnabled={toggleTtsEnabled}
+                onClose={() => setIsSettingsOpen(false)}
+                onToggleFullscreen={toggleFullscreen}
+                isFullscreen={isFullscreen}
+                onEndTurn={endTurn}
+                gameStatus={gameState.gameStatus}
+                onEnableAdmin={() => {
+                  setAdminEnabled(true);
+                  setShowAdminSidebar(true);
+                }}
+                onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
+                onReloadApp={() => setShowReloadConfirmation(true)}
+              />
             </div>
-            
+
             {/* Backdrop when settings menu is open */}
             {isSettingsOpen && (
               <div
@@ -1051,68 +1209,67 @@ function App() {
               <div ref={scoreboardRef} className="w-full max-w-2xl mx-auto">
                 <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-lg shadow-lg p-3 overflow-visible">
                   <div className="flex items-center justify-between overflow-visible">
-              {/* Player 1 */}
-              <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
-                gameState.currentPlayer === 1 
-                  ? 'bg-opacity-90 ring-2' 
-                  : 'bg-gray-50 bg-opacity-50'
-              } ${glowingPlayer === 1 ? 'player-turn-glow' : ''}`}
-              style={(() => {
-                const player1 = gameState.players.find(p => p.id === 1);
-                const playerColor = player1?.color || '#3b82f6';
-                const rgb = hexToRgb(playerColor);
-                const baseStyle: React.CSSProperties & { 
-                  '--tw-ring-color'?: string; 
-                  '--glow-color-start'?: string;
-                  '--glow-color-mid'?: string;
-                  '--glow-color-outer'?: string;
-                  '--glow-color-end'?: string;
-                } = {};
-                
-                if (gameState.currentPlayer === 1) {
-                  baseStyle.backgroundColor = `${playerColor}20`;
-                  baseStyle['--tw-ring-color'] = playerColor;
-                }
-                
-                // Set glow color RGB strings for CSS variables with different opacities
-                baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
-                baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
-                baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
-                baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
-                
-                return baseStyle;
-              })()}
-              >
-                <div className="flex items-baseline gap-2">
-                  <button
-                    onClick={() => setSelectedPlayerForMatches(1)}
-                    className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
-                    title="Click to view matches"
-                  >
-                    {gameState.players.find(p => p.id === 1)?.name || 'Player 1'}:
-                  </button>
-                  <button
-                    onClick={() => setSelectedPlayerForMatches(1)}
-                    className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
-                    style={gameState.currentPlayer === 1 ? { color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' } : {}}
-                    title="Click to view matches"
-                  >
-                    {gameState.players.find(p => p.id === 1)?.score || 0}
-                  </button>
-                </div>
-                {gameState.currentPlayer === 1 && (
-                  <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' }}>
-                    <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-xs">
-                      {gameMode === 'online'
-                        ? (localPlayerSlot === 1 ? 'Your Turn!' : 'Waiting...')
-                        : 'Turn'}
-                    </span>
-                  </div>
-                )}
-              </div>
+                    {/* Player 1 */}
+                    <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 1
+                        ? 'bg-opacity-90 ring-2'
+                        : 'bg-gray-50 bg-opacity-50'
+                      } ${glowingPlayer === 1 ? 'player-turn-glow' : ''}`}
+                      style={(() => {
+                        const player1 = gameState.players.find(p => p.id === 1);
+                        const playerColor = player1?.color || '#3b82f6';
+                        const rgb = hexToRgb(playerColor);
+                        const baseStyle: React.CSSProperties & {
+                          '--tw-ring-color'?: string;
+                          '--glow-color-start'?: string;
+                          '--glow-color-mid'?: string;
+                          '--glow-color-outer'?: string;
+                          '--glow-color-end'?: string;
+                        } = {};
+
+                        if (gameState.currentPlayer === 1) {
+                          baseStyle.backgroundColor = `${playerColor}20`;
+                          baseStyle['--tw-ring-color'] = playerColor;
+                        }
+
+                        // Set glow color RGB strings for CSS variables with different opacities
+                        baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
+                        baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
+                        baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+                        baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
+
+                        return baseStyle;
+                      })()}
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <button
+                          onClick={() => setSelectedPlayerForMatches(1)}
+                          className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                          title="Click to view matches"
+                        >
+                          {gameState.players.find(p => p.id === 1)?.name || 'Player 1'}:
+                        </button>
+                        <button
+                          onClick={() => setSelectedPlayerForMatches(1)}
+                          className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
+                          style={gameState.currentPlayer === 1 ? { color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' } : {}}
+                          title="Click to view matches"
+                        >
+                          {gameState.players.find(p => p.id === 1)?.score || 0}
+                        </button>
+                      </div>
+                      {gameState.currentPlayer === 1 && (
+                        <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' }}>
+                          <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-xs">
+                            {gameMode === 'online'
+                              ? (localPlayerSlot === 1 ? 'Your Turn!' : 'Waiting...')
+                              : 'Turn'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
                     {/* VS Divider with Room Code (online mode) */}
                     <div className="flex flex-col items-center px-3">
@@ -1130,68 +1287,67 @@ function App() {
                       <div className="text-gray-400 font-semibold text-sm">VS</div>
                     </div>
 
-              {/* Player 2 */}
-              <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
-                gameState.currentPlayer === 2 
-                  ? 'bg-opacity-90 ring-2' 
-                  : 'bg-gray-50 bg-opacity-50'
-              } ${glowingPlayer === 2 ? 'player-turn-glow' : ''}`}
-              style={(() => {
-                const player2 = gameState.players.find(p => p.id === 2);
-                const playerColor = player2?.color || '#10b981';
-                const rgb = hexToRgb(playerColor);
-                const baseStyle: React.CSSProperties & { 
-                  '--tw-ring-color'?: string; 
-                  '--glow-color-start'?: string;
-                  '--glow-color-mid'?: string;
-                  '--glow-color-outer'?: string;
-                  '--glow-color-end'?: string;
-                } = {};
-                
-                if (gameState.currentPlayer === 2) {
-                  baseStyle.backgroundColor = `${playerColor}20`;
-                  baseStyle['--tw-ring-color'] = playerColor;
-                }
-                
-                // Set glow color RGB strings for CSS variables with different opacities
-                baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
-                baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
-                baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
-                baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
-                
-                return baseStyle;
-              })()}
-              >
-                <div className="flex items-baseline gap-2">
-                  <button
-                    onClick={() => setSelectedPlayerForMatches(2)}
-                    className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
-                    title="Click to view matches"
-                  >
-                    {gameState.players.find(p => p.id === 2)?.name || 'Player 2'}:
-                  </button>
-                  <button
-                    onClick={() => setSelectedPlayerForMatches(2)}
-                    className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
-                    style={gameState.currentPlayer === 2 ? { color: gameState.players.find(p => p.id === 2)?.color || '#10b981' } : {}}
-                    title="Click to view matches"
-                  >
-                    {gameState.players.find(p => p.id === 2)?.score || 0}
-                  </button>
-                </div>
-                {gameState.currentPlayer === 2 && (
-                  <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: gameState.players.find(p => p.id === 2)?.color || '#10b981' }}>
-                    <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-xs">
-                      {gameMode === 'online'
-                        ? (localPlayerSlot === 2 ? 'Your Turn!' : 'Waiting...')
-                        : 'Turn'}
-                    </span>
-                  </div>
-                )}
-              </div>
+                    {/* Player 2 */}
+                    <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 2
+                        ? 'bg-opacity-90 ring-2'
+                        : 'bg-gray-50 bg-opacity-50'
+                      } ${glowingPlayer === 2 ? 'player-turn-glow' : ''}`}
+                      style={(() => {
+                        const player2 = gameState.players.find(p => p.id === 2);
+                        const playerColor = player2?.color || '#10b981';
+                        const rgb = hexToRgb(playerColor);
+                        const baseStyle: React.CSSProperties & {
+                          '--tw-ring-color'?: string;
+                          '--glow-color-start'?: string;
+                          '--glow-color-mid'?: string;
+                          '--glow-color-outer'?: string;
+                          '--glow-color-end'?: string;
+                        } = {};
+
+                        if (gameState.currentPlayer === 2) {
+                          baseStyle.backgroundColor = `${playerColor}20`;
+                          baseStyle['--tw-ring-color'] = playerColor;
+                        }
+
+                        // Set glow color RGB strings for CSS variables with different opacities
+                        baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
+                        baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
+                        baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+                        baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
+
+                        return baseStyle;
+                      })()}
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <button
+                          onClick={() => setSelectedPlayerForMatches(2)}
+                          className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                          title="Click to view matches"
+                        >
+                          {gameState.players.find(p => p.id === 2)?.name || 'Player 2'}:
+                        </button>
+                        <button
+                          onClick={() => setSelectedPlayerForMatches(2)}
+                          className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
+                          style={gameState.currentPlayer === 2 ? { color: gameState.players.find(p => p.id === 2)?.color || '#10b981' } : {}}
+                          title="Click to view matches"
+                        >
+                          {gameState.players.find(p => p.id === 2)?.score || 0}
+                        </button>
+                      </div>
+                      {gameState.currentPlayer === 2 && (
+                        <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: gameState.players.find(p => p.id === 2)?.color || '#10b981' }}>
+                          <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-xs">
+                            {gameMode === 'online'
+                              ? (localPlayerSlot === 2 ? 'Your Turn!' : 'Waiting...')
+                              : 'Turn'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1223,8 +1379,8 @@ function App() {
         )}
 
         {gameState.gameStatus === 'finished' && (gameState.winner || gameState.isTie) && (
-          <GameOver 
-            winner={gameState.winner} 
+          <GameOver
+            winner={gameState.winner}
             players={gameState.players}
             isTie={gameState.isTie}
             onPlayAgain={handleResetClick}
@@ -1293,7 +1449,7 @@ function App() {
             players={gameState.players}
             currentPlayer={gameState.currentPlayer}
             onStartGame={handleStartGame}
-            onPlayerNameChange={updatePlayerName}
+            onPlayerNameChange={handlePlayerNameChange}
             onPlayerColorChange={updatePlayerColor}
             onBack={handleStartModalBack}
             isResetting={isResetting}
@@ -1358,13 +1514,7 @@ function App() {
             emojiSizePercentage={emojiSizePercentage}
             cardBack={effectiveCardBack}
             onPlayerNameChange={(playerId, name) => {
-              if (isOnlineMode) {
-                // In online mode, use the online game's updatePlayerName which syncs to Firestore
-                onlineGame.updatePlayerName(playerId as 1 | 2, name);
-              } else {
-                // In local mode, use the local game's updatePlayerName
-                updatePlayerName(playerId, name);
-              }
+              handlePlayerNameChange(playerId as 1 | 2, name);
             }}
             canEditName={
               gameMode === 'local' || // Local mode: can edit both

@@ -27,6 +27,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
   const [view, setView] = useState<LobbyView>('choice');
   const [isLoading, setIsLoading] = useState(false);
   const hasStartedGame = useRef(false);
+  const [playerNameInput, setPlayerNameInput] = useState('');
 
   const {
     connectionStatus,
@@ -39,10 +40,15 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     createRoom,
     joinRoom,
     leaveRoom,
-    subscribeToRoom,
     subscribeToPresence,
     clearError,
+    playerName,
+    setPlayerNamePreference,
   } = useOnlineStore();
+
+  useEffect(() => {
+    setPlayerNameInput(playerName);
+  }, [playerName]);
 
   const { settings } = useGameStore();
 
@@ -111,14 +117,11 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
   useEffect(() => {
     if (!roomCode) return;
 
-    const unsubRoom = subscribeToRoom(roomCode);
     const unsubPresence = subscribeToPresence(roomCode);
-
     return () => {
-      unsubRoom();
       unsubPresence();
     };
-  }, [roomCode, subscribeToRoom, subscribeToPresence]);
+  }, [roomCode, subscribeToPresence]);
 
   // Move to waiting view when room is created/joined
   useEffect(() => {
@@ -145,8 +148,10 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     clearError();
 
     try {
+      const preferredName = playerNameInput.trim() || 'Player';
+      setPlayerNamePreference(preferredName);
       await createRoom({
-        hostName: settings.player1Name,
+        hostName: preferredName,
         hostColor: settings.player1Color,
         cardPack: settings.cardPack,
         background: settings.background,
@@ -162,7 +167,9 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     clearError();
 
     try {
-      await joinRoom(code, settings.player1Name, settings.player1Color);
+      const preferredName = playerNameInput.trim() || 'Player';
+      setPlayerNamePreference(preferredName);
+      await joinRoom(code, preferredName, settings.player1Color);
     } catch {
       setIsLoading(false);
     }
@@ -219,6 +226,24 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Online Multiplayer</h2>
               <p className="text-gray-600">Create a room or join an existing one</p>
+            </div>
+
+            <div className="max-w-sm mx-auto w-full text-left space-y-2">
+              <label className="text-sm font-semibold text-gray-700" htmlFor="online-name-input">
+                Your online name
+              </label>
+              <input
+                id="online-name-input"
+                type="text"
+                value={playerNameInput}
+                onChange={(e) => setPlayerNameInput(e.target.value)}
+                onBlur={() => setPlayerNamePreference(playerNameInput)}
+                maxLength={20}
+                className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter your name"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-500">This name is shared when you create or join rooms.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl mx-auto">

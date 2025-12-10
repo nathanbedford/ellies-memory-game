@@ -44,7 +44,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
   // Stuck game detection - track when cards were flipped
   const cardsFlippedAtRef = useRef<number | null>(null);
   const stuckCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const STUCK_THRESHOLD_MS = 15000; // 15 seconds without resolution is considered stuck
+  const STUCK_THRESHOLD_MS = 60000; // Only recover after a full minute with no progress
 
   // Sync version tracking to prevent processing our own updates
   const lastSyncedVersionRef = useRef(0);
@@ -469,8 +469,9 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
   useEffect(() => {
     const flippedUnmatched = gameState.cards.filter(c => c.isFlipped && !c.isMatched);
     const authoritativeTurn = localPlayerSlot === gameState.currentPlayer;
-    const hasPendingMatchResolution = flippedUnmatched.length >= 2 || isCheckingMatchRef.current || !!matchCheckTimeoutRef.current;
-    const shouldMonitor = authoritativeTurn && hasPendingMatchResolution;
+    const resolutionInFlight = isCheckingMatchRef.current || !!matchCheckTimeoutRef.current;
+    const hasTwoUnmatched = flippedUnmatched.length >= 2;
+    const shouldMonitor = authoritativeTurn && hasTwoUnmatched && !resolutionInFlight;
 
     if (shouldMonitor && cardsFlippedAtRef.current === null) {
       cardsFlippedAtRef.current = Date.now();
@@ -479,6 +480,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
         currentPlayer: gameState.currentPlayer,
         localPlayerSlot,
         selectedCards: gameState.selectedCards,
+        resolutionInFlight,
       });
     } else if (!shouldMonitor && cardsFlippedAtRef.current !== null) {
       const duration = Date.now() - cardsFlippedAtRef.current;

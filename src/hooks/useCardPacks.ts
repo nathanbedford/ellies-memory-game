@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { CardPack, CardPackOption } from '../types';
+import type { CardImage } from '../services/game/GameEngine';
 import { CARD_DECKS } from '../data/cardDecks';
 
 // Create CARD_PACKS after CARD_DECKS is defined to avoid evaluation issues
@@ -15,15 +16,17 @@ export const useCardPacks = () => {
     return (saved as CardPack) || 'animals';
   });
 
-  const getCurrentPackImages = useMemo(() => {
+  const currentPackImages = useMemo<CardImage[]>(() => {
     const deck = CARD_DECKS.find(d => d.id === selectedPack) || CARD_DECKS[0];
-    
+
     return deck.cards.map((card) => ({
       id: card.id,
       url: card.imageUrl || card.emoji,
-      gradient: card.gradient
+      gradient: card.gradient,
     }));
   }, [selectedPack]);
+
+  const getCurrentPackImages = useCallback(() => currentPackImages, [currentPackImages]);
 
   // Preload images when animals-real, ocean-real, emotions-real, insects-real, jungle-animals-real, construction-real, or animals-from-china-real deck is selected
   useEffect(() => {
@@ -109,6 +112,7 @@ export const useCardPacks = () => {
     selectedPack,
     setSelectedPack: setSelectedPackWithStorage,
     getCurrentPackImages,
+    currentPackImages,
     cardPacks: CARD_PACKS
   };
 };

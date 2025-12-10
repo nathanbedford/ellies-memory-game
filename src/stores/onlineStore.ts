@@ -36,6 +36,7 @@ interface OnlineStoreState {
   room: Room | null;
   roomCode: string | null;
   isHost: boolean;
+  playerName: string;
 
   // Presence
   presenceData: Record<string, PresenceData>;
@@ -72,6 +73,7 @@ interface OnlineStoreActions {
   // Player actions
   updatePlayerName: (name: string) => Promise<void>;
   updatePlayerColor: (color: string) => Promise<void>;
+  setPlayerNamePreference: (name: string) => void;
 
   // Presence actions
   subscribeToPresence: (roomCode: string) => () => void;
@@ -94,10 +96,25 @@ const initialState: OnlineStoreState = {
   room: null,
   roomCode: null,
   isHost: false,
+  playerName: 'Player',
   presenceData: {},
   opponentConnected: false,
   opponentDisconnectedAt: null,
   error: null,
+};
+
+const ONLINE_NAME_STORAGE_KEY = 'onlinePlayerName';
+
+const getStoredOnlinePlayerName = (): string => {
+  if (typeof window === 'undefined') {
+    return 'Player';
+  }
+  const stored = localStorage.getItem(ONLINE_NAME_STORAGE_KEY);
+  if (stored && stored.trim().length > 0) {
+    return stored.trim();
+  }
+  const fallback = localStorage.getItem('player1Name');
+  return fallback && fallback.trim().length > 0 ? fallback.trim() : 'Player';
 };
 
 // ============================================
@@ -107,6 +124,7 @@ const initialState: OnlineStoreState = {
 export const useOnlineStore = create<OnlineStore>()(
   subscribeWithSelector((set, get) => ({
     ...initialState,
+    playerName: getStoredOnlinePlayerName(),
 
     // Mode actions
     setGameMode: (mode: GameMode | null) => {
@@ -305,6 +323,14 @@ export const useOnlineStore = create<OnlineStore>()(
       }
     },
 
+    setPlayerNamePreference: (name: string) => {
+      const trimmed = name.trim() || 'Player';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(ONLINE_NAME_STORAGE_KEY, trimmed);
+      }
+      set({ playerName: trimmed });
+    },
+
     // Presence actions
     subscribeToPresence: (roomCode: string) => {
       return PresenceService.subscribeToRoomPresence(roomCode, (presenceData) => {
@@ -361,7 +387,10 @@ export const useOnlineStore = create<OnlineStore>()(
     // Reset
     reset: () => {
       resetFirestoreSyncAdapter();
-      set(initialState);
+      set((state) => ({
+        ...initialState,
+        playerName: state.playerName,
+      }));
     },
   }))
 );
