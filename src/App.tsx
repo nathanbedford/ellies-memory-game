@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useMemoryGame } from './hooks/useMemoryGame';
 import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme, BACKGROUND_OPTIONS } from './hooks/useBackgroundSelector';
 import { useCardBackSelector, CardBackType, CARD_BACK_OPTIONS } from './hooks/useCardBackSelector';
 import { useOnlineGame } from './hooks/useOnlineGame';
 import { useOnlineStore } from './stores/onlineStore';
+import { useCursorSync } from './hooks/useCursorSync';
 import { CardPack, GameMode } from './types';
 import { CARD_DECKS } from './data/cardDecks';
 import { initializeCards, createInitialState, startGameWithCards } from './services/game/GameEngine';
@@ -102,7 +103,7 @@ function App() {
   const [showPWAInstall, setShowPWAInstall] = useState(false);
 
   // Online multiplayer state
-  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, subscribeToRoom, isHost, updateRoomConfig, setPlayerNamePreference } = useOnlineStore();
+  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, setPlayerNamePreference } = useOnlineStore();
   // Get local player slot directly to avoid creating new objects that cause re-renders
   const localPlayerSlot = room && odahId ? (room.players[odahId]?.slot ?? null) : null;
 
@@ -176,17 +177,23 @@ function App() {
 
   const gameState = isOnlineMode ? onlineGame.gameState : localGame.gameState;
 
-  // Keep room subscription active outside of the lobby so config/player updates propagate
-  useEffect(() => {
-    if (!roomCode) {
-      return;
-    }
+  // Get opponent's odahId for cursor sync
+  const opponentOdahId = useMemo(() => {
+    if (!room || !odahId) return null;
+    const opponentEntry = Object.entries(room.players).find(([id]) => id !== odahId);
+    return opponentEntry ? opponentEntry[0] : null;
+  }, [room, odahId]);
 
-    const unsubscribe = subscribeToRoom(roomCode);
-    return () => {
-      unsubscribe();
+  // Get opponent's player info for cursor display
+  const opponentInfo = useMemo(() => {
+    if (!room || !opponentOdahId) return null;
+    const opponentPlayer = room.players[opponentOdahId];
+    if (!opponentPlayer) return null;
+    return {
+      name: opponentPlayer.name,
+      color: opponentPlayer.color,
     };
-  }, [roomCode, subscribeToRoom]);
+  }, [room, opponentOdahId]);
 
   // Subscribe to presence during online gameplay
   // OnlineLobby handles presence in the waiting room, but unmounts when game starts
@@ -220,6 +227,26 @@ function App() {
     increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, resetGame, isAnimatingCards,
     endGameEarly, updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
   } = localGame;
+
+  // Cursor sync for online mode - only active during gameplay
+  const cursorSyncEnabled = Boolean(isOnlineMode && gameState.gameStatus === 'playing');
+  const { opponentCursor, handleMouseMove: handleCursorMove, handleMouseLeave: handleCursorLeave } = useCursorSync({
+    roomCode: roomCode || '',
+    localOdahId: odahId || '',
+    opponentOdahId,
+    enabled: cursorSyncEnabled,
+    cardSize,
+  });
+
+  // Build remote cursor data for GameBoard
+  const remoteCursorData = useMemo(() => {
+    if (!opponentCursor || !opponentInfo) return null;
+    return {
+      position: opponentCursor,
+      playerName: opponentInfo.name,
+      playerColor: opponentInfo.color,
+    };
+  }, [opponentCursor, opponentInfo]);
 
   const getActiveConfig = useCallback(() => {
     if (isOnlineMode) {
@@ -1080,8 +1107,8 @@ function App() {
                 <button
                   onClick={() => setShowAdminSidebar(!showAdminSidebar)}
                   className={`p-2 text-xs font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 ${showAdminSidebar
-                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                      : 'bg-gray-400 hover:bg-gray-500 text-white'
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-400 hover:bg-gray-500 text-white'
                     }`}
                   title={showAdminSidebar ? 'Hide Admin Panel' : 'Show Admin Panel'}
                 >
@@ -1211,8 +1238,8 @@ function App() {
                   <div className="flex items-center justify-between overflow-visible">
                     {/* Player 1 */}
                     <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 1
-                        ? 'bg-opacity-90 ring-2'
-                        : 'bg-gray-50 bg-opacity-50'
+                      ? 'bg-opacity-90 ring-2'
+                      : 'bg-gray-50 bg-opacity-50'
                       } ${glowingPlayer === 1 ? 'player-turn-glow' : ''}`}
                       style={(() => {
                         const player1 = gameState.players.find(p => p.id === 1);
@@ -1289,8 +1316,8 @@ function App() {
 
                     {/* Player 2 */}
                     <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 2
-                        ? 'bg-opacity-90 ring-2'
-                        : 'bg-gray-50 bg-opacity-50'
+                      ? 'bg-opacity-90 ring-2'
+                      : 'bg-gray-50 bg-opacity-50'
                       } ${glowingPlayer === 2 ? 'player-turn-glow' : ''}`}
                       style={(() => {
                         const player2 = gameState.players.find(p => p.id === 2);
@@ -1362,6 +1389,9 @@ function App() {
                   useWhiteCardBackground={useWhiteCardBackground}
                   emojiSizePercentage={emojiSizePercentage}
                   cardBack={effectiveCardBack}
+                  onCursorMove={cursorSyncEnabled ? handleCursorMove : undefined}
+                  onCursorLeave={cursorSyncEnabled ? handleCursorLeave : undefined}
+                  remoteCursor={remoteCursorData}
                 />
               </div>
             </div>

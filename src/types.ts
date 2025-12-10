@@ -120,9 +120,9 @@ export interface PresenceData {
 	lastSeen: number;
 }
 
-// Cursor Position (normalized coordinates 0-1)
+// Cursor Position (grid-relative coordinates)
 export interface CursorPosition {
-	x: number; // Normalized x position (0-1)
-	y: number; // Normalized y position (0-1)
+	x: number; // Grid column position (0-8, where 3.5 means column 3, 50% across the card)
+	y: number; // Grid row position (0-5, where 2.25 means row 2, 25% down the card)
 	timestamp: number; // Timestamp when position was recorded
 }

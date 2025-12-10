@@ -2,17 +2,18 @@
  * RemoteCursor - Visual indicator for opponent's cursor position
  *
  * Displays a cursor icon with the opponent's player color and name label.
- * Position is calculated from normalized coordinates (0-1) relative to the board.
+ * Position is calculated from grid-relative coordinates (0-8 for x, 0-5 for y).
  */
 
 import type { CursorPosition } from '../../types';
 
 interface RemoteCursorProps {
-  /** Opponent's cursor position (normalized 0-1) */
+  /** Opponent's cursor position (grid-relative: 0-8 for x, 0-5 for y) */
   position: CursorPosition;
-  /** Board dimensions for converting normalized to pixel position */
-  boardWidth: number;
-  boardHeight: number;
+  /** Size of each card in pixels */
+  cardSize: number;
+  /** Gap between cards in pixels (default: 8px) */
+  gap?: number;
   /** Opponent's display name */
   playerName: string;
   /** Opponent's player color */
@@ -21,14 +22,20 @@ interface RemoteCursorProps {
 
 export function RemoteCursor({
   position,
-  boardWidth,
-  boardHeight,
+  cardSize,
+  gap = 8,
   playerName,
   playerColor,
 }: RemoteCursorProps) {
-  // Convert normalized position to pixels
-  const left = position.x * boardWidth;
-  const top = position.y * boardHeight;
+  // Only render if position is within valid grid bounds
+  if (position.x < 0 || position.x > 8 || position.y < 0 || position.y > 5) {
+    return null;
+  }
+
+  // Convert grid position to pixels
+  // Each grid cell is cardSize + gap wide/tall
+  const left = position.x * (cardSize + gap);
+  const top = position.y * (cardSize + gap);
 
   return (
     <div

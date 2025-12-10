@@ -4,7 +4,7 @@
  * Handles:
  * - Broadcasting local cursor position to Firebase RTDB
  * - Subscribing to opponent's cursor position
- * - Converting between pixel and normalized coordinates
+ * - Converting between pixel and grid-relative coordinates (0-8 for x, 0-5 for y)
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -16,10 +16,12 @@ interface UseCursorSyncOptions {
 	localOdahId: string;
 	opponentOdahId: string | null;
 	enabled: boolean;
+	cardSize: number; // Size of each card in pixels
+	gap?: number; // Gap between cards in pixels (default: 8px for gap-2)
 }
 
 interface UseCursorSyncResult {
-	/** Opponent's cursor position (normalized 0-1) */
+	/** Opponent's cursor position (grid-relative: 0-8 for x, 0-5 for y) */
 	opponentCursor: CursorPosition | null;
 	/** Handler for mouse move events on the game board */
 	handleMouseMove: (
@@ -33,7 +35,14 @@ interface UseCursorSyncResult {
 export function useCursorSync(
 	options: UseCursorSyncOptions,
 ): UseCursorSyncResult {
-	const { roomCode, localOdahId, opponentOdahId, enabled } = options;
+	const {
+		roomCode,
+		localOdahId,
+		opponentOdahId,
+		enabled,
+		cardSize,
+		gap = 8,
+	} = options;
 
 	const [opponentCursor, setOpponentCursor] = useState<CursorPosition | null>(
 		null,
@@ -82,22 +91,29 @@ export function useCursorSync(
 		};
 	}, [enabled, roomCode, opponentOdahId]);
 
-	// Handle mouse move - convert pixel position to normalized coordinates
+	// Handle mouse move - convert pixel position to grid-relative coordinates
 	const handleMouseMove = useCallback(
 		(event: React.MouseEvent<HTMLDivElement>, boardRect: DOMRect) => {
 			if (!cursorServiceRef.current || !enabled) return;
 
-			// Calculate position relative to the board
-			const x = (event.clientX - boardRect.left) / boardRect.width;
-			const y = (event.clientY - boardRect.top) / boardRect.height;
+			// Position relative to the board
+			const relX = event.clientX - boardRect.left;
+			const relY = event.clientY - boardRect.top;
 
-			// Clamp to 0-1 range
-			const clampedX = Math.max(0, Math.min(1, x));
-			const clampedY = Math.max(0, Math.min(1, y));
+			// Convert to grid position (0-8 for cols, 0-5 for rows)
+			// Each grid cell is cardSize + gap wide/tall
+			const gridX = relX / (cardSize + gap);
+			const gridY = relY / (cardSize + gap);
 
-			cursorServiceRef.current.updatePosition(clampedX, clampedY);
+			// Only send if within grid bounds (8 columns, 5 rows)
+			if (gridX >= 0 && gridX <= 8 && gridY >= 0 && gridY <= 5) {
+				cursorServiceRef.current.updatePosition(gridX, gridY);
+			} else {
+				// Clear position if outside grid bounds
+				cursorServiceRef.current.clearPosition();
+			}
 		},
-		[enabled],
+		[enabled, cardSize, gap],
 	);
 
 	// Handle mouse leave - clear cursor position

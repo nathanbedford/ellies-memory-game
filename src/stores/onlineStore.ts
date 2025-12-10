@@ -5,116 +5,155 @@
  * Does NOT persist to localStorage since online state is transient.
  */
 
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 import type {
-  GameMode,
-  ConnectionStatus,
-  Room,
-  PresenceData,
-  CardPack,
-} from '../types';
+	GameMode,
+	ConnectionStatus,
+	Room,
+	PresenceData,
+	CardPack,
+} from "../types";
 import {
-  getFirestoreSyncAdapter,
-  resetFirestoreSyncAdapter,
-} from '../services/sync/FirestoreSyncAdapter';
-import { PresenceService } from '../services/sync/PresenceService';
+	getFirestoreSyncAdapter,
+	resetFirestoreSyncAdapter,
+} from "../services/sync/FirestoreSyncAdapter";
+import { PresenceService } from "../services/sync/PresenceService";
+
+// ============================================
+// Module-level subscription management
+// ============================================
+
+// Store the unsubscribe function outside of Zustand state
+let roomUnsubscribe: (() => void) | null = null;
+
+// Helper to start room subscription
+const startRoomSubscription = (
+	roomCode: string,
+	set: (partial: Partial<OnlineStoreState>) => void,
+) => {
+	// Clean up any existing subscription first
+	if (roomUnsubscribe) {
+		roomUnsubscribe();
+		roomUnsubscribe = null;
+	}
+
+	const adapter = getFirestoreSyncAdapter();
+	roomUnsubscribe = adapter.subscribeToRoom(roomCode, (room) => {
+		set({ room });
+	});
+};
+
+// Helper to stop room subscription
+const stopRoomSubscription = () => {
+	if (roomUnsubscribe) {
+		roomUnsubscribe();
+		roomUnsubscribe = null;
+	}
+};
 
 // ============================================
 // Store State
 // ============================================
 
 interface OnlineStoreState {
-  // Mode
-  gameMode: GameMode | null;
+	// Mode
+	gameMode: GameMode | null;
 
-  // Connection
-  connectionStatus: ConnectionStatus;
-  odahId: string | null;
+	// Connection
+	connectionStatus: ConnectionStatus;
+	odahId: string | null;
 
-  // Room
-  room: Room | null;
-  roomCode: string | null;
-  isHost: boolean;
-  playerName: string;
+	// Room
+	room: Room | null;
+	roomCode: string | null;
+	isHost: boolean;
+	playerName: string;
 
-  // Presence
-  presenceData: Record<string, PresenceData>;
-  opponentConnected: boolean;
-  opponentDisconnectedAt: number | null; // Timestamp when opponent disconnect was detected
+	// Presence
+	presenceData: Record<string, PresenceData>;
+	opponentConnected: boolean;
+	opponentDisconnectedAt: number | null; // Timestamp when opponent disconnect was detected
 
-  // Error handling
-  error: string | null;
+	// Error handling
+	error: string | null;
 }
 
 interface OnlineStoreActions {
-  // Mode actions
-  setGameMode: (mode: GameMode | null) => void;
+	// Mode actions
+	setGameMode: (mode: GameMode | null) => void;
 
-  // Connection actions
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
+	// Connection actions
+	connect: () => Promise<void>;
+	disconnect: () => Promise<void>;
 
-  // Room actions
-  createRoom: (options: {
-    hostName: string;
-    hostColor: string;
-    cardPack: CardPack;
-    background: string;
-    cardBack: string;
-  }) => Promise<string>;
-  joinRoom: (roomCode: string, playerName: string, playerColor: string) => Promise<Room>;
-  leaveRoom: () => Promise<void>;
-  subscribeToRoom: (roomCode: string) => () => void;
+	// Room actions
+	createRoom: (options: {
+		hostName: string;
+		hostColor: string;
+		cardPack: CardPack;
+		background: string;
+		cardBack: string;
+	}) => Promise<string>;
+	joinRoom: (
+		roomCode: string,
+		playerName: string,
+		playerColor: string,
+	) => Promise<Room>;
+	leaveRoom: () => Promise<void>;
 
-  // Room config (host only)
-  updateRoomConfig: (config: { cardPack?: CardPack; background?: string; cardBack?: string }) => Promise<void>;
+	// Room config (host only)
+	updateRoomConfig: (config: {
+		cardPack?: CardPack;
+		background?: string;
+		cardBack?: string;
+	}) => Promise<void>;
 
-  // Player actions
-  updatePlayerName: (name: string) => Promise<void>;
-  updatePlayerColor: (color: string) => Promise<void>;
-  setPlayerNamePreference: (name: string) => void;
+	// Player actions
+	updatePlayerName: (name: string) => Promise<void>;
+	updatePlayerColor: (color: string) => Promise<void>;
+	setPlayerNamePreference: (name: string) => void;
 
-  // Presence actions
-  subscribeToPresence: (roomCode: string) => () => void;
-  setPresenceData: (data: Record<string, PresenceData>) => void;
+	// Presence actions
+	subscribeToPresence: (roomCode: string) => () => void;
+	setPresenceData: (data: Record<string, PresenceData>) => void;
 
-  // Error handling
-  setError: (error: string | null) => void;
-  clearError: () => void;
+	// Error handling
+	setError: (error: string | null) => void;
+	clearError: () => void;
 
-  // Reset
-  reset: () => void;
+	// Reset
+	reset: () => void;
 }
 
 type OnlineStore = OnlineStoreState & OnlineStoreActions;
 
 const initialState: OnlineStoreState = {
-  gameMode: null,
-  connectionStatus: 'disconnected',
-  odahId: null,
-  room: null,
-  roomCode: null,
-  isHost: false,
-  playerName: 'Player',
-  presenceData: {},
-  opponentConnected: false,
-  opponentDisconnectedAt: null,
-  error: null,
+	gameMode: null,
+	connectionStatus: "disconnected",
+	odahId: null,
+	room: null,
+	roomCode: null,
+	isHost: false,
+	playerName: "Player",
+	presenceData: {},
+	opponentConnected: false,
+	opponentDisconnectedAt: null,
+	error: null,
 };
 
-const ONLINE_NAME_STORAGE_KEY = 'onlinePlayerName';
+const ONLINE_NAME_STORAGE_KEY = "onlinePlayerName";
 
 const getStoredOnlinePlayerName = (): string => {
-  if (typeof window === 'undefined') {
-    return 'Player';
-  }
-  const stored = localStorage.getItem(ONLINE_NAME_STORAGE_KEY);
-  if (stored && stored.trim().length > 0) {
-    return stored.trim();
-  }
-  const fallback = localStorage.getItem('player1Name');
-  return fallback && fallback.trim().length > 0 ? fallback.trim() : 'Player';
+	if (typeof window === "undefined") {
+		return "Player";
+	}
+	const stored = localStorage.getItem(ONLINE_NAME_STORAGE_KEY);
+	if (stored && stored.trim().length > 0) {
+		return stored.trim();
+	}
+	const fallback = localStorage.getItem("player1Name");
+	return fallback && fallback.trim().length > 0 ? fallback.trim() : "Player";
 };
 
 // ============================================
@@ -122,277 +161,307 @@ const getStoredOnlinePlayerName = (): string => {
 // ============================================
 
 export const useOnlineStore = create<OnlineStore>()(
-  subscribeWithSelector((set, get) => ({
-    ...initialState,
-    playerName: getStoredOnlinePlayerName(),
+	subscribeWithSelector((set, get) => ({
+		...initialState,
+		playerName: getStoredOnlinePlayerName(),
 
-    // Mode actions
-    setGameMode: (mode: GameMode | null) => {
-      set({ gameMode: mode });
-    },
+		// Mode actions
+		setGameMode: (mode: GameMode | null) => {
+			set({ gameMode: mode });
+		},
 
-    // Connection actions
-    connect: async () => {
-      const { connectionStatus } = get();
-      if (connectionStatus === 'connected' || connectionStatus === 'connecting') {
-        return;
-      }
+		// Connection actions
+		connect: async () => {
+			const { connectionStatus } = get();
+			if (
+				connectionStatus === "connected" ||
+				connectionStatus === "connecting"
+			) {
+				return;
+			}
 
-      set({ connectionStatus: 'connecting', error: null });
+			set({ connectionStatus: "connecting", error: null });
 
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        await adapter.connect();
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				await adapter.connect();
 
-        set({
-          connectionStatus: 'connected',
-          odahId: adapter.getOdahId(),
-        });
-      } catch (error) {
-        set({
-          connectionStatus: 'disconnected',
-          error: error instanceof Error ? error.message : 'Connection failed',
-        });
-        throw error;
-      }
-    },
+				set({
+					connectionStatus: "connected",
+					odahId: adapter.getOdahId(),
+				});
+			} catch (error) {
+				set({
+					connectionStatus: "disconnected",
+					error: error instanceof Error ? error.message : "Connection failed",
+				});
+				throw error;
+			}
+		},
 
-    disconnect: async () => {
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        await adapter.disconnect();
-        resetFirestoreSyncAdapter();
-      } catch (error) {
-        console.error('Disconnect error:', error);
-      }
+		disconnect: async () => {
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				await adapter.disconnect();
+				resetFirestoreSyncAdapter();
+			} catch (error) {
+				console.error("Disconnect error:", error);
+			}
 
-      set({
-        connectionStatus: 'disconnected',
-        odahId: null,
-        room: null,
-        roomCode: null,
-        isHost: false,
-        presenceData: {},
-        opponentConnected: false,
-        opponentDisconnectedAt: null,
-      });
-    },
+			set({
+				connectionStatus: "disconnected",
+				odahId: null,
+				room: null,
+				roomCode: null,
+				isHost: false,
+				presenceData: {},
+				opponentConnected: false,
+				opponentDisconnectedAt: null,
+			});
+		},
 
-    // Room actions
-    createRoom: async (options) => {
-      const { odahId } = get();
-      if (!odahId) {
-        throw new Error('Not connected');
-      }
+		// Room actions
+		createRoom: async (options) => {
+			const { odahId } = get();
+			if (!odahId) {
+				throw new Error("Not connected");
+			}
 
-      set({ error: null });
+			set({ error: null });
 
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        const roomCode = await adapter.createRoom({
-          hostId: odahId,
-          hostName: options.hostName,
-          hostColor: options.hostColor,
-          cardPack: options.cardPack,
-          background: options.background,
-          cardBack: options.cardBack,
-        });
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				const roomCode = await adapter.createRoom({
+					hostId: odahId,
+					hostName: options.hostName,
+					hostColor: options.hostColor,
+					cardPack: options.cardPack,
+					background: options.background,
+					cardBack: options.cardBack,
+				});
 
-        set({
-          roomCode,
-          isHost: true,
-        });
+				set({
+					roomCode,
+					isHost: true,
+				});
 
-        return roomCode;
-      } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Failed to create room',
-        });
-        throw error;
-      }
-    },
+				// Start room subscription automatically
+				startRoomSubscription(roomCode, set);
 
-    joinRoom: async (roomCode: string, playerName: string, playerColor: string) => {
-      const { odahId } = get();
-      if (!odahId) {
-        throw new Error('Not connected');
-      }
+				return roomCode;
+			} catch (error) {
+				set({
+					error:
+						error instanceof Error ? error.message : "Failed to create room",
+				});
+				throw error;
+			}
+		},
 
-      set({ error: null });
+		joinRoom: async (
+			roomCode: string,
+			playerName: string,
+			playerColor: string,
+		) => {
+			const { odahId } = get();
+			if (!odahId) {
+				throw new Error("Not connected");
+			}
 
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        const room = await adapter.joinRoom(roomCode, {
-          odahId,
-          name: playerName,
-          color: playerColor,
-        });
+			set({ error: null });
 
-        set({
-          room,
-          roomCode: roomCode.toUpperCase(),
-          isHost: false,
-        });
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				const room = await adapter.joinRoom(roomCode, {
+					odahId,
+					name: playerName,
+					color: playerColor,
+				});
 
-        return room;
-      } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Failed to join room',
-        });
-        throw error;
-      }
-    },
+				const normalizedRoomCode = roomCode.toUpperCase();
 
-    leaveRoom: async () => {
-      set({ error: null });
+				set({
+					room,
+					roomCode: normalizedRoomCode,
+					isHost: false,
+				});
 
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        await adapter.leaveRoom();
+				// Start room subscription automatically
+				startRoomSubscription(normalizedRoomCode, set);
 
-        set({
-          room: null,
-          roomCode: null,
-          isHost: false,
-          presenceData: {},
-          opponentConnected: false,
-          opponentDisconnectedAt: null,
-        });
-      } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Failed to leave room',
-        });
-        throw error;
-      }
-    },
+				return room;
+			} catch (error) {
+				set({
+					error: error instanceof Error ? error.message : "Failed to join room",
+				});
+				throw error;
+			}
+		},
 
-    subscribeToRoom: (roomCode: string) => {
-      const adapter = getFirestoreSyncAdapter();
+		leaveRoom: async () => {
+			set({ error: null });
 
-      return adapter.subscribeToRoom(roomCode, (room) => {
-        set({ room });
-      });
-    },
+			// Stop room subscription before leaving
+			stopRoomSubscription();
 
-    // Room config (host only)
-    updateRoomConfig: async (config) => {
-      const { roomCode, isHost } = get();
-      if (!roomCode || !isHost) {
-        throw new Error('Only host can update room config');
-      }
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				await adapter.leaveRoom();
 
-      set({ error: null });
+				set({
+					room: null,
+					roomCode: null,
+					isHost: false,
+					presenceData: {},
+					opponentConnected: false,
+					opponentDisconnectedAt: null,
+				});
+			} catch (error) {
+				set({
+					error:
+						error instanceof Error ? error.message : "Failed to leave room",
+				});
+				throw error;
+			}
+		},
 
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        await adapter.updateRoomConfig(roomCode, config);
-      } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Failed to update room config',
-        });
-        throw error;
-      }
-    },
+		// Room config (host only)
+		updateRoomConfig: async (config) => {
+			const { roomCode, isHost } = get();
+			if (!roomCode || !isHost) {
+				throw new Error("Only host can update room config");
+			}
 
-    // Player actions
-    updatePlayerName: async (name: string) => {
-      set({ error: null });
+			set({ error: null });
 
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        await adapter.updatePlayerName(name);
-      } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Failed to update name',
-        });
-        throw error;
-      }
-    },
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				await adapter.updateRoomConfig(roomCode, config);
+			} catch (error) {
+				set({
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to update room config",
+				});
+				throw error;
+			}
+		},
 
-    updatePlayerColor: async (color: string) => {
-      set({ error: null });
+		// Player actions
+		updatePlayerName: async (name: string) => {
+			set({ error: null });
 
-      try {
-        const adapter = getFirestoreSyncAdapter();
-        await adapter.updatePlayerColor(color);
-      } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Failed to update color',
-        });
-        throw error;
-      }
-    },
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				await adapter.updatePlayerName(name);
+			} catch (error) {
+				set({
+					error:
+						error instanceof Error ? error.message : "Failed to update name",
+				});
+				throw error;
+			}
+		},
 
-    setPlayerNamePreference: (name: string) => {
-      const trimmed = name.trim() || 'Player';
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(ONLINE_NAME_STORAGE_KEY, trimmed);
-      }
-      set({ playerName: trimmed });
-    },
+		updatePlayerColor: async (color: string) => {
+			set({ error: null });
 
-    // Presence actions
-    subscribeToPresence: (roomCode: string) => {
-      return PresenceService.subscribeToRoomPresence(roomCode, (presenceData) => {
-        // Convert internal presence data to external format
-        const converted: Record<string, PresenceData> = {};
-        for (const [id, data] of Object.entries(presenceData)) {
-          converted[id] = {
-            odahId: data.odahId,
-            name: data.name,
-            online: data.online,
-            lastSeen: typeof data.lastSeen === 'number' ? data.lastSeen : Date.now(),
-          };
-        }
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				await adapter.updatePlayerColor(color);
+			} catch (error) {
+				set({
+					error:
+						error instanceof Error ? error.message : "Failed to update color",
+				});
+				throw error;
+			}
+		},
 
-        // Check if opponent is connected
-        const { odahId, opponentConnected: prevOpponentConnected } = get();
-        const opponentConnected = Object.values(converted).some(
-          (p) => p.odahId !== odahId && p.online
-        );
+		setPlayerNamePreference: (name: string) => {
+			const trimmed = name.trim() || "Player";
+			if (typeof window !== "undefined") {
+				localStorage.setItem(ONLINE_NAME_STORAGE_KEY, trimmed);
+			}
+			set({ playerName: trimmed });
+		},
 
-        // Track disconnect timing for overlay countdown
-        let opponentDisconnectedAt = get().opponentDisconnectedAt;
-        if (!opponentConnected && prevOpponentConnected) {
-          // Opponent just disconnected - record timestamp
-          opponentDisconnectedAt = Date.now();
-          console.log('[PRESENCE] Opponent disconnected at:', opponentDisconnectedAt);
-        } else if (opponentConnected && !prevOpponentConnected) {
-          // Opponent reconnected - clear timestamp
-          opponentDisconnectedAt = null;
-          console.log('[PRESENCE] Opponent reconnected');
-        }
+		// Presence actions
+		subscribeToPresence: (roomCode: string) => {
+			return PresenceService.subscribeToRoomPresence(
+				roomCode,
+				(presenceData) => {
+					// Convert internal presence data to external format
+					const converted: Record<string, PresenceData> = {};
+					for (const [id, data] of Object.entries(presenceData)) {
+						converted[id] = {
+							odahId: data.odahId,
+							name: data.name,
+							online: data.online,
+							lastSeen:
+								typeof data.lastSeen === "number" ? data.lastSeen : Date.now(),
+						};
+					}
 
-        set({ presenceData: converted, opponentConnected, opponentDisconnectedAt });
-      });
-    },
+					// Check if opponent is connected
+					const { odahId, opponentConnected: prevOpponentConnected } = get();
+					const opponentConnected = Object.values(converted).some(
+						(p) => p.odahId !== odahId && p.online,
+					);
 
-    setPresenceData: (data: Record<string, PresenceData>) => {
-      const { odahId } = get();
-      const opponentConnected = Object.values(data).some(
-        (p) => p.odahId !== odahId && p.online
-      );
-      set({ presenceData: data, opponentConnected });
-    },
+					// Track disconnect timing for overlay countdown
+					let opponentDisconnectedAt = get().opponentDisconnectedAt;
+					if (!opponentConnected && prevOpponentConnected) {
+						// Opponent just disconnected - record timestamp
+						opponentDisconnectedAt = Date.now();
+						console.log(
+							"[PRESENCE] Opponent disconnected at:",
+							opponentDisconnectedAt,
+						);
+					} else if (opponentConnected && !prevOpponentConnected) {
+						// Opponent reconnected - clear timestamp
+						opponentDisconnectedAt = null;
+						console.log("[PRESENCE] Opponent reconnected");
+					}
 
-    // Error handling
-    setError: (error: string | null) => {
-      set({ error });
-    },
+					set({
+						presenceData: converted,
+						opponentConnected,
+						opponentDisconnectedAt,
+					});
+				},
+			);
+		},
 
-    clearError: () => {
-      set({ error: null });
-    },
+		setPresenceData: (data: Record<string, PresenceData>) => {
+			const { odahId } = get();
+			const opponentConnected = Object.values(data).some(
+				(p) => p.odahId !== odahId && p.online,
+			);
+			set({ presenceData: data, opponentConnected });
+		},
 
-    // Reset
-    reset: () => {
-      resetFirestoreSyncAdapter();
-      set((state) => ({
-        ...initialState,
-        playerName: state.playerName,
-      }));
-    },
-  }))
+		// Error handling
+		setError: (error: string | null) => {
+			set({ error });
+		},
+
+		clearError: () => {
+			set({ error: null });
+		},
+
+		// Reset
+		reset: () => {
+			// Stop room subscription before resetting
+			stopRoomSubscription();
+			resetFirestoreSyncAdapter();
+			set((state) => ({
+				...initialState,
+				playerName: state.playerName,
+			}));
+		},
+	})),
 );
 
 // ============================================
@@ -400,51 +469,50 @@ export const useOnlineStore = create<OnlineStore>()(
 // ============================================
 
 export const selectIsOnline = (state: OnlineStore) =>
-  state.gameMode === 'online';
+	state.gameMode === "online";
 
 export const selectIsConnected = (state: OnlineStore) =>
-  state.connectionStatus === 'connected';
+	state.connectionStatus === "connected";
 
-export const selectIsInRoom = (state: OnlineStore) =>
-  state.roomCode !== null;
+export const selectIsInRoom = (state: OnlineStore) => state.roomCode !== null;
 
 export const selectCanStartGame = (state: OnlineStore) =>
-  state.isHost &&
-  state.room !== null &&
-  Object.keys(state.room.players).length === 2 &&
-  state.opponentConnected;
+	state.isHost &&
+	state.room !== null &&
+	Object.keys(state.room.players).length === 2 &&
+	state.opponentConnected;
 
 export const selectOpponent = (state: OnlineStore) => {
-  if (!state.room || !state.odahId) return null;
+	if (!state.room || !state.odahId) return null;
 
-  const opponentEntry = Object.entries(state.room.players).find(
-    ([id]) => id !== state.odahId
-  );
+	const opponentEntry = Object.entries(state.room.players).find(
+		([id]) => id !== state.odahId,
+	);
 
-  if (!opponentEntry) return null;
+	if (!opponentEntry) return null;
 
-  const [id, player] = opponentEntry;
-  const presence = state.presenceData[id];
+	const [id, player] = opponentEntry;
+	const presence = state.presenceData[id];
 
-  return {
-    odahId: id,
-    name: player.name,
-    color: player.color,
-    slot: player.slot,
-    online: presence?.online ?? false,
-  };
+	return {
+		odahId: id,
+		name: player.name,
+		color: player.color,
+		slot: player.slot,
+		online: presence?.online ?? false,
+	};
 };
 
 export const selectSelf = (state: OnlineStore) => {
-  if (!state.room || !state.odahId) return null;
+	if (!state.room || !state.odahId) return null;
 
-  const player = state.room.players[state.odahId];
-  if (!player) return null;
+	const player = state.room.players[state.odahId];
+	if (!player) return null;
 
-  return {
-    odahId: state.odahId,
-    name: player.name,
-    color: player.color,
-    slot: player.slot,
-  };
+	return {
+		odahId: state.odahId,
+		name: player.name,
+		color: player.color,
+		slot: player.slot,
+	};
 };

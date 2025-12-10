@@ -3,7 +3,8 @@
     "allow": [
       "Bash(for dir in /Users/nathanbedford/dev/playground/memory-finally/public/deck-images/*/)",
       "Bash(done)",
-      "Bash(for deck in */)"
+      "Bash(for deck in */)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

@@ -2,16 +2,16 @@
   "rules": {
     "presence": {
       "$roomCode": {
+        ".read": true,
         "$odahId": {
-          ".read": true,
           ".write": "auth != null && auth.uid == $odahId"
         }
       }
     },
     "cursors": {
       "$roomCode": {
+        ".read": true,
         "$odahId": {
-          ".read": true,
           ".write": "auth != null && auth.uid == $odahId"
         }
       }

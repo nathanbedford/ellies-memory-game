@@ -1,8 +1,15 @@
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { CardLightbox } from './CardLightbox';
 import { Card } from './Card';
-import { Card as CardType } from '../types';
+import { RemoteCursor } from './online/RemoteCursor';
+import type { Card as CardType, CursorPosition } from '../types';
 import type { CardBackOption } from '../hooks/useCardBackSelector';
+
+interface RemoteCursorData {
+  position: CursorPosition;
+  playerName: string;
+  playerColor: string;
+}
 
 interface GameBoardProps {
   cards: CardType[];
@@ -12,6 +19,10 @@ interface GameBoardProps {
   useWhiteCardBackground?: boolean;
   emojiSizePercentage?: number;
   cardBack?: CardBackOption;
+  // Cursor tracking props (for online mode)
+  onCursorMove?: (event: React.MouseEvent<HTMLDivElement>, boardRect: DOMRect) => void;
+  onCursorLeave?: () => void;
+  remoteCursor?: RemoteCursorData | null;
 }
 
 interface CardAnimationData {
@@ -20,17 +31,32 @@ interface CardAnimationData {
   rotation: number;
 }
 
-export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack }: GameBoardProps) => {
+export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack, onCursorMove, onCursorLeave, remoteCursor }: GameBoardProps) => {
   const [lightboxCardId, setLightboxCardId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  
+
+  // Handle mouse move on the board
+  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (onCursorMove && boardRef.current) {
+      const rect = boardRef.current.getBoundingClientRect();
+      onCursorMove(event, rect);
+    }
+  }, [onCursorMove]);
+
+  // Handle mouse leave
+  const handleMouseLeave = useCallback(() => {
+    if (onCursorLeave) {
+      onCursorLeave();
+    }
+  }, [onCursorLeave]);
+
   // Monitor card state changes for debugging
   useEffect(() => {
     const flippedCards = cards.filter(c => c.isFlipped && !c.isMatched);
     const flyingCards = cards.filter(c => c.isFlyingToPlayer);
     const matchedCards = cards.filter(c => c.isMatched);
-    
+
     console.log('[CARD STATE] Cards state changed', JSON.stringify({
       totalCards: cards.length,
       flippedCardsCount: flippedCards.length,
@@ -40,32 +66,32 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       timestamp: new Date().toISOString()
     }));
   }, [cards]);
-  
+
   // Generate random starting positions and rotations for each card
   const animationData = useMemo<CardAnimationData[]>(() => {
     if (!isAnimating) return [];
-    
+
     // Get the game board container position (we'll need to calculate offsets relative to viewport)
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    
+
     return cards.map((_, index) => {
       // Calculate card's position in grid
       const col = index % 8;
       const row = Math.floor(index / 8);
-      
+
       // Estimate card's final position (center of game board)
       const boardWidth = (cardSize * 8) + (8 * 7); // 8 cards + 7 gaps
       const boardLeft = (viewportWidth - boardWidth) / 2;
       const cardCenterX = boardLeft + (col * (cardSize + 8)) + (cardSize / 2);
       const cardCenterY = viewportHeight / 2 + (row * (cardSize + 8)) - (cardSize / 2);
-      
+
       // Random edge: 0 = top, 1 = right, 2 = bottom, 3 = left
       const edge = Math.floor(Math.random() * 4);
-      
+
       // Calculate offset from card's final position to screen edge
       let offsetX: number, offsetY: number;
-      
+
       switch (edge) {
         case 0: // Top - card comes from above
           offsetX = (Math.random() - 0.5) * 400; // Some horizontal variation
@@ -87,10 +113,10 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           offsetX = 0;
           offsetY = -viewportHeight;
       }
-      
+
       // Random rotation between -720 and 720 degrees (2 full spins either direction)
       const rotation = (Math.random() - 0.5) * 1440;
-      
+
       return {
         startX: offsetX,
         startY: offsetY,
@@ -113,40 +139,40 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       cardSize,
       viewport: { width: window.innerWidth, height: window.innerHeight }
     });
-    
+
     const result = cards.map((card) => {
       if (!card.isFlyingToPlayer) return null;
-      
+
       // Get the actual DOM position of the card using the ref
       const cardElement = cardRefs.current.get(card.id);
       if (!cardElement) {
         console.warn('[FLY DATA] Card element not found in refs', { cardId: card.id });
         return null;
       }
-      
+
       // Get the actual bounding rectangle
       const rect = cardElement.getBoundingClientRect();
-      
+
       // Calculate card's actual center position from DOM
       const cardCenterX = rect.left + rect.width / 2;
       const cardCenterY = rect.top + rect.height / 2;
-      
+
       // Calculate target position (next to player name)
       // Player 1 is on the left, Player 2 is on the right
       const headerY = 120; // Approximate header Y position
       const viewportWidth = window.innerWidth;
-      const targetX = card.flyingToPlayerId === 1 
+      const targetX = card.flyingToPlayerId === 1
         ? viewportWidth * 0.25 // Left side for Player 1
         : viewportWidth * 0.75; // Right side for Player 2
-      
+
       // Calculate rotation angle based on direction from card to player name
       const deltaX = targetX - cardCenterX;
       const deltaY = headerY - cardCenterY;
       const rotationAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-      
+
       // Final position: continue off screen above the player name
       const finalY = -cardSize - 50; // Off screen above
-      
+
       const flyData = {
         startX: rect.left,
         startY: rect.top,
@@ -156,7 +182,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         rotationAngle: rotationAngle,
         playerId: card.flyingToPlayerId
       };
-      
+
       console.log('[FLY DATA] Calculated fly data for card', {
         cardId: card.id,
         actualRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
@@ -168,17 +194,17 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         rotationAngle: flyData.rotationAngle,
         playerId: flyData.playerId
       });
-      
+
       return flyData;
     });
-    
+
     const validResults = result.filter(r => r !== null);
     console.log('[FLY DATA] Fly data calculation complete', {
       totalResults: result.length,
       validResults: validResults.length,
       validCardIds: validResults.map((r) => cards.find(c => c.isFlyingToPlayer && result.indexOf(r) === cards.indexOf(c))?.id)
     });
-    
+
     return result;
   }, [cards, cardSize]);
 
@@ -187,7 +213,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       {/* Flying cards overlay */}
       {cards.map((card, index) => {
         const flyData = flyToPlayerData[index];
-        
+
         // Log all cards being processed
         if (card.isFlyingToPlayer) {
           console.log('[RENDER] Card is marked as flying', {
@@ -203,7 +229,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
             } : null
           });
         }
-        
+
         if (!card.isFlyingToPlayer || !flyData) {
           if (card.isFlyingToPlayer && !flyData) {
             console.warn('[RENDER] ⚠️ Card marked as flying but no fly data!', {
@@ -217,7 +243,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           }
           return null;
         }
-        
+
         console.log('[RENDER] ✓ Rendering flying card overlay', {
           cardId: card.id,
           style: {
@@ -229,7 +255,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
             '--rotation-angle': `${flyData.rotationAngle}deg`
           }
         });
-        
+
         return (
           <div
             key={`flying-${card.id}`}
@@ -259,24 +285,37 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           </div>
         );
       })}
-      
+
       <CardLightbox
         isOpen={!!lightboxCardId}
         onClose={() => setLightboxCardId(null)}
         card={lightboxCardId ? cards.find(c => c.id === lightboxCardId) || null : null}
       />
 
-      <div 
+      <div
         ref={boardRef}
-        className="grid grid-cols-8 gap-2 max-w-none mx-auto justify-center"
-        style={{ 
+        className="grid grid-cols-8 gap-2 max-w-none mx-auto justify-center relative"
+        style={{
           perspective: '1000px',
           width: `${(cardSize * 8) + (8 * 7)}px` // 8 cards + 7 gaps
         }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
+        {/* Remote cursor overlay */}
+        {remoteCursor && (
+          <RemoteCursor
+            position={remoteCursor.position}
+            cardSize={cardSize}
+            gap={8}
+            playerName={remoteCursor.playerName}
+            playerColor={remoteCursor.playerColor}
+          />
+        )}
+
         {cards.map((card, index) => {
           const shouldShowPlaceholder = card.isMatched || card.isFlyingToPlayer;
-          
+
           if (shouldShowPlaceholder) {
             console.log('[RENDER] Showing placeholder for card', {
               cardId: card.id,
@@ -286,15 +325,15 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
               reason: card.isMatched ? 'matched' : 'flying'
             });
           }
-          
+
           return shouldShowPlaceholder ? (
             // Placeholder for matched cards (or cards that are flying)
             <div
               key={card.id}
               className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 opacity-15"
-              style={{ 
-                width: `${cardSize}px`, 
-                height: `${cardSize}px` 
+              style={{
+                width: `${cardSize}px`,
+                height: `${cardSize}px`
               }}
             />
           ) : (
