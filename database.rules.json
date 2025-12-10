@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "presence": {
+      "$roomCode": {
+        "$odahId": {
+          ".read": true,
+          ".write": "auth != null && auth.uid == $odahId"
+        }
+      }
+    },
+    "cursors": {
+      "$roomCode": {
+        "$odahId": {
+          ".read": true,
+          ".write": "auth != null && auth.uid == $odahId"
+        }
+      }
+    }
+  }
+}
