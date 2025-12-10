@@ -141,6 +141,7 @@ function App() {
   const setFullGameState = isOnlineMode ? onlineGame.setFullGameState : localGame.setFullGameState;
   const flipCard = isOnlineMode ? onlineGame.flipCard : localGame.flipCard;
   const endTurn = isOnlineMode ? onlineGame.endTurn : localGame.endTurn;
+  const toggleAllCardsAdmin = isOnlineMode ? onlineGame.toggleAllCardsFlipped : localGame.toggleAllCardsFlipped;
 
   // Settings and other functions always come from localGame
   const {
@@ -149,7 +150,7 @@ function App() {
     updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize,
     toggleWhiteCardBackground, toggleAutoSize, increaseFlipDuration, decreaseFlipDuration,
     increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, resetGame, isAnimatingCards,
-    endGameEarly, toggleAllCardsFlipped, updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
+    endGameEarly, updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
   } = localGame;
 
   const boardWrapperRef = useRef<HTMLDivElement>(null);
@@ -1396,7 +1397,7 @@ function App() {
               endGameEarly();
               setShowAdminSidebar(false);
             }}
-            onToggleFlipAll={toggleAllCardsFlipped}
+            onToggleFlipAll={toggleAllCardsAdmin}
             allCardsFlipped={
               gameState.cards.length > 0 &&
               gameState.cards

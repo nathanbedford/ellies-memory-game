@@ -10,12 +10,19 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { getFirestoreSyncAdapter } from '../services/sync/FirestoreSyncAdapter';
-import type { Player, GameState, OnlineGameState } from '../types';
-
-// Helper to sort players by ID
-const sortPlayersByID = (players: Player[]): Player[] => {
-  return [...players].sort((a, b) => a.id - b.id);
-};
+import type { GameState, OnlineGameState } from '../types';
+import {
+  getPlayerById,
+  canFlipCard,
+  flipCard as engineFlipCard,
+  checkMatch,
+  startMatchAnimation,
+  completeMatchAnimation,
+  applyNoMatchWithReset,
+  checkAndFinishGame,
+  endTurn as engineEndTurn,
+  updatePlayerName as engineUpdatePlayerName,
+} from '../services/game/GameEngine';
 
 interface UseOnlineGameOptions {
   roomCode: string;
@@ -195,28 +202,14 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
       return;
     }
 
-    // Don't allow more than 2 cards
-    if (gameState.selectedCards.length >= 2) {
-      console.log('[ONLINE GAME] Already have 2 cards selected');
+    // Use GameEngine to validate if card can be flipped
+    if (!canFlipCard(gameState, cardId)) {
+      console.log('[ONLINE GAME] Card cannot be flipped (validated by GameEngine)');
       return;
     }
 
-    const card = gameState.cards.find(c => c.id === cardId);
-    if (!card || card.isFlipped || card.isMatched) {
-      return;
-    }
-
-    // Apply flip optimistically
-    const newCards = gameState.cards.map(c =>
-      c.id === cardId ? { ...c, isFlipped: true } : c
-    );
-    const newSelectedCards = [...gameState.selectedCards, cardId];
-
-    const newState: GameState = {
-      ...gameState,
-      cards: newCards,
-      selectedCards: newSelectedCards,
-    };
+    // Use GameEngine to flip the card
+    const newState = engineFlipCard(gameState, cardId);
 
     setGameState(newState);
 
@@ -225,12 +218,12 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 
     console.log('[FLIP] Card flipped', {
       cardId,
-      selectedCards: newSelectedCards,
-      isSecondCard: newSelectedCards.length === 2,
+      selectedCards: newState.selectedCards,
+      isSecondCard: newState.selectedCards.length === 2,
     });
 
     // Schedule match check if 2 cards selected
-    if (newSelectedCards.length === 2) {
+    if (newState.selectedCards.length === 2) {
       // Cancel any existing timeout
       if (matchCheckTimeoutRef.current) {
         console.log('[FLIP] Cancelling existing match check timeout');
@@ -238,18 +231,18 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
       }
 
       console.log('[FLIP] Scheduling match check', {
-        selectedCards: newSelectedCards,
+        selectedCards: newState.selectedCards,
         flipDuration,
         scheduledAt: new Date().toISOString(),
       });
 
       matchCheckTimeoutRef.current = setTimeout(() => {
         console.log('[MATCH CHECK] Timeout fired', {
-          selectedCards: newSelectedCards,
+          selectedCards: newState.selectedCards,
           firedAt: new Date().toISOString(),
         });
         matchCheckTimeoutRef.current = null;
-        checkForMatch(newSelectedCards, newState);
+        checkForMatch(newState.selectedCards, newState);
       }, flipDuration);
     }
   }, [gameState, localPlayerSlot, flipDuration, syncToFirestore]);
@@ -257,11 +250,17 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
   // Check for match - only authoritative client runs this
   const checkForMatch = useCallback((selectedIds: string[], currentState: GameState) => {
     const checkId = Date.now().toString(36);
+
+    // Log the full state for debugging
+    const flippedCards = currentState.cards.filter(c => c.isFlipped && !c.isMatched);
     console.log(`[MATCH CHECK ${checkId}] Starting`, {
       selectedIds,
+      currentStateSelectedCards: currentState.selectedCards,
       currentPlayer: currentState.currentPlayer,
       localPlayerSlot,
       isAuthoritative: localPlayerSlot === currentState.currentPlayer,
+      flippedCardIds: flippedCards.map(c => c.id),
+      flippedCardCount: flippedCards.length,
     });
 
     // Double-check we're still authoritative
@@ -275,129 +274,61 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 
     isCheckingMatchRef.current = true;
 
-    const [firstId, secondId] = selectedIds;
-    const firstCard = currentState.cards.find(c => c.id === firstId);
-    const secondCard = currentState.cards.find(c => c.id === secondId);
+    // Use GameEngine to check for match
+    const matchResult = checkMatch(currentState);
 
-    if (!firstCard || !secondCard) {
+    if (!matchResult) {
       console.error(`[MATCH CHECK ${checkId}] ABORTED - Cards not found`, {
-        firstId,
-        secondId,
-        firstCardFound: !!firstCard,
-        secondCardFound: !!secondCard,
+        selectedCards: currentState.selectedCards,
+        selectedIds,
       });
       isCheckingMatchRef.current = false;
       return;
     }
 
-    const isMatch = firstCard.imageId === secondCard.imageId;
+    const { isMatch, firstCard, secondCard } = matchResult;
+    const cardIds: [string, string] = [firstCard.id, secondCard.id];
 
     console.log(`[MATCH CHECK ${checkId}] Comparing cards`, {
       isMatch,
-      firstCard: { id: firstId, imageId: firstCard.imageId },
-      secondCard: { id: secondId, imageId: secondCard.imageId },
+      firstCard: { id: firstCard.id, imageId: firstCard.imageId },
+      secondCard: { id: secondCard.id, imageId: secondCard.imageId },
     });
 
-    let newState: GameState;
-
     if (isMatch) {
-      // PHASE 1: Mark cards as flying to player (triggers animation)
-      const flyingCards = currentState.cards.map(c => {
-        if (c.id === firstId || c.id === secondId) {
-          return {
-            ...c,
-            isFlipped: true,
-            isFlyingToPlayer: true,
-            flyingToPlayerId: currentState.currentPlayer,
-          };
-        }
-        return c;
-      });
+      const currentPlayerId = currentState.currentPlayer;
 
-      // Update score immediately
-      const newPlayers = sortPlayersByID(
-        currentState.players.map(p =>
-          p.id === currentState.currentPlayer
-            ? { ...p, score: p.score + 1 }
-            : p
-        )
-      );
-
-      // Capture values for the timeout closure
-      const matchedByPlayerId = currentState.currentPlayer;
-
-      const flyingState: GameState = {
-        ...currentState,
-        cards: flyingCards,
-        players: newPlayers,
-        selectedCards: [],
-      };
+      // Use GameEngine for Phase 1: flying animation
+      const flyingState = startMatchAnimation(currentState, cardIds, currentPlayerId);
 
       console.log(`[MATCH CHECK ${checkId}] MATCH FOUND - Starting flying animation`, {
-        cardIds: [firstId, secondId],
-        playerId: matchedByPlayerId,
-        newScore: newPlayers.find(p => p.id === matchedByPlayerId)?.score,
+        cardIds,
+        playerId: currentPlayerId,
+        newScore: getPlayerById(flyingState.players, currentPlayerId)?.score,
       });
 
       setGameState(flyingState);
-      syncToFirestore(flyingState, `match:flying:${firstId}+${secondId}`);
+      syncToFirestore(flyingState, `match:flying:${cardIds[0]}+${cardIds[1]}`);
 
-      // PHASE 2: After animation completes, mark cards as matched
+      // PHASE 2: After animation completes, mark cards as matched using GameEngine
       setTimeout(() => {
         console.log(`[MATCH CHECK ${checkId}] Phase 2 - Animation complete, marking cards as matched`, {
-          cardIds: [firstId, secondId],
+          cardIds,
           timestamp: new Date().toISOString(),
         });
 
         setGameState(prevState => {
-          const matchedCards = prevState.cards.map(c => {
-            if (c.id === firstId || c.id === secondId) {
-              return {
-                ...c,
-                isMatched: true,
-                isFlyingToPlayer: false,
-                matchedByPlayerId,
-              };
-            }
-            return c;
-          });
+          // Use GameEngine for Phase 2: complete match
+          const matchedState = completeMatchAnimation(prevState, cardIds, currentPlayerId);
 
-          // Check for game over
-          const allMatched = matchedCards.every(c => c.isMatched);
+          // Use GameEngine to check if game is finished
+          const finalState = checkAndFinishGame(matchedState);
 
-          let finalState: GameState;
-
-          if (allMatched) {
-            // Game finished
-            const winner = prevState.players.reduce((prev, curr) =>
-              curr.score > prev.score ? curr : prev
-            );
-            const isTie = prevState.players.every(p => p.score === winner.score);
-
-            finalState = {
-              ...prevState,
-              cards: matchedCards,
-              selectedCards: [],
-              gameStatus: 'finished',
-              winner: isTie ? null : winner,
-              isTie,
-            };
-          } else {
-            // Match found but game continues - player keeps turn
-            finalState = {
-              ...prevState,
-              cards: matchedCards,
-              selectedCards: [],
-            };
-          }
-
-          // Sync the final matched state
           console.log(`[MATCH CHECK ${checkId}] Phase 2 - Syncing matched state`, {
-            allMatched: matchedCards.every(c => c.isMatched),
             gameStatus: finalState.gameStatus,
-            matchedCount: matchedCards.filter(c => c.isMatched).length,
+            matchedCount: finalState.cards.filter(c => c.isMatched).length,
           });
-          syncToFirestore(finalState, `match:complete:${firstId}+${secondId}`);
+          syncToFirestore(finalState, `match:complete:${cardIds[0]}+${cardIds[1]}`);
 
           return finalState;
         });
@@ -406,49 +337,37 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
       isCheckingMatchRef.current = false;
       return; // Exit early - the setTimeout will handle the rest
     } else {
-      // No match - flip cards back and switch turns
+      // Use GameEngine for no match: flip back and switch turns
+      const beforeFlippedCards = currentState.cards.filter(c => c.isFlipped && !c.isMatched);
       console.log(`[MATCH CHECK ${checkId}] NO MATCH - Flipping cards back`, {
-        cardIds: [firstId, secondId],
+        cardIds,
         currentPlayer: currentState.currentPlayer,
+        beforeFlippedCount: beforeFlippedCards.length,
+        beforeFlippedIds: beforeFlippedCards.map(c => c.id),
         timestamp: new Date().toISOString(),
       });
 
-      const newCards = currentState.cards.map(c => {
-        if (c.id === firstId || c.id === secondId) {
-          return { ...c, isFlipped: false };
-        }
-        return c;
-      });
+      const noMatchState = applyNoMatchWithReset(currentState, cardIds);
 
-      const nextPlayer = currentState.currentPlayer === 1 ? 2 : 1;
-
+      const afterFlippedCards = noMatchState.cards.filter(c => c.isFlipped && !c.isMatched);
       console.log(`[MATCH CHECK ${checkId}] Switching turn`, {
         fromPlayer: currentState.currentPlayer,
-        toPlayer: nextPlayer,
+        toPlayer: noMatchState.currentPlayer,
+        afterFlippedCount: afterFlippedCards.length,
+        afterFlippedIds: afterFlippedCards.map(c => c.id),
+        card0State: noMatchState.cards.find(c => c.id === cardIds[0]),
+        card1State: noMatchState.cards.find(c => c.id === cardIds[1]),
       });
 
-      newState = {
-        ...currentState,
-        cards: newCards,
-        currentPlayer: nextPlayer,
-        selectedCards: [],
-      };
+      setGameState(noMatchState);
+      syncToFirestore(noMatchState, `noMatch:flipBack:${cardIds[0]}+${cardIds[1]}`);
+
+      console.log(`[MATCH CHECK ${checkId}] COMPLETE - State synced`, {
+        timestamp: new Date().toISOString(),
+      });
+
+      isCheckingMatchRef.current = false;
     }
-
-    console.log(`[MATCH CHECK ${checkId}] Applying no-match state`, {
-      currentPlayer: newState.currentPlayer,
-      selectedCards: newState.selectedCards,
-      flippedCards: newState.cards.filter(c => c.isFlipped && !c.isMatched).map(c => c.id),
-    });
-
-    setGameState(newState);
-    syncToFirestore(newState, `noMatch:flipBack:${firstId}+${secondId}`);
-
-    console.log(`[MATCH CHECK ${checkId}] COMPLETE - State synced`, {
-      timestamp: new Date().toISOString(),
-    });
-
-    isCheckingMatchRef.current = false;
   }, [localPlayerSlot, syncToFirestore]);
 
   // Reset game (for when leaving online mode)
@@ -477,7 +396,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
       localPlayerSlot,
       selectedCards: gameState.selectedCards,
       flippedUnmatchedCount: flippedUnmatched.length,
-      flippedUnmatchedIds: flippedUnmatched.map(c => c.id),
       hadPendingMatchCheck: !!matchCheckTimeoutRef.current,
       timestamp: new Date().toISOString(),
     });
@@ -488,26 +406,12 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
     }
     isCheckingMatchRef.current = false;
 
-    // Flip back any face-up unmatched cards and switch turns
-    const newCards = gameState.cards.map(c => {
-      if (c.isFlipped && !c.isMatched) {
-        return { ...c, isFlipped: false };
-      }
-      return c;
-    });
-
-    const nextPlayer = gameState.currentPlayer === 1 ? 2 : 1;
-
-    const newState: GameState = {
-      ...gameState,
-      cards: newCards,
-      currentPlayer: nextPlayer,
-      selectedCards: [],
-    };
+    // Use GameEngine to end the turn
+    const newState = engineEndTurn(gameState);
 
     console.log('[END TURN] Switching turn and flipping cards back', {
       fromPlayer: gameState.currentPlayer,
-      toPlayer: nextPlayer,
+      toPlayer: newState.currentPlayer,
       cardsFlippedBack: flippedUnmatched.length,
     });
 
@@ -520,16 +424,8 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
     const trimmedName = newName.trim();
     if (!trimmedName) return;
 
-    const newPlayers = sortPlayersByID(
-      gameState.players.map(p =>
-        p.id === playerId ? { ...p, name: trimmedName } : p
-      )
-    );
-
-    const newState: GameState = {
-      ...gameState,
-      players: newPlayers,
-    };
+    // Use GameEngine to update player name
+    const newState = engineUpdatePlayerName(gameState, playerId, trimmedName);
 
     console.log('[ONLINE GAME] Updating player name', {
       playerId,
@@ -541,35 +437,61 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
     syncToFirestore(newState, `updatePlayerName:${playerId}`);
   }, [gameState, localPlayerSlot, syncToFirestore]);
 
+  const toggleAllCardsFlipped = useCallback(() => {
+    if (gameState.cards.length === 0) return;
+
+    const unmatchedCards = gameState.cards.filter(c => !c.isMatched && !c.isFlyingToPlayer);
+    if (unmatchedCards.length === 0) {
+      return;
+    }
+
+    const allFlipped = unmatchedCards.every(c => c.isFlipped);
+    const newFlippedState = !allFlipped;
+
+    const newCards = gameState.cards.map(card => {
+      if (card.isMatched || card.isFlyingToPlayer) {
+        return card;
+      }
+      return { ...card, isFlipped: newFlippedState };
+    });
+
+    const newState: GameState = {
+      ...gameState,
+      cards: newCards,
+      selectedCards: [],
+    };
+
+    setGameState(newState);
+    syncToFirestore(newState, newFlippedState ? 'admin:revealAll' : 'admin:hideAll');
+  }, [gameState, syncToFirestore]);
+
   // Stuck game detection - monitors for cards stuck in flipped state
   useEffect(() => {
     const flippedUnmatched = gameState.cards.filter(c => c.isFlipped && !c.isMatched);
-    const hasFlippedCards = flippedUnmatched.length > 0;
+    const authoritativeTurn = localPlayerSlot === gameState.currentPlayer;
+    const hasPendingMatchResolution = flippedUnmatched.length >= 2 || isCheckingMatchRef.current || !!matchCheckTimeoutRef.current;
+    const shouldMonitor = authoritativeTurn && hasPendingMatchResolution;
 
-    // Track when cards first became flipped
-    if (hasFlippedCards && cardsFlippedAtRef.current === null) {
+    if (shouldMonitor && cardsFlippedAtRef.current === null) {
       cardsFlippedAtRef.current = Date.now();
-      console.log('[STUCK DETECTION] Cards flipped, starting timer', {
+      console.log('[STUCK DETECTION] Monitoring potential stuck cards', {
         flippedCards: flippedUnmatched.map(c => c.id),
         currentPlayer: gameState.currentPlayer,
         localPlayerSlot,
+        selectedCards: gameState.selectedCards,
       });
-    } else if (!hasFlippedCards && cardsFlippedAtRef.current !== null) {
+    } else if (!shouldMonitor && cardsFlippedAtRef.current !== null) {
       const duration = Date.now() - cardsFlippedAtRef.current;
-      console.log('[STUCK DETECTION] Cards cleared, resetting timer', {
-        durationMs: duration,
-      });
+      console.log('[STUCK DETECTION] Monitoring cleared', { durationMs: duration });
       cardsFlippedAtRef.current = null;
     }
 
-    // Clear any existing interval
     if (stuckCheckIntervalRef.current) {
       clearInterval(stuckCheckIntervalRef.current);
       stuckCheckIntervalRef.current = null;
     }
 
-    // If we have flipped cards and it's our turn, start monitoring
-    if (hasFlippedCards && localPlayerSlot === gameState.currentPlayer) {
+    if (shouldMonitor) {
       stuckCheckIntervalRef.current = setInterval(() => {
         if (cardsFlippedAtRef.current === null) return;
 
@@ -586,15 +508,13 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
             timestamp: new Date().toISOString(),
           });
 
-          // Auto-recovery: if we're authoritative and stuck, trigger endTurn
-          if (localPlayerSlot === gameState.currentPlayer) {
+          if (authoritativeTurn) {
             console.log('[STUCK DETECTION] Triggering auto-recovery via endTurn');
-            // Clear the timer to prevent repeated triggers
             cardsFlippedAtRef.current = null;
             endTurn();
           }
         }
-      }, 5000); // Check every 5 seconds
+      }, 5000);
     }
 
     return () => {
@@ -625,5 +545,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
     resetGame,
     isAuthoritative,
     updatePlayerName,
+    toggleAllCardsFlipped,
   };
 }

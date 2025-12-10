@@ -1,0 +1,981 @@
+import { describe, it, expect } from 'vitest';
+import {
+  sortPlayersByID,
+  getPlayerById,
+  generateRoomCode,
+  createCardPairs,
+  shuffleCards,
+  initializeCards,
+  canFlipCard,
+  flipCard,
+  checkMatch,
+  applyMatch,
+  startMatchAnimation,
+  completeMatchAnimation,
+  applyNoMatchWithReset,
+  getNextPlayer,
+  switchPlayer,
+  endTurn,
+  isGameOver,
+  calculateWinner,
+  finishGame,
+  checkAndFinishGame,
+  createInitialState,
+  resetGameState,
+  startGameWithCards,
+  updatePlayerName,
+  updatePlayerColor,
+  cleanStateForPersistence,
+  validateState,
+  type CardImage,
+} from './GameEngine';
+import type { Card, Player, GameState } from '../../types';
+
+// ============================================
+// Test Fixtures
+// ============================================
+
+function createTestCard(overrides: Partial<Card> = {}): Card {
+  return {
+    id: 'card-1',
+    imageId: 'img-1',
+    imageUrl: '/test.png',
+    isFlipped: false,
+    isMatched: false,
+    ...overrides,
+  };
+}
+
+function createTestPlayer(overrides: Partial<Player> = {}): Player {
+  return {
+    id: 1,
+    name: 'Player 1',
+    score: 0,
+    color: '#3b82f6',
+    ...overrides,
+  };
+}
+
+function createTestState(overrides: Partial<GameState> = {}): GameState {
+  return {
+    cards: [],
+    players: [
+      createTestPlayer({ id: 1, name: 'Player 1' }),
+      createTestPlayer({ id: 2, name: 'Player 2', color: '#10b981' }),
+    ],
+    currentPlayer: 1,
+    selectedCards: [],
+    gameStatus: 'playing',
+    winner: null,
+    isTie: false,
+    ...overrides,
+  };
+}
+
+function createMatchingCardPair(): Card[] {
+  return [
+    createTestCard({ id: 'card-0', imageId: 'img-1' }),
+    createTestCard({ id: 'card-1', imageId: 'img-1' }),
+  ];
+}
+
+function createNonMatchingCards(): Card[] {
+  return [
+    createTestCard({ id: 'card-0', imageId: 'img-1' }),
+    createTestCard({ id: 'card-1', imageId: 'img-2' }),
+  ];
+}
+
+// ============================================
+// Helper Functions Tests
+// ============================================
+
+describe('Helper Functions', () => {
+  describe('sortPlayersByID', () => {
+    it('sorts players by ID in ascending order', () => {
+      const players = [
+        createTestPlayer({ id: 2 }),
+        createTestPlayer({ id: 1 }),
+      ];
+      const sorted = sortPlayersByID(players);
+      expect(sorted[0].id).toBe(1);
+      expect(sorted[1].id).toBe(2);
+    });
+
+    it('does not mutate original array', () => {
+      const players = [
+        createTestPlayer({ id: 2 }),
+        createTestPlayer({ id: 1 }),
+      ];
+      sortPlayersByID(players);
+      expect(players[0].id).toBe(2);
+    });
+  });
+
+  describe('getPlayerById', () => {
+    it('returns player with matching ID', () => {
+      const players = [
+        createTestPlayer({ id: 1, name: 'Alice' }),
+        createTestPlayer({ id: 2, name: 'Bob' }),
+      ];
+      const player = getPlayerById(players, 2);
+      expect(player?.name).toBe('Bob');
+    });
+
+    it('returns undefined for non-existent ID', () => {
+      const players = [createTestPlayer({ id: 1 })];
+      const player = getPlayerById(players, 99);
+      expect(player).toBeUndefined();
+    });
+  });
+
+  describe('generateRoomCode', () => {
+    it('generates a 4-character code', () => {
+      const code = generateRoomCode();
+      expect(code).toHaveLength(4);
+    });
+
+    it('generates uppercase letters only', () => {
+      const code = generateRoomCode();
+      expect(code).toMatch(/^[A-Z]+$/);
+    });
+
+    it('excludes ambiguous characters O and I', () => {
+      // Generate many codes to increase chance of catching violations
+      for (let i = 0; i < 100; i++) {
+        const code = generateRoomCode();
+        expect(code).not.toContain('O');
+        expect(code).not.toContain('I');
+      }
+    });
+  });
+});
+
+// ============================================
+// Card Initialization Tests
+// ============================================
+
+describe('Card Initialization', () => {
+  describe('createCardPairs', () => {
+    it('creates two cards for each image', () => {
+      const images: CardImage[] = [
+        { id: 'img-1', url: '/1.png' },
+        { id: 'img-2', url: '/2.png' },
+      ];
+      const cards = createCardPairs(images);
+      expect(cards).toHaveLength(4);
+    });
+
+    it('creates cards with matching imageIds for pairs', () => {
+      const images: CardImage[] = [{ id: 'img-1', url: '/1.png' }];
+      const cards = createCardPairs(images);
+      expect(cards[0].imageId).toBe(cards[1].imageId);
+    });
+
+    it('creates cards with unique IDs', () => {
+      const images: CardImage[] = [
+        { id: 'img-1', url: '/1.png' },
+        { id: 'img-2', url: '/2.png' },
+      ];
+      const cards = createCardPairs(images);
+      const ids = cards.map(c => c.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(ids.length);
+    });
+
+    it('initializes cards as not flipped and not matched', () => {
+      const images: CardImage[] = [{ id: 'img-1', url: '/1.png' }];
+      const cards = createCardPairs(images);
+      cards.forEach(card => {
+        expect(card.isFlipped).toBe(false);
+        expect(card.isMatched).toBe(false);
+      });
+    });
+  });
+
+  describe('shuffleCards', () => {
+    it('returns same number of cards', () => {
+      const cards = [
+        createTestCard({ id: '1' }),
+        createTestCard({ id: '2' }),
+        createTestCard({ id: '3' }),
+      ];
+      const shuffled = shuffleCards(cards);
+      expect(shuffled).toHaveLength(cards.length);
+    });
+
+    it('does not mutate original array', () => {
+      const cards = [
+        createTestCard({ id: '1' }),
+        createTestCard({ id: '2' }),
+      ];
+      const originalFirst = cards[0];
+      shuffleCards(cards);
+      expect(cards[0]).toBe(originalFirst);
+    });
+
+    it('contains all original cards', () => {
+      const cards = [
+        createTestCard({ id: '1' }),
+        createTestCard({ id: '2' }),
+        createTestCard({ id: '3' }),
+      ];
+      const shuffled = shuffleCards(cards);
+      cards.forEach(card => {
+        expect(shuffled).toContainEqual(card);
+      });
+    });
+  });
+
+  describe('initializeCards', () => {
+    it('creates and shuffles card pairs', () => {
+      const images: CardImage[] = [
+        { id: 'img-1', url: '/1.png' },
+        { id: 'img-2', url: '/2.png' },
+      ];
+      const cards = initializeCards(images);
+      expect(cards).toHaveLength(4);
+    });
+  });
+});
+
+// ============================================
+// Card Operations Tests
+// ============================================
+
+describe('Card Operations', () => {
+  describe('canFlipCard', () => {
+    it('returns false if game not playing', () => {
+      const state = createTestState({
+        gameStatus: 'setup',
+        cards: [createTestCard()],
+      });
+      expect(canFlipCard(state, 'card-1')).toBe(false);
+    });
+
+    it('returns false if 2 cards already selected', () => {
+      const state = createTestState({
+        cards: [createTestCard()],
+        selectedCards: ['card-a', 'card-b'],
+      });
+      expect(canFlipCard(state, 'card-1')).toBe(false);
+    });
+
+    it('returns false if card not found', () => {
+      const state = createTestState({ cards: [] });
+      expect(canFlipCard(state, 'nonexistent')).toBe(false);
+    });
+
+    it('returns false if card already flipped', () => {
+      const state = createTestState({
+        cards: [createTestCard({ isFlipped: true })],
+      });
+      expect(canFlipCard(state, 'card-1')).toBe(false);
+    });
+
+    it('returns false if card already matched', () => {
+      const state = createTestState({
+        cards: [createTestCard({ isMatched: true })],
+      });
+      expect(canFlipCard(state, 'card-1')).toBe(false);
+    });
+
+    it('returns true for valid flip', () => {
+      const state = createTestState({
+        cards: [createTestCard()],
+      });
+      expect(canFlipCard(state, 'card-1')).toBe(true);
+    });
+
+    it('returns true when one card already selected', () => {
+      const state = createTestState({
+        cards: [
+          createTestCard({ id: 'card-1' }),
+          createTestCard({ id: 'card-2' }),
+        ],
+        selectedCards: ['card-1'],
+      });
+      expect(canFlipCard(state, 'card-2')).toBe(true);
+    });
+  });
+
+  describe('flipCard', () => {
+    it('flips the specified card', () => {
+      const state = createTestState({
+        cards: [createTestCard({ id: 'card-1', isFlipped: false })],
+      });
+      const newState = flipCard(state, 'card-1');
+      expect(newState.cards[0].isFlipped).toBe(true);
+    });
+
+    it('adds card to selectedCards', () => {
+      const state = createTestState({
+        cards: [createTestCard()],
+        selectedCards: [],
+      });
+      const newState = flipCard(state, 'card-1');
+      expect(newState.selectedCards).toContain('card-1');
+    });
+
+    it('returns unchanged state if invalid flip', () => {
+      const state = createTestState({
+        cards: [createTestCard({ isFlipped: true })],
+      });
+      const newState = flipCard(state, 'card-1');
+      expect(newState).toBe(state);
+    });
+
+    it('does not mutate original state', () => {
+      const state = createTestState({
+        cards: [createTestCard()],
+      });
+      flipCard(state, 'card-1');
+      expect(state.cards[0].isFlipped).toBe(false);
+    });
+  });
+});
+
+// ============================================
+// Match Detection Tests
+// ============================================
+
+describe('Match Detection', () => {
+  describe('checkMatch', () => {
+    it('returns null if less than 2 cards selected', () => {
+      const state = createTestState({
+        cards: createMatchingCardPair(),
+        selectedCards: ['card-0'],
+      });
+      expect(checkMatch(state)).toBeNull();
+    });
+
+    it('returns null if selected cards not found', () => {
+      const state = createTestState({
+        cards: [],
+        selectedCards: ['card-0', 'card-1'],
+      });
+      expect(checkMatch(state)).toBeNull();
+    });
+
+    it('returns isMatch: true for matching imageIds', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({
+        cards,
+        selectedCards: ['card-0', 'card-1'],
+      });
+      const result = checkMatch(state);
+      expect(result?.isMatch).toBe(true);
+    });
+
+    it('returns isMatch: false for different imageIds', () => {
+      const cards = createNonMatchingCards();
+      const state = createTestState({
+        cards,
+        selectedCards: ['card-0', 'card-1'],
+      });
+      const result = checkMatch(state);
+      expect(result?.isMatch).toBe(false);
+    });
+
+    it('returns the matched cards', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({
+        cards,
+        selectedCards: ['card-0', 'card-1'],
+      });
+      const result = checkMatch(state);
+      expect(result?.firstCard.id).toBe('card-0');
+      expect(result?.secondCard.id).toBe('card-1');
+    });
+  });
+
+  describe('applyMatch', () => {
+    it('returns unchanged state if not a match', () => {
+      const state = createTestState();
+      const result = applyMatch(state, {
+        isMatch: false,
+        firstCard: createTestCard(),
+        secondCard: createTestCard({ id: 'card-2' }),
+      });
+      expect(result).toBe(state);
+    });
+
+    it('marks cards as matched', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards });
+      const result = applyMatch(state, {
+        isMatch: true,
+        firstCard: cards[0],
+        secondCard: cards[1],
+      });
+      expect(result.cards[0].isMatched).toBe(true);
+      expect(result.cards[1].isMatched).toBe(true);
+    });
+
+    it('increments current player score', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards, currentPlayer: 1 });
+      const result = applyMatch(state, {
+        isMatch: true,
+        firstCard: cards[0],
+        secondCard: cards[1],
+      });
+      const player1 = result.players.find(p => p.id === 1);
+      expect(player1?.score).toBe(1);
+    });
+
+    it('clears selectedCards', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({
+        cards,
+        selectedCards: ['card-0', 'card-1'],
+      });
+      const result = applyMatch(state, {
+        isMatch: true,
+        firstCard: cards[0],
+        secondCard: cards[1],
+      });
+      expect(result.selectedCards).toEqual([]);
+    });
+
+    it('sets matchedByPlayerId on matched cards', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards, currentPlayer: 2 });
+      const result = applyMatch(state, {
+        isMatch: true,
+        firstCard: cards[0],
+        secondCard: cards[1],
+      });
+      expect(result.cards[0].matchedByPlayerId).toBe(2);
+      expect(result.cards[1].matchedByPlayerId).toBe(2);
+    });
+  });
+});
+
+// ============================================
+// Animation-Aware Match Functions Tests
+// ============================================
+
+describe('Animation-Aware Match Functions', () => {
+  describe('startMatchAnimation', () => {
+    it('sets isFlyingToPlayer on matched cards', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards });
+      const result = startMatchAnimation(state, ['card-0', 'card-1'], 1);
+      expect(result.cards[0].isFlyingToPlayer).toBe(true);
+      expect(result.cards[1].isFlyingToPlayer).toBe(true);
+    });
+
+    it('sets flyingToPlayerId on matched cards', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards });
+      const result = startMatchAnimation(state, ['card-0', 'card-1'], 2);
+      expect(result.cards[0].flyingToPlayerId).toBe(2);
+      expect(result.cards[1].flyingToPlayerId).toBe(2);
+    });
+
+    it('increments player score', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards });
+      const result = startMatchAnimation(state, ['card-0', 'card-1'], 1);
+      const player1 = result.players.find(p => p.id === 1);
+      expect(player1?.score).toBe(1);
+    });
+
+    it('clears selectedCards', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({
+        cards,
+        selectedCards: ['card-0', 'card-1'],
+      });
+      const result = startMatchAnimation(state, ['card-0', 'card-1'], 1);
+      expect(result.selectedCards).toEqual([]);
+    });
+
+    it('keeps cards flipped', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards });
+      const result = startMatchAnimation(state, ['card-0', 'card-1'], 1);
+      expect(result.cards[0].isFlipped).toBe(true);
+      expect(result.cards[1].isFlipped).toBe(true);
+    });
+  });
+
+  describe('completeMatchAnimation', () => {
+    it('sets isMatched on cards', () => {
+      const cards = createMatchingCardPair().map(c => ({
+        ...c,
+        isFlyingToPlayer: true,
+        flyingToPlayerId: 1,
+      }));
+      const state = createTestState({ cards });
+      const result = completeMatchAnimation(state, ['card-0', 'card-1'], 1);
+      expect(result.cards[0].isMatched).toBe(true);
+      expect(result.cards[1].isMatched).toBe(true);
+    });
+
+    it('clears isFlyingToPlayer', () => {
+      const cards = createMatchingCardPair().map(c => ({
+        ...c,
+        isFlyingToPlayer: true,
+        flyingToPlayerId: 1,
+      }));
+      const state = createTestState({ cards });
+      const result = completeMatchAnimation(state, ['card-0', 'card-1'], 1);
+      expect(result.cards[0].isFlyingToPlayer).toBe(false);
+      expect(result.cards[1].isFlyingToPlayer).toBe(false);
+    });
+
+    it('sets matchedByPlayerId', () => {
+      const cards = createMatchingCardPair();
+      const state = createTestState({ cards });
+      const result = completeMatchAnimation(state, ['card-0', 'card-1'], 2);
+      expect(result.cards[0].matchedByPlayerId).toBe(2);
+      expect(result.cards[1].matchedByPlayerId).toBe(2);
+    });
+
+    it('omits flyingToPlayerId to avoid persisting undefined', () => {
+      const cards = createMatchingCardPair().map(c => ({
+        ...c,
+        isFlyingToPlayer: true,
+        flyingToPlayerId: 1,
+      }));
+      const state = createTestState({ cards });
+      const result = completeMatchAnimation(state, ['card-0', 'card-1'], 2);
+      expect('flyingToPlayerId' in result.cards[0]).toBe(false);
+      expect('flyingToPlayerId' in result.cards[1]).toBe(false);
+    });
+  });
+
+  describe('applyNoMatchWithReset', () => {
+    it('flips cards back', () => {
+      const cards = createNonMatchingCards().map(c => ({
+        ...c,
+        isFlipped: true,
+      }));
+      const state = createTestState({ cards });
+      const result = applyNoMatchWithReset(state, ['card-0', 'card-1']);
+      expect(result.cards[0].isFlipped).toBe(false);
+      expect(result.cards[1].isFlipped).toBe(false);
+    });
+
+    it('switches to next player', () => {
+      const cards = createNonMatchingCards();
+      const state = createTestState({ cards, currentPlayer: 1 });
+      const result = applyNoMatchWithReset(state, ['card-0', 'card-1']);
+      expect(result.currentPlayer).toBe(2);
+    });
+
+    it('clears selectedCards', () => {
+      const cards = createNonMatchingCards();
+      const state = createTestState({
+        cards,
+        selectedCards: ['card-0', 'card-1'],
+      });
+      const result = applyNoMatchWithReset(state, ['card-0', 'card-1']);
+      expect(result.selectedCards).toEqual([]);
+    });
+
+    it('clears animation state', () => {
+      const cards = createNonMatchingCards().map(c => ({
+        ...c,
+        isFlyingToPlayer: true,
+        flyingToPlayerId: 1,
+      }));
+      const state = createTestState({ cards });
+      const result = applyNoMatchWithReset(state, ['card-0', 'card-1']);
+      expect(result.cards[0].isFlyingToPlayer).toBe(false);
+      expect(result.cards[0].flyingToPlayerId).toBeUndefined();
+    });
+
+    it('removes flyingToPlayerId property entirely after reset', () => {
+      const cards = createNonMatchingCards().map(c => ({
+        ...c,
+        isFlyingToPlayer: true,
+        flyingToPlayerId: 1,
+      }));
+      const state = createTestState({ cards });
+      const result = applyNoMatchWithReset(state, ['card-0', 'card-1']);
+      expect('flyingToPlayerId' in result.cards[0]).toBe(false);
+      expect('flyingToPlayerId' in result.cards[1]).toBe(false);
+    });
+  });
+});
+
+// ============================================
+// Turn Management Tests
+// ============================================
+
+describe('Turn Management', () => {
+  describe('getNextPlayer', () => {
+    it('returns 2 when current is 1', () => {
+      expect(getNextPlayer(1)).toBe(2);
+    });
+
+    it('returns 1 when current is 2', () => {
+      expect(getNextPlayer(2)).toBe(1);
+    });
+  });
+
+  describe('switchPlayer', () => {
+    it('switches from player 1 to player 2', () => {
+      const state = createTestState({ currentPlayer: 1 });
+      const result = switchPlayer(state);
+      expect(result.currentPlayer).toBe(2);
+    });
+
+    it('switches from player 2 to player 1', () => {
+      const state = createTestState({ currentPlayer: 2 });
+      const result = switchPlayer(state);
+      expect(result.currentPlayer).toBe(1);
+    });
+
+    it('clears selectedCards', () => {
+      const state = createTestState({ selectedCards: ['card-1'] });
+      const result = switchPlayer(state);
+      expect(result.selectedCards).toEqual([]);
+    });
+  });
+
+  describe('endTurn', () => {
+    it('flips all non-matched cards back', () => {
+      const cards = [
+        createTestCard({ id: 'card-0', isFlipped: true }),
+        createTestCard({ id: 'card-1', isFlipped: true }),
+        createTestCard({ id: 'card-2', isMatched: true, isFlipped: true }),
+      ];
+      const state = createTestState({ cards });
+      const result = endTurn(state);
+      expect(result.cards[0].isFlipped).toBe(false);
+      expect(result.cards[1].isFlipped).toBe(false);
+      expect(result.cards[2].isFlipped).toBe(true); // Matched card stays flipped
+    });
+
+    it('switches player', () => {
+      const state = createTestState({ currentPlayer: 1 });
+      const result = endTurn(state);
+      expect(result.currentPlayer).toBe(2);
+    });
+
+    it('clears selectedCards', () => {
+      const state = createTestState({ selectedCards: ['card-1', 'card-2'] });
+      const result = endTurn(state);
+      expect(result.selectedCards).toEqual([]);
+    });
+
+    it('handles stuck flying cards', () => {
+      const cards = [
+        createTestCard({ id: 'card-0', isFlyingToPlayer: true, isFlipped: true }),
+      ];
+      const state = createTestState({ cards });
+      const result = endTurn(state);
+      expect(result.cards[0].isFlyingToPlayer).toBe(false);
+      expect(result.cards[0].isFlipped).toBe(false);
+    });
+  });
+});
+
+// ============================================
+// Game Status Tests
+// ============================================
+
+describe('Game Status', () => {
+  describe('isGameOver', () => {
+    it('returns false if no cards', () => {
+      const state = createTestState({ cards: [] });
+      expect(isGameOver(state)).toBe(false);
+    });
+
+    it('returns false if not all cards matched', () => {
+      const cards = [
+        createTestCard({ isMatched: true }),
+        createTestCard({ isMatched: false }),
+      ];
+      const state = createTestState({ cards });
+      expect(isGameOver(state)).toBe(false);
+    });
+
+    it('returns true if all cards matched', () => {
+      const cards = [
+        createTestCard({ isMatched: true }),
+        createTestCard({ isMatched: true }),
+      ];
+      const state = createTestState({ cards });
+      expect(isGameOver(state)).toBe(true);
+    });
+  });
+
+  describe('calculateWinner', () => {
+    it('returns null winner with empty players', () => {
+      const state = createTestState({ players: [] });
+      const result = calculateWinner(state);
+      expect(result.winner).toBeNull();
+    });
+
+    it('returns player with highest score as winner', () => {
+      const players = [
+        createTestPlayer({ id: 1, score: 3 }),
+        createTestPlayer({ id: 2, score: 5 }),
+      ];
+      const state = createTestState({ players });
+      const result = calculateWinner(state);
+      expect(result.winner?.id).toBe(2);
+      expect(result.isTie).toBe(false);
+    });
+
+    it('detects tie correctly', () => {
+      const players = [
+        createTestPlayer({ id: 1, score: 3 }),
+        createTestPlayer({ id: 2, score: 3 }),
+      ];
+      const state = createTestState({ players });
+      const result = calculateWinner(state);
+      expect(result.winner).toBeNull();
+      expect(result.isTie).toBe(true);
+    });
+  });
+
+  describe('finishGame', () => {
+    it('sets gameStatus to finished', () => {
+      const state = createTestState();
+      const result = finishGame(state);
+      expect(result.gameStatus).toBe('finished');
+    });
+
+    it('sets winner', () => {
+      const players = [
+        createTestPlayer({ id: 1, score: 5 }),
+        createTestPlayer({ id: 2, score: 3 }),
+      ];
+      const state = createTestState({ players });
+      const result = finishGame(state);
+      expect(result.winner?.id).toBe(1);
+    });
+
+    it('clears selectedCards', () => {
+      const state = createTestState({ selectedCards: ['card-1'] });
+      const result = finishGame(state);
+      expect(result.selectedCards).toEqual([]);
+    });
+  });
+
+  describe('checkAndFinishGame', () => {
+    it('returns unchanged if not all matched', () => {
+      const cards = [createTestCard({ isMatched: false })];
+      const state = createTestState({ cards });
+      const result = checkAndFinishGame(state);
+      expect(result.gameStatus).toBe('playing');
+    });
+
+    it('finishes game if all matched', () => {
+      const cards = [
+        createTestCard({ isMatched: true }),
+        createTestCard({ isMatched: true }),
+      ];
+      const state = createTestState({ cards });
+      const result = checkAndFinishGame(state);
+      expect(result.gameStatus).toBe('finished');
+    });
+  });
+});
+
+// ============================================
+// Game Reset Tests
+// ============================================
+
+describe('Game Reset', () => {
+  describe('createInitialState', () => {
+    it('creates state with setup status', () => {
+      const state = createInitialState();
+      expect(state.gameStatus).toBe('setup');
+    });
+
+    it('creates two players with names', () => {
+      const state = createInitialState('Alice', 'Bob');
+      expect(state.players).toHaveLength(2);
+      expect(state.players[0].name).toBe('Alice');
+      expect(state.players[1].name).toBe('Bob');
+    });
+
+    it('sets first player correctly', () => {
+      const state = createInitialState('A', 'B', '#fff', '#000', 2);
+      expect(state.currentPlayer).toBe(2);
+    });
+
+    it('initializes with zero scores', () => {
+      const state = createInitialState();
+      state.players.forEach(p => {
+        expect(p.score).toBe(0);
+      });
+    });
+  });
+
+  describe('resetGameState', () => {
+    it('keeps player names', () => {
+      const state = createTestState({
+        players: [
+          createTestPlayer({ id: 1, name: 'Alice' }),
+          createTestPlayer({ id: 2, name: 'Bob' }),
+        ],
+      });
+      const result = resetGameState(state);
+      expect(result.players[0].name).toBe('Alice');
+      expect(result.players[1].name).toBe('Bob');
+    });
+
+    it('resets scores to zero', () => {
+      const state = createTestState({
+        players: [
+          createTestPlayer({ id: 1, score: 5 }),
+          createTestPlayer({ id: 2, score: 3 }),
+        ],
+      });
+      const result = resetGameState(state);
+      result.players.forEach(p => {
+        expect(p.score).toBe(0);
+      });
+    });
+
+    it('clears cards', () => {
+      const state = createTestState({
+        cards: [createTestCard()],
+      });
+      const result = resetGameState(state);
+      expect(result.cards).toEqual([]);
+    });
+
+    it('sets status to setup', () => {
+      const state = createTestState({ gameStatus: 'finished' });
+      const result = resetGameState(state);
+      expect(result.gameStatus).toBe('setup');
+    });
+  });
+
+  describe('startGameWithCards', () => {
+    it('sets cards on state', () => {
+      const cards = [createTestCard()];
+      const state = createTestState({ gameStatus: 'setup' });
+      const result = startGameWithCards(state, cards);
+      expect(result.cards).toEqual(cards);
+    });
+
+    it('sets status to playing', () => {
+      const state = createTestState({ gameStatus: 'setup' });
+      const result = startGameWithCards(state, []);
+      expect(result.gameStatus).toBe('playing');
+    });
+  });
+});
+
+// ============================================
+// Player Management Tests
+// ============================================
+
+describe('Player Management', () => {
+  describe('updatePlayerName', () => {
+    it('updates the correct player name', () => {
+      const state = createTestState();
+      const result = updatePlayerName(state, 1, 'NewName');
+      const player1 = result.players.find(p => p.id === 1);
+      expect(player1?.name).toBe('NewName');
+    });
+
+    it('trims whitespace from name', () => {
+      const state = createTestState();
+      const result = updatePlayerName(state, 1, '  Trimmed  ');
+      const player1 = result.players.find(p => p.id === 1);
+      expect(player1?.name).toBe('Trimmed');
+    });
+
+    it('does not modify other players', () => {
+      const state = createTestState();
+      const result = updatePlayerName(state, 1, 'NewName');
+      const player2 = result.players.find(p => p.id === 2);
+      expect(player2?.name).toBe('Player 2');
+    });
+  });
+
+  describe('updatePlayerColor', () => {
+    it('updates the correct player color', () => {
+      const state = createTestState();
+      const result = updatePlayerColor(state, 1, '#ff0000');
+      const player1 = result.players.find(p => p.id === 1);
+      expect(player1?.color).toBe('#ff0000');
+    });
+  });
+});
+
+// ============================================
+// State Serialization Tests
+// ============================================
+
+describe('State Serialization', () => {
+  describe('cleanStateForPersistence', () => {
+    it('removes animation properties from cards', () => {
+      const cards = [
+        createTestCard({
+          isFlyingToPlayer: true,
+          flyingToPlayerId: 1,
+        }),
+      ];
+      const state = createTestState({ cards });
+      const result = cleanStateForPersistence(state);
+      expect(result.cards[0].isFlyingToPlayer).toBeUndefined();
+      expect(result.cards[0].flyingToPlayerId).toBeUndefined();
+    });
+
+    it('clears selectedCards', () => {
+      const state = createTestState({ selectedCards: ['card-1'] });
+      const result = cleanStateForPersistence(state);
+      expect(result.selectedCards).toEqual([]);
+    });
+
+    it('preserves game-relevant card properties', () => {
+      const cards = [
+        createTestCard({
+          id: 'card-1',
+          imageId: 'img-1',
+          isFlipped: true,
+          isMatched: true,
+          matchedByPlayerId: 1,
+        }),
+      ];
+      const state = createTestState({ cards });
+      const result = cleanStateForPersistence(state);
+      expect(result.cards[0].id).toBe('card-1');
+      expect(result.cards[0].isFlipped).toBe(true);
+      expect(result.cards[0].isMatched).toBe(true);
+      expect(result.cards[0].matchedByPlayerId).toBe(1);
+    });
+  });
+
+  describe('validateState', () => {
+    it('returns false for null', () => {
+      expect(validateState(null)).toBe(false);
+    });
+
+    it('returns false for non-object', () => {
+      expect(validateState('string')).toBe(false);
+    });
+
+    it('returns false for missing cards array', () => {
+      expect(validateState({ players: [], currentPlayer: 1 })).toBe(false);
+    });
+
+    it('returns false for invalid gameStatus', () => {
+      const state = {
+        cards: [],
+        players: [],
+        currentPlayer: 1,
+        selectedCards: [],
+        gameStatus: 'invalid',
+      };
+      expect(validateState(state)).toBe(false);
+    });
+
+    it('returns true for valid state', () => {
+      const state = createTestState();
+      expect(validateState(state)).toBe(true);
+    });
+  });
+});

@@ -1,16 +1,20 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Card, Player, GameState } from '../types';
 import { useTextToSpeech } from './useTextToSpeech';
-
-// Helper function to ensure players are always sorted by ID (1, then 2)
-const sortPlayersByID = (players: Player[]): Player[] => {
-  return [...players].sort((a, b) => a.id - b.id);
-};
-
-// Helper function to get player by ID
-const getPlayerById = (players: Player[], id: number): Player | undefined => {
-  return players.find(p => p.id === id);
-};
+import {
+  sortPlayersByID,
+  getPlayerById,
+  canFlipCard,
+  flipCard as engineFlipCard,
+  checkMatch,
+  startMatchAnimation,
+  completeMatchAnimation,
+  applyNoMatchWithReset,
+  checkAndFinishGame,
+  endTurn as engineEndTurn,
+  updatePlayerName as engineUpdatePlayerName,
+  updatePlayerColor as engineUpdatePlayerColor,
+} from '../services/game/GameEngine';
 
 export const useMemoryGame = () => {
   const [gameState, setGameState] = useState<GameState>(() => {
@@ -408,27 +412,20 @@ export const useMemoryGame = () => {
   }, []);
 
   const updatePlayerName = useCallback((playerId: 1 | 2, newName: string) => {
+    const trimmedName = newName.trim();
     // Save to localStorage
-    localStorage.setItem(`player${playerId}Name`, newName.trim());
-    
-    setGameState(prev => ({
-      ...prev,
-      players: sortPlayersByID(prev.players.map(player =>
-        player.id === playerId ? { ...player, name: newName.trim() } : player
-      ))
-    }));
+    localStorage.setItem(`player${playerId}Name`, trimmedName);
+
+    // Use GameEngine to update player name
+    setGameState(prev => engineUpdatePlayerName(prev, playerId, trimmedName));
   }, []);
 
   const updatePlayerColor = useCallback((playerId: 1 | 2, newColor: string) => {
     // Save to localStorage
     localStorage.setItem(`player${playerId}Color`, newColor);
-    
-    setGameState(prev => ({
-      ...prev,
-      players: sortPlayersByID(prev.players.map(player =>
-        player.id === playerId ? { ...player, color: newColor } : player
-      ))
-    }));
+
+    // Use GameEngine to update player color
+    setGameState(prev => engineUpdatePlayerColor(prev, playerId, newColor));
   }, []);
 
   const resetGame = useCallback(() => {
@@ -476,18 +473,18 @@ export const useMemoryGame = () => {
       console.log('[MATCH CHECK] Match check already in progress, ignoring duplicate call', JSON.stringify({ selectedIds }));
       return;
     }
-    
+
     isCheckingMatchRef.current = true;
     matchCheckTimeoutRef.current = null;
-    
+
     console.log('[MATCH CHECK] Starting match check', JSON.stringify({ selectedIds, timestamp: new Date().toISOString() }));
-    
+
     setGameState(prev => {
       const [firstId, secondId] = selectedIds;
-      
+
       // Verify the cards are still selected (prevent race conditions)
-      if (prev.selectedCards.length !== 2 || 
-          !prev.selectedCards.includes(firstId) || 
+      if (prev.selectedCards.length !== 2 ||
+          !prev.selectedCards.includes(firstId) ||
           !prev.selectedCards.includes(secondId)) {
         console.log('[MATCH CHECK] Cards no longer selected, ignoring', JSON.stringify({
           selectedIds,
@@ -496,205 +493,113 @@ export const useMemoryGame = () => {
         isCheckingMatchRef.current = false;
         return prev;
       }
-      
-      const firstCard = prev.cards.find(c => c.id === firstId);
-      const secondCard = prev.cards.find(c => c.id === secondId);
 
-      console.log('[MATCH CHECK] Cards found', JSON.stringify({ 
-        firstCard: firstCard ? { id: firstCard.id, imageId: firstCard.imageId, isFlipped: firstCard.isFlipped, isMatched: firstCard.isMatched } : null,
-        secondCard: secondCard ? { id: secondCard.id, imageId: secondCard.imageId, isFlipped: secondCard.isFlipped, isMatched: secondCard.isMatched } : null
-      }));
+      // Use GameEngine to check for match
+      const matchResult = checkMatch(prev);
 
-      if (!firstCard || !secondCard) {
-        console.warn('[MATCH CHECK] Cards not found!', JSON.stringify({ firstId, secondId, availableCardIds: prev.cards.map(c => c.id) }));
+      if (!matchResult) {
+        console.warn('[MATCH CHECK] Cards not found!');
         isCheckingMatchRef.current = false;
         return prev;
       }
 
-      const isMatch = firstCard.imageId === secondCard.imageId;
+      const { isMatch, firstCard, secondCard } = matchResult;
+      const cardIds: [string, string] = [firstCard.id, secondCard.id];
+
       console.log('[MATCH CHECK] Match result', JSON.stringify({ isMatch, imageId1: firstCard.imageId, imageId2: secondCard.imageId }));
-      
-      let newCards = prev.cards;
-      let newPlayers = [...prev.players];
-      let nextPlayer = prev.currentPlayer;
 
       if (isMatch) {
+        const currentPlayerId = prev.currentPlayer;
+        const matchedPlayerName = getPlayerById(prev.players, currentPlayerId)?.name || `Player ${currentPlayerId}`;
+
         console.log('[MATCH CHECK] ✓ MATCH FOUND! Marking cards as flying to player', JSON.stringify({
-          cardIds: [firstId, secondId],
-          playerId: prev.currentPlayer,
-          playerName: prev.players.find(p => p.id === prev.currentPlayer)?.name
+          cardIds,
+          playerId: currentPlayerId,
+          playerName: matchedPlayerName
         }));
-        
-        // Mark cards as flying to player (will animate to player's name)
-        newCards = prev.cards.map(c =>
-          c.id === firstId || c.id === secondId
-            ? { ...c, isFlipped: true, isFlyingToPlayer: true, flyingToPlayerId: prev.currentPlayer }
-            : c
-        );
-        
-        // Verify cards were marked correctly
-        const flyingCards = newCards.filter(c => c.isFlyingToPlayer);
-        console.log('[MATCH CHECK] Cards marked as flying', JSON.stringify({
-          flyingCardsCount: flyingCards.length,
-          flyingCards: flyingCards.map(c => ({
-            id: c.id,
-            isFlyingToPlayer: c.isFlyingToPlayer,
-            flyingToPlayerId: c.flyingToPlayerId
-          }))
-        }));
-        
-        // Increment current player's score
-        newPlayers = sortPlayersByID(prev.players.map(p =>
-          p.id === prev.currentPlayer
-            ? { ...p, score: p.score + 1 }
-            : p
-        ));
-        
-        // Capture the player ID who matched these cards
-        const matchedByPlayerId = prev.currentPlayer;
-        
+
+        // Use GameEngine for Phase 1: flying animation
+        const flyingState = startMatchAnimation(prev, cardIds, currentPlayerId);
+
         // Announce match found immediately (don't wait for animation)
         if (ttsEnabled && isAvailable()) {
-          // Cancel any pending TTS
           if (ttsDelayTimeoutRef.current) {
             clearTimeout(ttsDelayTimeoutRef.current);
           }
           ttsDelayTimeoutRef.current = setTimeout(() => {
-            const matchedPlayerName = prev.players.find(p => p.id === matchedByPlayerId)?.name || `Player ${matchedByPlayerId}`;
             speakMatchFound(matchedPlayerName);
             ttsDelayTimeoutRef.current = null;
-          }, 400); // Small delay to let visual feedback register
+          }, 400);
         }
-        
-        // After animation completes, mark as matched
+
+        // After animation completes, mark as matched using GameEngine
         setTimeout(() => {
           console.log('[MATCH CHECK] Animation timeout fired, marking cards as matched', JSON.stringify({
-            cardIds: [firstId, secondId],
-            matchedByPlayerId,
+            cardIds,
+            matchedByPlayerId: currentPlayerId,
             timestamp: new Date().toISOString()
           }));
 
           setGameState(prevState => {
-            const beforeMatch = prevState.cards.filter(c => c.isMatched).length;
-            const updatedCards = prevState.cards.map(c =>
-              c.id === firstId || c.id === secondId
-                ? { ...c, isMatched: true, isFlyingToPlayer: false, matchedByPlayerId }
-                : c
-            );
-            const afterMatch = updatedCards.filter(c => c.isMatched).length;
+            // Use GameEngine for Phase 2: complete match
+            const matchedState = completeMatchAnimation(prevState, cardIds, currentPlayerId);
+
+            // Use GameEngine to check if game is finished
+            const finalState = checkAndFinishGame(matchedState);
 
             console.log('[MATCH CHECK] Cards marked as matched', JSON.stringify({
-              beforeMatchCount: beforeMatch,
-              afterMatchCount: afterMatch,
-              matchedCardIds: updatedCards.filter(c => c.isMatched).map(c => c.id)
+              matchedCount: finalState.cards.filter(c => c.isMatched).length,
+              gameStatus: finalState.gameStatus
             }));
 
-            const filteredSelectedCards = prevState.selectedCards.filter(
-              id => id !== firstId && id !== secondId
-            );
-
-            // Check if game is finished after cards are marked as matched
-            const allMatched = updatedCards.every(c => c.isMatched);
-            if (allMatched) {
-              // Find the player with the highest score
-              const winner = prevState.players.reduce((prevPlayer, currentPlayer) =>
-                currentPlayer.score > prevPlayer.score ? currentPlayer : prevPlayer
-              );
-
-              // Check if it's a tie
-              const isTie = prevState.players.every(player => player.score === winner.score);
-
-              return {
-                ...prevState,
-                cards: updatedCards,
-                selectedCards: filteredSelectedCards,
-                gameStatus: 'finished' as const,
-                winner: isTie ? null : winner,
-                isTie
-              };
-            }
-
-            return {
-              ...prevState,
-              cards: updatedCards,
-              selectedCards: filteredSelectedCards
-            };
+            return finalState;
           });
         }, 3000); // Match animation duration (matches CSS animation length)
-      } else {
-        // Flip cards back and switch player
-        console.log('[MATCH CHECK] ✗ NO MATCH - Flipping cards back', JSON.stringify({
-          cardIds: [firstId, secondId],
-          currentPlayer: prev.currentPlayer,
-          nextPlayer: prev.currentPlayer === 1 ? 2 : 1
-        }));
-        
-        newCards = prev.cards.map(c => {
-          if (c.id === firstId || c.id === secondId) {
-            console.log('[MATCH CHECK] Flipping card back', JSON.stringify({
-              cardId: c.id,
-              wasFlipped: c.isFlipped,
-              willBeFlipped: false
-            }));
-            return { ...c, isFlipped: false };
-          }
-          return c;
-        });
-        
-        nextPlayer = prev.currentPlayer === 1 ? 2 : 1;
-        
-        // Verify cards were flipped back
-        const flippedBackCards = newCards.filter(c => (c.id === firstId || c.id === secondId) && !c.isFlipped);
-        console.log('[MATCH CHECK] Cards flipped back verification', JSON.stringify({
-          expectedCount: 2,
-          actualCount: flippedBackCards.length,
-          cardStates: newCards.filter(c => c.id === firstId || c.id === secondId).map(c => ({
-            id: c.id,
-            isFlipped: c.isFlipped,
-            isMatched: c.isMatched
-          }))
-        }));
-      }
 
-      const newState = {
-        ...prev,
-        cards: [...newCards], // Ensure new array reference
-        players: newPlayers,
-        currentPlayer: nextPlayer,
-        selectedCards: []
-      };
-      
-      console.log('[MATCH CHECK] State update complete', JSON.stringify({
-        cardsCount: newState.cards.length,
-        flippedCardsCount: newState.cards.filter(c => c.isFlipped && !c.isFlyingToPlayer && !c.isMatched).length,
-        matchedCardsCount: newState.cards.filter(c => c.isMatched).length,
-        currentPlayer: newState.currentPlayer,
-        selectedCardsCount: newState.selectedCards.length
-      }));
-
-      // Announce next player's turn if no match was found
-      if (!isMatch && ttsEnabled && isAvailable()) {
-        // Cancel any pending TTS
-        if (ttsDelayTimeoutRef.current) {
-          clearTimeout(ttsDelayTimeoutRef.current);
-        }
-        // Announce immediately after determining no match (don't wait for flip animation)
-        ttsDelayTimeoutRef.current = setTimeout(() => {
-          const nextPlayerName = newPlayers.find(p => p.id === nextPlayer)?.name || `Player ${nextPlayer}`;
-          speakPlayerTurn(nextPlayerName);
-          ttsDelayTimeoutRef.current = null;
-        }, 400); // Small delay to let visual feedback register
-      }
-
-      // Reset the checking flag after state update completes
-      // Use requestAnimationFrame to ensure React has rendered the update
-      requestAnimationFrame(() => {
+        // Reset checking flag
         requestAnimationFrame(() => {
-          isCheckingMatchRef.current = false;
+          requestAnimationFrame(() => {
+            isCheckingMatchRef.current = false;
+          });
         });
-      });
 
-      return newState;
+        return flyingState;
+      } else {
+        // Use GameEngine for no match: flip back and switch player
+        console.log('[MATCH CHECK] ✗ NO MATCH - Flipping cards back', JSON.stringify({
+          cardIds,
+          currentPlayer: prev.currentPlayer
+        }));
+
+        const noMatchState = applyNoMatchWithReset(prev, cardIds);
+        const nextPlayer = noMatchState.currentPlayer;
+
+        console.log('[MATCH CHECK] State update complete', JSON.stringify({
+          cardsCount: noMatchState.cards.length,
+          currentPlayer: nextPlayer
+        }));
+
+        // Announce next player's turn
+        if (ttsEnabled && isAvailable()) {
+          if (ttsDelayTimeoutRef.current) {
+            clearTimeout(ttsDelayTimeoutRef.current);
+          }
+          ttsDelayTimeoutRef.current = setTimeout(() => {
+            const nextPlayerName = getPlayerById(noMatchState.players, nextPlayer)?.name || `Player ${nextPlayer}`;
+            speakPlayerTurn(nextPlayerName);
+            ttsDelayTimeoutRef.current = null;
+          }, 400);
+        }
+
+        // Reset the checking flag
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            isCheckingMatchRef.current = false;
+          });
+        });
+
+        return noMatchState;
+      }
     });
   }, [speakPlayerTurn, speakMatchFound, isAvailable, ttsEnabled]);
 
@@ -711,80 +616,19 @@ export const useMemoryGame = () => {
     }
     cancelTTS();
     isCheckingMatchRef.current = false;
-    
+
     setGameState(prev => {
-      // Find all stuck flying cards (cards that are flying but stuck)
-      const flyingCards = prev.cards.filter(c => c.isFlyingToPlayer);
-      
-      // Group flying cards by imageId to find pairs
-      const flyingByImageId: { [key: string]: Card[] } = {};
-      flyingCards.forEach(card => {
-        if (!flyingByImageId[card.imageId]) {
-          flyingByImageId[card.imageId] = [];
-        }
-        flyingByImageId[card.imageId].push(card);
-      });
-      
-      // Find stuck pairs (cards with same imageId that are both flying)
-      const stuckPairIds = new Set<string>();
-      Object.values(flyingByImageId).forEach(cards => {
-        if (cards.length >= 2) {
-          // These are pairs that should be matched
-          for (const c of cards) {
-            stuckPairIds.add(c.id);
-          }
-        }
-      });
-      
-      // Process cards: fix stuck matches and flip back non-matched cards
-      const newCards = prev.cards.map(c => {
-        // If card is stuck flying and part of a pair, mark it as matched
-        if (c.isFlyingToPlayer && stuckPairIds.has(c.id)) {
-          console.log('[END TURN] Fixing stuck matched card', JSON.stringify({
-            cardId: c.id,
-            imageId: c.imageId
-          }));
-          return { ...c, isMatched: true, isFlyingToPlayer: false, isFlipped: false };
-        }
-        
-        // If card is stuck flying but not part of a pair, clear flying state and flip back
-        if (c.isFlyingToPlayer && !stuckPairIds.has(c.id)) {
-          console.log('[END TURN] Clearing stuck flying card (not a pair)', JSON.stringify({
-            cardId: c.id,
-            imageId: c.imageId
-          }));
-          return { ...c, isFlyingToPlayer: false, isFlipped: false };
-        }
-        
-        // Flip all other face-up cards back (except matched ones)
-        if (c.isFlipped && !c.isMatched) {
-          return { ...c, isFlipped: false };
-        }
-        
-        return c;
-      });
-      
-      // Switch to next player
-      const nextPlayer = prev.currentPlayer === 1 ? 2 : 1;
-      
-      const stuckFlyingCount = flyingCards.length;
-      const stuckPairsFixed = stuckPairIds.size / 2;
-      
+      // Use GameEngine to end the turn
+      const newState = engineEndTurn(prev);
+
       console.log('[END TURN] Manually ending turn', JSON.stringify({
         previousPlayer: prev.currentPlayer,
-        nextPlayer,
+        nextPlayer: newState.currentPlayer,
         flippedCardsCount: prev.cards.filter(c => c.isFlipped && !c.isMatched).length,
-        stuckFlyingCount,
-        stuckPairsFixed,
         timestamp: new Date().toISOString()
       }));
-      
-      return {
-        ...prev,
-        cards: [...newCards], // Ensure new array reference
-        currentPlayer: nextPlayer,
-        selectedCards: []
-      };
+
+      return newState;
     });
   }, [cancelTTS]);
 
@@ -845,7 +689,7 @@ export const useMemoryGame = () => {
       }));
       return;
     }
-    
+
     setGameState(prev => {
       console.log('[FLIP CARD] Card clicked', JSON.stringify({
         cardId,
@@ -854,77 +698,42 @@ export const useMemoryGame = () => {
         selectedCards: prev.selectedCards,
         timestamp: new Date().toISOString()
       }));
-      
-      if (prev.gameStatus !== 'playing') {
-        console.log('[FLIP CARD] Game not playing, ignoring');
-        return prev;
-      }
-      
-      // Check if any cards are currently flying to a player
-      const flyingCards = prev.cards.filter(c => c.isFlyingToPlayer);
-      if (flyingCards.length > 0) {
-        console.log('[FLIP CARD] Cards are currently flying to player, proceeding with new selection', JSON.stringify({
-          flyingCardsCount: flyingCards.length,
-          flyingCardIds: flyingCards.map(c => c.id)
-        }));
-      }
-      
-      // Additional guard: prevent flipping if we have 2 selected cards and match check might be pending
-      if (prev.selectedCards.length >= 2) {
-        console.log('[FLIP CARD] Already have 2 cards selected, ignoring');
-        return prev;
-      }
-      
-      const card = prev.cards.find(c => c.id === cardId);
-      if (!card || card.isFlipped || card.isMatched) {
-        console.log('[FLIP CARD] Card invalid or already flipped/matched', JSON.stringify({
-          cardFound: !!card,
-          isFlipped: card?.isFlipped,
-          isMatched: card?.isMatched
-        }));
-        return prev;
-      }
-      
-      if (prev.selectedCards.length >= 2) {
-        console.log('[FLIP CARD] Already have 2 cards selected, ignoring');
+
+      // Use GameEngine to validate if card can be flipped
+      if (!canFlipCard(prev, cardId)) {
+        console.log('[FLIP CARD] Card cannot be flipped (validated by GameEngine)');
         return prev;
       }
 
-      const newCards = prev.cards.map(c =>
-        c.id === cardId ? { ...c, isFlipped: true } : c
-      );
-      
-      const newSelectedCards = [...prev.selectedCards, cardId];
+      // Use GameEngine to flip the card
+      const newState = engineFlipCard(prev, cardId);
+
       console.log('[FLIP CARD] Card flipped, new selected cards', JSON.stringify({
-        newSelectedCards,
-        willCheckMatch: newSelectedCards.length === 2
+        newSelectedCards: newState.selectedCards,
+        willCheckMatch: newState.selectedCards.length === 2
       }));
 
       // Check for match when two cards are selected
-      if (newSelectedCards.length === 2) {
+      if (newState.selectedCards.length === 2) {
         // Cancel any existing match check timeout
         if (matchCheckTimeoutRef.current) {
           console.log('[FLIP CARD] Cancelling existing match check timeout');
           clearTimeout(matchCheckTimeoutRef.current);
           matchCheckTimeoutRef.current = null;
         }
-        
+
         console.log('[FLIP CARD] Scheduling match check', JSON.stringify({
-          selectedCards: newSelectedCards,
+          selectedCards: newState.selectedCards,
           duration: flipDuration
         }));
         matchCheckTimeoutRef.current = setTimeout(() => {
           console.log('[FLIP CARD] Match check timeout fired, calling checkForMatch');
           matchCheckTimeoutRef.current = null;
-          checkForMatch(newSelectedCards);
+          checkForMatch(newState.selectedCards);
         }, flipDuration);
       }
 
-      return {
-        ...prev,
-        cards: newCards,
-        selectedCards: newSelectedCards
-      };
+      return newState;
     });
   }, [checkForMatch, flipDuration]);
 

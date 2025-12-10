@@ -180,6 +180,8 @@ export function checkMatch(state: GameState): MatchResult | null {
 
 /**
  * Apply match result to state (marks cards as matched, updates score)
+ * Note: This is the direct version that skips animation. For animated matches,
+ * use startMatchAnimation() followed by completeMatchAnimation().
  */
 export function applyMatch(state: GameState, matchResult: MatchResult): GameState {
   if (!matchResult.isMatch) {
@@ -207,6 +209,111 @@ export function applyMatch(state: GameState, matchResult: MatchResult): GameStat
     ...state,
     cards: newCards,
     players: newPlayers,
+    selectedCards: [],
+  };
+}
+
+// ============================================
+// Animation-Aware Match Functions
+// ============================================
+
+/**
+ * Start match animation (Phase 1 of 2-phase match)
+ * Sets cards to "flying" state and updates score immediately.
+ * Call completeMatchAnimation() after the animation completes.
+ */
+export function startMatchAnimation(
+  state: GameState,
+  cardIds: [string, string],
+  playerId: number
+): GameState {
+  const [firstId, secondId] = cardIds;
+
+  // Mark cards as flying to player
+  const newCards = state.cards.map(c =>
+    c.id === firstId || c.id === secondId
+      ? { ...c, isFlipped: true, isFlyingToPlayer: true, flyingToPlayerId: playerId }
+      : c
+  );
+
+  // Increment player's score immediately
+  const newPlayers = sortPlayersByID(
+    state.players.map(p =>
+      p.id === playerId ? { ...p, score: p.score + 1 } : p
+    )
+  );
+
+  return {
+    ...state,
+    cards: newCards,
+    players: newPlayers,
+    selectedCards: [],
+  };
+}
+
+/**
+ * Complete match animation (Phase 2 of 2-phase match)
+ * Called after flying animation completes to mark cards as matched.
+ */
+export function completeMatchAnimation(
+  state: GameState,
+  cardIds: [string, string],
+  playerId: number
+): GameState {
+  const [firstId, secondId] = cardIds;
+
+  // Mark cards as matched and clear flying state
+  const newCards = state.cards.map(c =>
+    c.id === firstId || c.id === secondId
+      ? (() => {
+          const { flyingToPlayerId: _omit, ...rest } = c;
+          return {
+            ...rest,
+            isMatched: true,
+            isFlyingToPlayer: false,
+            matchedByPlayerId: playerId,
+          };
+        })()
+      : c
+  );
+
+  return {
+    ...state,
+    cards: newCards,
+  };
+}
+
+/**
+ * Apply no-match result with card reset (flips cards back, switches player)
+ * This is the animated version that properly resets card states.
+ */
+export function applyNoMatchWithReset(
+  state: GameState,
+  cardIds: [string, string]
+): GameState {
+  const [firstId, secondId] = cardIds;
+
+  // Flip cards back and clear any animation state
+  const newCards = state.cards.map(c =>
+    c.id === firstId || c.id === secondId
+      ? (() => {
+          const { flyingToPlayerId: _omit, ...rest } = c;
+          return {
+            ...rest,
+            isFlipped: false,
+            isFlyingToPlayer: false,
+          };
+        })()
+      : c
+  );
+
+  // Switch to next player
+  const nextPlayer = getNextPlayer(state.currentPlayer);
+
+  return {
+    ...state,
+    cards: newCards,
+    currentPlayer: nextPlayer,
     selectedCards: [],
   };
 }
