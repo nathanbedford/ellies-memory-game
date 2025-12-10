@@ -154,7 +154,8 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			const lastUpdatedBy = onlineState.lastUpdatedBy;
 
 			// Check if this is a new game round (reset detected)
-			const isNewRound = remoteGameRound !== lastGameRoundRef.current;
+			// Use > instead of !== to reject stale updates from older rounds
+			const isNewRound = remoteGameRound > lastGameRoundRef.current;
 
 			// Skip if this update came from us (unless it's a new round)
 			if (lastUpdatedBy === localPlayerSlot && !isNewRound) {

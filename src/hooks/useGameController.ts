@@ -181,6 +181,7 @@ export function useGameController(
 					...state,
 					syncVersion: newVersion,
 					lastUpdatedBy: localPlayerSlot,
+					gameRound: (state as OnlineGameState).gameRound || 0,
 				};
 
 				await syncAdapter.setState(onlineState);

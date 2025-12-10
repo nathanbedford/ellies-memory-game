@@ -4,7 +4,6 @@ import { useTextToSpeech } from "./useTextToSpeech";
 import {
 	sortPlayersByID,
 	getPlayerById,
-	getPlayerScore,
 	canFlipCard,
 	flipCard as engineFlipCard,
 	checkMatch,

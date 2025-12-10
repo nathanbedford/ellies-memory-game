@@ -81,7 +81,7 @@ export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExplore
             </div>
           ) : (
             <p className="text-xl text-gray-600 mb-6">
-              {winner?.name} wins with {getPlayerScore(cards, winner.id)} pairs!
+              {winner?.name} wins with {winner ? getPlayerScore(cards, winner.id) : 0} pairs!
             </p>
           )}
           <div className="flex flex-col gap-3">
