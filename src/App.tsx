@@ -6,9 +6,9 @@ import { useCardBackSelector, CardBackType, CARD_BACK_OPTIONS } from './hooks/us
 import { useOnlineGame } from './hooks/useOnlineGame';
 import { useOnlineStore } from './stores/onlineStore';
 import { useCursorSync } from './hooks/useCursorSync';
-import { CardPack, GameMode } from './types';
+import { CardPack, GameMode, OnlineGameState } from './types';
 import { CARD_DECKS } from './data/cardDecks';
-import { initializeCards, createInitialState, startGameWithCards } from './services/game/GameEngine';
+import { initializeCards, createInitialState, startGameWithCards, getPlayerScore } from './services/game/GameEngine';
 import { getFirestoreSyncAdapter } from './services/sync/FirestoreSyncAdapter';
 import { GameBoard } from './components/GameBoard';
 import { GameOver } from './components/GameOver';
@@ -152,7 +152,18 @@ function App() {
         );
         const nextState = startGameWithCards(initialState, cards);
 
-        await adapter.setState(nextState);
+        // Increment gameRound for new game - read current round or default to 0
+        const currentGameRound = (room.gameState as OnlineGameState)?.gameRound || 0;
+        const newGameRound = currentGameRound + 1;
+
+        // Create online state with incremented gameRound
+        const onlineState: OnlineGameState = {
+          ...nextState,
+          syncVersion: 1, // Reset sync version for new game
+          gameRound: newGameRound,
+        };
+
+        await adapter.setState(onlineState);
 
         const configUpdates: { cardPack?: CardPack; background?: string; cardBack?: string } = {};
         if (room.config?.cardPack !== options.pack) configUpdates.cardPack = options.pack;
@@ -217,6 +228,7 @@ function App() {
   const flipCard = isOnlineMode ? onlineGame.flipCard : localGame.flipCard;
   const endTurn = isOnlineMode ? onlineGame.endTurn : localGame.endTurn;
   const toggleAllCardsAdmin = isOnlineMode ? onlineGame.toggleAllCardsFlipped : localGame.toggleAllCardsFlipped;
+  const endGameEarly = isOnlineMode ? onlineGame.endGameEarly : localGame.endGameEarly;
 
   // Settings and other functions always come from localGame
   const {
@@ -225,7 +237,7 @@ function App() {
     updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize,
     toggleWhiteCardBackground, toggleAutoSize, increaseFlipDuration, decreaseFlipDuration,
     increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, resetGame, isAnimatingCards,
-    endGameEarly, updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
+    updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
   } = localGame;
 
   // Cursor sync for online mode - only active during gameplay
@@ -1281,7 +1293,7 @@ function App() {
                           style={gameState.currentPlayer === 1 ? { color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' } : {}}
                           title="Click to view matches"
                         >
-                          {gameState.players.find(p => p.id === 1)?.score || 0}
+                          {getPlayerScore(gameState.cards, 1)}
                         </button>
                       </div>
                       {gameState.currentPlayer === 1 && (
@@ -1359,7 +1371,7 @@ function App() {
                           style={gameState.currentPlayer === 2 ? { color: gameState.players.find(p => p.id === 2)?.color || '#10b981' } : {}}
                           title="Click to view matches"
                         >
-                          {gameState.players.find(p => p.id === 2)?.score || 0}
+                          {getPlayerScore(gameState.cards, 2)}
                         </button>
                       </div>
                       {gameState.currentPlayer === 2 && (
@@ -1408,10 +1420,11 @@ function App() {
           />
         )}
 
-        {gameState.gameStatus === 'finished' && (gameState.winner || gameState.isTie) && (
+        {gameState.gameStatus === 'finished' && (gameState.winner !== null || gameState.isTie === true) && (
           <GameOver
             winner={gameState.winner}
             players={gameState.players}
+            cards={gameState.cards}
             isTie={gameState.isTie}
             onPlayAgain={handleResetClick}
             onExploreCards={() => setShowCardExplorer(true)}

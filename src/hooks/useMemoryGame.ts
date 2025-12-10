@@ -1,919 +1,1135 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Card, Player, GameState } from '../types';
-import { useTextToSpeech } from './useTextToSpeech';
+import { useState, useCallback, useRef, useEffect } from "react";
+import type { Card, Player, GameState } from "../types";
+import { useTextToSpeech } from "./useTextToSpeech";
 import {
-  sortPlayersByID,
-  getPlayerById,
-  canFlipCard,
-  flipCard as engineFlipCard,
-  checkMatch,
-  startMatchAnimation,
-  completeMatchAnimation,
-  applyNoMatchWithReset,
-  checkAndFinishGame,
-  endTurn as engineEndTurn,
-  updatePlayerName as engineUpdatePlayerName,
-  updatePlayerColor as engineUpdatePlayerColor,
-} from '../services/game/GameEngine';
+	sortPlayersByID,
+	getPlayerById,
+	getPlayerScore,
+	canFlipCard,
+	flipCard as engineFlipCard,
+	checkMatch,
+	startMatchAnimation,
+	completeMatchAnimation,
+	applyNoMatchWithReset,
+	checkAndFinishGame,
+	endTurn as engineEndTurn,
+	updatePlayerName as engineUpdatePlayerName,
+	updatePlayerColor as engineUpdatePlayerColor,
+} from "../services/game/GameEngine";
 
 export const useMemoryGame = () => {
-  const [gameState, setGameState] = useState<GameState>(() => {
-    // Try to load saved game state from sessionStorage
-    const savedGameState = sessionStorage.getItem('gameState');
-    if (savedGameState) {
-      try {
-        const parsed = JSON.parse(savedGameState);
-        // Validate that we have a valid game state with cards
-        if (parsed && parsed.cards && Array.isArray(parsed.cards) && parsed.cards.length > 0) {
-          // Clean up transient states that shouldn't persist (like animation states)
-          const cleanedCards = parsed.cards.map((card: Card) => ({
-            ...card,
-            isFlyingToPlayer: false, // Don't persist animation state
-            // Keep isFlipped and isMatched as they represent actual game state
-          }));
-          
-          const players = parsed.players && Array.isArray(parsed.players) && parsed.players.length >= 2
-            ? sortPlayersByID(parsed.players)
-            : [
-                { id: 1, name: 'Player 1', score: 0, color: '#3b82f6' },
-                { id: 2, name: 'Player 2', score: 0, color: '#10b981' }
-              ];
-          
-          return {
-            cards: cleanedCards,
-            players,
-            currentPlayer: parsed.currentPlayer || 1,
-            selectedCards: [], // Reset selected cards on reload
-            gameStatus: parsed.gameStatus || 'setup',
-            winner: parsed.winner || null,
-            isTie: parsed.isTie || false
-          };
-        }
-      } catch (e) {
-        console.warn('Failed to load saved game state:', e);
-      }
-    }
-    
-    // Load player names from localStorage (fallback)
-    const savedPlayer1Name = localStorage.getItem('player1Name') || 'Player 1';
-    const savedPlayer2Name = localStorage.getItem('player2Name') || 'Player 2';
-    const savedPlayer1Color = localStorage.getItem('player1Color') || '#3b82f6'; // Default blue
-    const savedPlayer2Color = localStorage.getItem('player2Color') || '#10b981'; // Default green
-    const savedFirstPlayer = parseInt(localStorage.getItem('firstPlayer') || '1') as 1 | 2;
-
-    const initialPlayers: Player[] = [
-      { id: 1, name: savedPlayer1Name, score: 0, color: savedPlayer1Color },
-      { id: 2, name: savedPlayer2Name, score: 0, color: savedPlayer2Color }
-    ];
-
-    return {
-      cards: [],
-      players: initialPlayers,
-      currentPlayer: savedFirstPlayer,
-      selectedCards: [],
-      gameStatus: 'setup',
-      winner: null,
-      isTie: false
-    };
-  });
-
-  const [showStartModal, setShowStartModal] = useState(false);
-  const [cardSize, setCardSize] = useState(() => {
-    // Load card size from localStorage
-    const savedCardSize = localStorage.getItem('cardSize');
-    return savedCardSize ? parseInt(savedCardSize, 10) : 100;
-  });
-  const [autoSizeEnabled, setAutoSizeEnabled] = useState(() => {
-    // Load auto-size preference from localStorage, default to true
-    const saved = localStorage.getItem('autoSizeEnabled');
-    return saved === null ? true : saved === 'true';
-  });
-  const [layoutMetrics, setLayoutMetrics] = useState({
-    boardWidth: 0,
-    boardAvailableHeight: 0,
-    scoreboardHeight: 0
-  });
-  const [useWhiteCardBackground, setUseWhiteCardBackground] = useState(() => {
-    // Load white card background preference from localStorage
-    const saved = localStorage.getItem('useWhiteCardBackground');
-    return saved === 'true'; // Default to false (use colorized backgrounds)
-  });
-  const [isAnimatingCards, setIsAnimatingCards] = useState(false);
-  const isInitialLoadRef = useRef(true);
-  const matchCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isCheckingMatchRef = useRef(false);
-  const [flipDuration, setFlipDuration] = useState(() => {
-    // Load flip duration from localStorage, default to 2000ms (2 seconds)
-    const saved = localStorage.getItem('flipDuration');
-    return saved ? parseInt(saved, 10) : 2000;
-  });
-  const [emojiSizePercentage, setEmojiSizePercentage] = useState(() => {
-    // Load emoji size percentage from localStorage, default to 72 (matches current default: 0.4 * 1.8 = 0.72)
-    const saved = localStorage.getItem('emojiSizePercentage');
-    return saved ? parseInt(saved, 10) : 72;
-  });
-
-  const [ttsEnabled, setTtsEnabled] = useState(() => {
-    // Load TTS enabled preference from localStorage, default to true
-    const saved = localStorage.getItem('ttsEnabled');
-    return saved === null ? true : saved === 'true';
-  });
-
-  const [allCardsFlipped, setAllCardsFlipped] = useState(false);
-
-  // Initialize text-to-speech
-  const { speakPlayerTurn, speakMatchFound, isAvailable, cancel: cancelTTS } = useTextToSpeech();
-  const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const updateAutoSizeMetrics = useCallback((metrics: { boardWidth: number; boardAvailableHeight: number; scoreboardHeight: number }) => {
-    setLayoutMetrics(prev => {
-      const roundedPrev = {
-        boardWidth: Math.round(prev.boardWidth),
-        boardAvailableHeight: Math.round(prev.boardAvailableHeight),
-        scoreboardHeight: Math.round(prev.scoreboardHeight)
-      };
-      const roundedNext = {
-        boardWidth: Math.round(metrics.boardWidth),
-        boardAvailableHeight: Math.round(metrics.boardAvailableHeight),
-        scoreboardHeight: Math.round(metrics.scoreboardHeight)
-      };
-
-      if (
-        roundedPrev.boardWidth === roundedNext.boardWidth &&
-        roundedPrev.boardAvailableHeight === roundedNext.boardAvailableHeight &&
-        roundedPrev.scoreboardHeight === roundedNext.scoreboardHeight
-      ) {
-        return prev;
-      }
-
-      return metrics;
-    });
-  }, []);
-
-  const calculateOptimalCardSize = useCallback((cardCount: number, metricsOverride?: { boardWidth: number; boardAvailableHeight: number; scoreboardHeight: number }) => {
-    if (!autoSizeEnabled || cardCount === 0) {
-      return Math.min(Math.max(cardSize, 60), 300);
-    }
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    const horizontalPadding = 80;
-    const gapSize = 8;
-    const totalHorizontalGaps = 7 * gapSize;
-
-    // Use provided metrics override, or fall back to state layoutMetrics
-    const metrics = metricsOverride || layoutMetrics;
-
-    // Use measured width if available, otherwise calculate from viewport
-    const measuredBoardWidth = metrics.boardWidth > 0 ? metrics.boardWidth : 0;
-    const effectiveBoardWidth = Math.max(measuredBoardWidth || viewportWidth - horizontalPadding, 0);
-
-    const actualRows = Math.max(Math.ceil(cardCount / 8), 1);
-    const widthForCards = Math.max(effectiveBoardWidth - totalHorizontalGaps, actualRows);
-    const maxWidthBasedSize = Math.floor(widthForCards / 8);
-
-    const totalVerticalGaps = (actualRows - 1) * gapSize;
-    const safetyMargin = 10;
-
-    // Use measured metrics if available, otherwise use viewport-based fallback
-    // Scoreboard is typically ~90px + padding + gap, so reserve ~150px to be safe
-    const scoreboardReserve = metrics.scoreboardHeight > 0
-      ? metrics.scoreboardHeight + 50
-      : 150;
-    
-    // Calculate available height: use measured if available, otherwise viewport minus reserve
-    // When measured metrics aren't available, be more conservative with the reserve
-    const measuredAvailableHeight = metrics.boardAvailableHeight > 0
-      ? metrics.boardAvailableHeight
-      : Math.max(viewportHeight - scoreboardReserve - 20, actualRows); // Extra 20px buffer when using fallback
-    
-    const effectiveAvailableHeight = Math.max(measuredAvailableHeight - safetyMargin, actualRows);
-    const heightForCards = Math.max(effectiveAvailableHeight - totalVerticalGaps, actualRows);
-    const maxHeightBasedSize = Math.floor(heightForCards / actualRows);
-
-    const optimalSize = Math.min(
-      300,
-      Math.max(60, Math.min(maxWidthBasedSize, maxHeightBasedSize))
-    );
-
-    console.log('[AUTO-SIZE] Calculated optimal size', {
-      cardCount,
-      actualRows,
-      viewportWidth,
-      viewportHeight,
-      availableWidth: effectiveBoardWidth,
-      availableHeight: effectiveAvailableHeight,
-      totalVerticalGaps,
-      maxWidthBasedSize,
-      maxHeightBasedSize,
-      optimalSize,
-      verticalReserved: scoreboardReserve,
-      usingMeasuredMetrics: metrics.boardWidth > 0 || metrics.boardAvailableHeight > 0,
-      metricsOverrideProvided: !!metricsOverride
-    });
-
-    return optimalSize;
-  }, [autoSizeEnabled, cardSize, layoutMetrics]);
-
-  // Exported function for calculating card size based on card count
-  // Can be called externally (e.g., when pack is selected) before cards are created
-  // Optional metricsOverride allows passing measured metrics directly to bypass state timing issues
-  const calculateOptimalCardSizeForCount = useCallback((cardCount: number, metricsOverride?: { boardWidth: number; boardAvailableHeight: number; scoreboardHeight: number }) => {
-    if (!autoSizeEnabled || cardCount === 0) {
-      return;
-    }
-
-    const optimalSize = calculateOptimalCardSize(cardCount, metricsOverride);
-    if (optimalSize !== cardSize) {
-      setCardSize(optimalSize);
-      localStorage.setItem('cardSize', optimalSize.toString());
-    }
-  }, [autoSizeEnabled, calculateOptimalCardSize, cardSize]);
-
-  useEffect(() => {
-    if (!autoSizeEnabled || gameState.cards.length === 0) return;
-
-    const optimalSize = calculateOptimalCardSize(gameState.cards.length);
-    if (optimalSize !== cardSize) {
-      setCardSize(optimalSize);
-      localStorage.setItem('cardSize', optimalSize.toString());
-    }
-  }, [autoSizeEnabled, calculateOptimalCardSize, cardSize, gameState.cards.length]);
-
-  // Save game state to sessionStorage whenever it changes
-  useEffect(() => {
-    // Only save if we have cards (game is in progress or finished)
-    if (gameState.cards.length > 0) {
-      // Create a clean state without transient animation properties
-      const stateToSave = {
-        ...gameState,
-        cards: gameState.cards.map(card => ({
-          id: card.id,
-          imageId: card.imageId,
-          imageUrl: card.imageUrl,
-          gradient: card.gradient,
-          isFlipped: card.isFlipped,
-          isMatched: card.isMatched,
-          matchedByPlayerId: card.matchedByPlayerId
-          // Exclude isFlyingToPlayer and flyingToPlayerId as they're transient
-        })),
-        players: sortPlayersByID(gameState.players) // Ensure players are sorted before saving
-      };
-      sessionStorage.setItem('gameState', JSON.stringify(stateToSave));
-    } else {
-      // Clear saved state if no cards (game reset or not started)
-      sessionStorage.removeItem('gameState');
-    }
-  }, [gameState]);
-
-  const initializeGame = useCallback((images: { id: string; url: string; gradient?: string }[], startPlaying: boolean = false) => {
-    // Cancel any pending match check
-    if (matchCheckTimeoutRef.current) {
-      clearTimeout(matchCheckTimeoutRef.current);
-      matchCheckTimeoutRef.current = null;
-    }
-    isCheckingMatchRef.current = false;
-    
-    const cards: Card[] = [];
-    
-    // Note: Card size is calculated in handleStartGame before initializeGame is called
-    // with measured metrics passed directly to avoid state timing issues
-
-    // Create pairs of cards
-    images.forEach((image, index) => {
-      cards.push({
-        id: `card-${index * 2}`,
-        imageId: image.id,
-        imageUrl: image.url,
-        gradient: image.gradient,
-        isFlipped: false,
-        isMatched: false
-      });
-      cards.push({
-        id: `card-${index * 2 + 1}`,
-        imageId: image.id,
-        imageUrl: image.url,
-        gradient: image.gradient,
-        isFlipped: false,
-        isMatched: false
-      });
-    });
-
-    // Shuffle cards
-    const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
-
-    if (startPlaying) {
-      // Start animation sequence
-      setIsAnimatingCards(true);
-      setGameState(prev => ({
-        ...prev,
-        cards: shuffledCards,
-        selectedCards: [],
-        gameStatus: 'playing',
-        winner: null,
-        isTie: false
-      }));
-      
-      // After animation completes, mark animation as done
-      // 900ms per card animation + 30ms delay between cards
-      const totalAnimationTime = shuffledCards.length * 30 + 900;
-      setTimeout(() => {
-        setIsAnimatingCards(false);
-      }, totalAnimationTime);
-    } else {
-      setGameState(prev => ({
-        ...prev,
-        cards: shuffledCards,
-        selectedCards: [],
-        gameStatus: 'setup',
-        winner: null,
-        isTie: false
-      }));
-    }
-  }, []);
-
-  const startGame = useCallback((player1Name: string, player2Name: string, firstPlayer: number) => {
-    const savedPlayer1Color = localStorage.getItem('player1Color') || '#3b82f6';
-    const savedPlayer2Color = localStorage.getItem('player2Color') || '#10b981';
-    const players = sortPlayersByID([
-      { id: 1, name: player1Name, score: 0, color: savedPlayer1Color },
-      { id: 2, name: player2Name, score: 0, color: savedPlayer2Color }
-    ]);
-    setGameState({
-      cards: [],
-      players,
-      currentPlayer: firstPlayer,
-      selectedCards: [],
-      gameStatus: 'setup',
-      winner: null,
-      isTie: false
-    });
-    // Don't show modal yet - wait for cards to be initialized
-  }, []);
-
-  const startGameWithFirstPlayer = useCallback((firstPlayer: number) => {
-    setGameState(prev => {
-      const firstPlayerName = prev.players.find(p => p.id === firstPlayer)?.name || `Player ${firstPlayer}`;
-      
-      // Announce first player's turn after a short delay
-      if (ttsEnabled && isAvailable()) {
-        setTimeout(() => {
-          speakPlayerTurn(firstPlayerName);
-        }, 400);
-      }
-      
-      return {
-        ...prev,
-        currentPlayer: firstPlayer,
-        gameStatus: 'playing' as const
-      };
-    });
-    setShowStartModal(false);
-    localStorage.setItem('firstPlayer', firstPlayer.toString());
-    isInitialLoadRef.current = false;
-  }, [speakPlayerTurn, isAvailable, ttsEnabled]);
-
-  const showStartGameModal = useCallback(() => {
-    console.log('showStartGameModal called'); // Debug log
-    setShowStartModal(true);
-  }, []);
-
-  const increaseCardSize = useCallback(() => {
-    setCardSize(prev => {
-      const newSize = Math.min(prev + 10, 300); // Max 300px
-      localStorage.setItem('cardSize', newSize.toString());
-      return newSize;
-    });
-  }, []);
-
-  const decreaseCardSize = useCallback(() => {
-    setCardSize(prev => {
-      const newSize = Math.max(prev - 10, 60); // Min 60px
-      localStorage.setItem('cardSize', newSize.toString());
-      return newSize;
-    });
-  }, []);
-
-  const toggleWhiteCardBackground = useCallback(() => {
-    setUseWhiteCardBackground(prev => {
-      const newValue = !prev;
-      localStorage.setItem('useWhiteCardBackground', newValue.toString());
-      return newValue;
-    });
-  }, []);
-
-  const toggleAutoSize = useCallback(() => {
-    setAutoSizeEnabled(prev => {
-      const newValue = !prev;
-      localStorage.setItem('autoSizeEnabled', newValue.toString());
-      return newValue;
-    });
-  }, []);
-
-  const updatePlayerName = useCallback((playerId: 1 | 2, newName: string) => {
-    const trimmedName = newName.trim();
-    // Save to localStorage
-    localStorage.setItem(`player${playerId}Name`, trimmedName);
-
-    // Use GameEngine to update player name
-    setGameState(prev => engineUpdatePlayerName(prev, playerId, trimmedName));
-  }, []);
-
-  const updatePlayerColor = useCallback((playerId: 1 | 2, newColor: string) => {
-    // Save to localStorage
-    localStorage.setItem(`player${playerId}Color`, newColor);
-
-    // Use GameEngine to update player color
-    setGameState(prev => engineUpdatePlayerColor(prev, playerId, newColor));
-  }, []);
-
-  const resetGame = useCallback(() => {
-    // Cancel any pending match check
-    if (matchCheckTimeoutRef.current) {
-      clearTimeout(matchCheckTimeoutRef.current);
-      matchCheckTimeoutRef.current = null;
-    }
-    // Cancel any pending TTS
-    if (ttsDelayTimeoutRef.current) {
-      clearTimeout(ttsDelayTimeoutRef.current);
-      ttsDelayTimeoutRef.current = null;
-    }
-    cancelTTS();
-    isCheckingMatchRef.current = false;
-    setAllCardsFlipped(false);
-    
-    // Clear saved game state from sessionStorage
-    sessionStorage.removeItem('gameState');
-    
-    // Reset clears cards and goes back to setup mode
-    // The actual reset flow will be handled by App.tsx
-    setGameState(prev => {
-      const player1 = getPlayerById(prev.players, 1);
-      const player2 = getPlayerById(prev.players, 2);
-      const players = sortPlayersByID([
-        { id: 1, name: player1?.name || 'Player 1', score: 0, color: player1?.color || '#3b82f6' },
-        { id: 2, name: player2?.name || 'Player 2', score: 0, color: player2?.color || '#10b981' }
-      ]);
-      return {
-        ...prev,
-        cards: [],
-        players,
-        selectedCards: [],
-        gameStatus: 'setup',
-        winner: null,
-        isTie: false
-      };
-    });
-  }, [cancelTTS]);
-
-  const checkForMatch = useCallback((selectedIds: string[]) => {
-    // Prevent duplicate match checks
-    if (isCheckingMatchRef.current) {
-      console.log('[MATCH CHECK] Match check already in progress, ignoring duplicate call', JSON.stringify({ selectedIds }));
-      return;
-    }
-
-    isCheckingMatchRef.current = true;
-    matchCheckTimeoutRef.current = null;
-
-    console.log('[MATCH CHECK] Starting match check', JSON.stringify({ selectedIds, timestamp: new Date().toISOString() }));
-
-    setGameState(prev => {
-      const [firstId, secondId] = selectedIds;
-
-      // Verify the cards are still selected (prevent race conditions)
-      if (prev.selectedCards.length !== 2 ||
-          !prev.selectedCards.includes(firstId) ||
-          !prev.selectedCards.includes(secondId)) {
-        console.log('[MATCH CHECK] Cards no longer selected, ignoring', JSON.stringify({
-          selectedIds,
-          currentSelectedCards: prev.selectedCards
-        }));
-        isCheckingMatchRef.current = false;
-        return prev;
-      }
-
-      // Use GameEngine to check for match
-      const matchResult = checkMatch(prev);
-
-      if (!matchResult) {
-        console.warn('[MATCH CHECK] Cards not found!');
-        isCheckingMatchRef.current = false;
-        return prev;
-      }
-
-      const { isMatch, firstCard, secondCard } = matchResult;
-      const cardIds: [string, string] = [firstCard.id, secondCard.id];
-
-      console.log('[MATCH CHECK] Match result', JSON.stringify({ isMatch, imageId1: firstCard.imageId, imageId2: secondCard.imageId }));
-
-      if (isMatch) {
-        const currentPlayerId = prev.currentPlayer;
-        const matchedPlayerName = getPlayerById(prev.players, currentPlayerId)?.name || `Player ${currentPlayerId}`;
-
-        console.log('[MATCH CHECK] ✓ MATCH FOUND! Marking cards as flying to player', JSON.stringify({
-          cardIds,
-          playerId: currentPlayerId,
-          playerName: matchedPlayerName
-        }));
-
-        // Use GameEngine for Phase 1: flying animation
-        const flyingState = startMatchAnimation(prev, cardIds, currentPlayerId);
-
-        // Announce match found immediately (don't wait for animation)
-        if (ttsEnabled && isAvailable()) {
-          if (ttsDelayTimeoutRef.current) {
-            clearTimeout(ttsDelayTimeoutRef.current);
-          }
-          ttsDelayTimeoutRef.current = setTimeout(() => {
-            speakMatchFound(matchedPlayerName);
-            ttsDelayTimeoutRef.current = null;
-          }, 400);
-        }
-
-        // After animation completes, mark as matched using GameEngine
-        setTimeout(() => {
-          console.log('[MATCH CHECK] Animation timeout fired, marking cards as matched', JSON.stringify({
-            cardIds,
-            matchedByPlayerId: currentPlayerId,
-            timestamp: new Date().toISOString()
-          }));
-
-          setGameState(prevState => {
-            // Use GameEngine for Phase 2: complete match
-            const matchedState = completeMatchAnimation(prevState, cardIds, currentPlayerId);
-
-            // Use GameEngine to check if game is finished
-            const finalState = checkAndFinishGame(matchedState);
-
-            console.log('[MATCH CHECK] Cards marked as matched', JSON.stringify({
-              matchedCount: finalState.cards.filter(c => c.isMatched).length,
-              gameStatus: finalState.gameStatus
-            }));
-
-            return finalState;
-          });
-        }, 3000); // Match animation duration (matches CSS animation length)
-
-        // Reset checking flag
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            isCheckingMatchRef.current = false;
-          });
-        });
-
-        return flyingState;
-      } else {
-        // Use GameEngine for no match: flip back and switch player
-        console.log('[MATCH CHECK] ✗ NO MATCH - Flipping cards back', JSON.stringify({
-          cardIds,
-          currentPlayer: prev.currentPlayer
-        }));
-
-        const noMatchState = applyNoMatchWithReset(prev, cardIds);
-        const nextPlayer = noMatchState.currentPlayer;
-
-        console.log('[MATCH CHECK] State update complete', JSON.stringify({
-          cardsCount: noMatchState.cards.length,
-          currentPlayer: nextPlayer
-        }));
-
-        // Announce next player's turn
-        if (ttsEnabled && isAvailable()) {
-          if (ttsDelayTimeoutRef.current) {
-            clearTimeout(ttsDelayTimeoutRef.current);
-          }
-          ttsDelayTimeoutRef.current = setTimeout(() => {
-            const nextPlayerName = getPlayerById(noMatchState.players, nextPlayer)?.name || `Player ${nextPlayer}`;
-            speakPlayerTurn(nextPlayerName);
-            ttsDelayTimeoutRef.current = null;
-          }, 400);
-        }
-
-        // Reset the checking flag
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            isCheckingMatchRef.current = false;
-          });
-        });
-
-        return noMatchState;
-      }
-    });
-  }, [speakPlayerTurn, speakMatchFound, isAvailable, ttsEnabled]);
-
-  const endTurn = useCallback(() => {
-    // Cancel any pending match check
-    if (matchCheckTimeoutRef.current) {
-      clearTimeout(matchCheckTimeoutRef.current);
-      matchCheckTimeoutRef.current = null;
-    }
-    // Cancel any pending TTS
-    if (ttsDelayTimeoutRef.current) {
-      clearTimeout(ttsDelayTimeoutRef.current);
-      ttsDelayTimeoutRef.current = null;
-    }
-    cancelTTS();
-    isCheckingMatchRef.current = false;
-
-    setGameState(prev => {
-      // Use GameEngine to end the turn
-      const newState = engineEndTurn(prev);
-
-      console.log('[END TURN] Manually ending turn', JSON.stringify({
-        previousPlayer: prev.currentPlayer,
-        nextPlayer: newState.currentPlayer,
-        flippedCardsCount: prev.cards.filter(c => c.isFlipped && !c.isMatched).length,
-        timestamp: new Date().toISOString()
-      }));
-
-      return newState;
-    });
-  }, [cancelTTS]);
-
-  const increaseFlipDuration = useCallback(() => {
-    setFlipDuration(prev => {
-      const newDuration = Math.min(prev + 500, 10000); // Max 10 seconds
-      localStorage.setItem('flipDuration', newDuration.toString());
-      return newDuration;
-    });
-  }, []);
-
-  const decreaseFlipDuration = useCallback(() => {
-    setFlipDuration(prev => {
-      const newDuration = Math.max(prev - 500, 500); // Min 0.5 seconds
-      localStorage.setItem('flipDuration', newDuration.toString());
-      return newDuration;
-    });
-  }, []);
-
-  const increaseEmojiSize = useCallback(() => {
-    setEmojiSizePercentage(prev => {
-      const newPercentage = Math.min(prev + 5, 150); // Max 150%
-      localStorage.setItem('emojiSizePercentage', newPercentage.toString());
-      return newPercentage;
-    });
-  }, []);
-
-  const decreaseEmojiSize = useCallback(() => {
-    setEmojiSizePercentage(prev => {
-      const newPercentage = Math.max(prev - 5, 20); // Min 20%
-      localStorage.setItem('emojiSizePercentage', newPercentage.toString());
-      return newPercentage;
-    });
-  }, []);
-
-  const toggleTtsEnabled = useCallback(() => {
-    setTtsEnabled(prev => {
-      const newValue = !prev;
-      localStorage.setItem('ttsEnabled', newValue.toString());
-      // Cancel any ongoing TTS when disabling
-      if (!newValue) {
-        cancelTTS();
-        if (ttsDelayTimeoutRef.current) {
-          clearTimeout(ttsDelayTimeoutRef.current);
-          ttsDelayTimeoutRef.current = null;
-        }
-      }
-      return newValue;
-    });
-  }, [cancelTTS]);
-
-  const flipCard = useCallback((cardId: string) => {
-    // Prevent card flips during match checks to avoid race conditions
-    if (isCheckingMatchRef.current) {
-      console.log('[FLIP CARD] Match check in progress, ignoring card click', JSON.stringify({
-        cardId,
-        timestamp: new Date().toISOString()
-      }));
-      return;
-    }
-
-    setGameState(prev => {
-      console.log('[FLIP CARD] Card clicked', JSON.stringify({
-        cardId,
-        gameStatus: prev.gameStatus,
-        selectedCardsCount: prev.selectedCards.length,
-        selectedCards: prev.selectedCards,
-        timestamp: new Date().toISOString()
-      }));
-
-      // Use GameEngine to validate if card can be flipped
-      if (!canFlipCard(prev, cardId)) {
-        console.log('[FLIP CARD] Card cannot be flipped (validated by GameEngine)');
-        return prev;
-      }
-
-      // Use GameEngine to flip the card
-      const newState = engineFlipCard(prev, cardId);
-
-      console.log('[FLIP CARD] Card flipped, new selected cards', JSON.stringify({
-        newSelectedCards: newState.selectedCards,
-        willCheckMatch: newState.selectedCards.length === 2
-      }));
-
-      // Check for match when two cards are selected
-      if (newState.selectedCards.length === 2) {
-        // Cancel any existing match check timeout
-        if (matchCheckTimeoutRef.current) {
-          console.log('[FLIP CARD] Cancelling existing match check timeout');
-          clearTimeout(matchCheckTimeoutRef.current);
-          matchCheckTimeoutRef.current = null;
-        }
-
-        console.log('[FLIP CARD] Scheduling match check', JSON.stringify({
-          selectedCards: newState.selectedCards,
-          duration: flipDuration
-        }));
-        matchCheckTimeoutRef.current = setTimeout(() => {
-          console.log('[FLIP CARD] Match check timeout fired, calling checkForMatch');
-          matchCheckTimeoutRef.current = null;
-          checkForMatch(newState.selectedCards);
-        }, flipDuration);
-      }
-
-      return newState;
-    });
-  }, [checkForMatch, flipDuration]);
-
-  const endGameEarly = useCallback(() => {
-    setGameState(prev => {
-      if (prev.gameStatus !== 'playing' || prev.cards.length === 0) {
-        return prev;
-      }
-
-      // Find the player with the highest score
-      const winner = prev.players.reduce((prevPlayer, currentPlayer) =>
-        currentPlayer.score > prevPlayer.score ? currentPlayer : prevPlayer
-      );
-
-      // Check if it's a tie
-      const isTie = prev.players.every(player => player.score === winner.score);
-
-      return {
-        ...prev,
-        gameStatus: 'finished' as const,
-        winner: isTie ? null : winner,
-        isTie,
-        selectedCards: []
-      };
-    });
-  }, []);
-
-  const toggleAllCardsFlipped = useCallback(() => {
-    setGameState(prev => {
-      if (prev.cards.length === 0) return prev;
-
-      // Check if all unmatched cards are currently flipped
-      const unmatchedCards = prev.cards.filter(c => !c.isMatched && !c.isFlyingToPlayer);
-      const allFlipped = unmatchedCards.length > 0 && unmatchedCards.every(c => c.isFlipped);
-      const newFlippedState = !allFlipped;
-      
-      setAllCardsFlipped(newFlippedState);
-
-      const newCards = prev.cards.map(card => {
-        // Don't flip matched cards or cards that are currently flying
-        if (card.isMatched || card.isFlyingToPlayer) {
-          return card;
-        }
-        return { ...card, isFlipped: newFlippedState };
-      });
-
-      return {
-        ...prev,
-        cards: newCards,
-        selectedCards: [] // Clear selected cards when toggling
-      };
-    });
-  }, []);
-
-  // Test function: Advance game to end state - flip all cards except last pair, mark them as matched, and distribute evenly between players
-  const flipAllExceptLastPair = useCallback(() => {
-    setGameState(prev => {
-      if (prev.cards.length === 0) return prev;
-      
-      // Find the last pair (cards with the same imageId that appear last)
-      const lastPairImageId = prev.cards[prev.cards.length - 1]?.imageId;
-      if (!lastPairImageId) return prev;
-      
-      // Get all cards that should be matched (all except the last pair)
-      const cardsToMatch: Card[] = [];
-      
-      prev.cards.forEach(card => {
-        if (card.imageId !== lastPairImageId && !card.isMatched) {
-          cardsToMatch.push(card);
-        }
-      });
-      
-      // Group cards by imageId to get pairs
-      const cardPairs: { [imageId: string]: Card[] } = {};
-      cardsToMatch.forEach(card => {
-        if (!cardPairs[card.imageId]) {
-          cardPairs[card.imageId] = [];
-        }
-        cardPairs[card.imageId].push(card);
-      });
-      
-      // Get complete pairs only (should be exactly 2 cards each)
-      const pairs = Object.values(cardPairs).filter(pair => pair.length === 2);
-      
-      // Create a map of card ID to assigned player ID
-      const cardToPlayerMap = new Map<string, number>();
-      
-      // Distribute pairs evenly between players
-      pairs.forEach((pair, index) => {
-        const assignedPlayer = (index % 2 === 0) ? 1 : 2;
-        // Assign both cards in the pair to the same player
-        pair.forEach(card => {
-          cardToPlayerMap.set(card.id, assignedPlayer);
-        });
-      });
-      
-      // Update cards
-      const newCards = prev.cards.map(card => {
-        // Keep the last pair unflipped and unmatched
-        if (card.imageId === lastPairImageId) {
-          return { ...card, isFlipped: false, isMatched: false };
-        }
-        
-        // If already matched, keep as is
-        if (card.isMatched) {
-          return card;
-        }
-        
-        // Check if this card should be matched
-        const matchedByPlayerId = cardToPlayerMap.get(card.id);
-        if (matchedByPlayerId !== undefined) {
-          return {
-            ...card,
-            isFlipped: true,
-            isMatched: true,
-            matchedByPlayerId
-          };
-        }
-        
-        return card;
-      });
-      
-      // Calculate new scores (count pairs, not individual cards)
-      const player1Matches = pairs.filter((_, index) => index % 2 === 0).length;
-      const player2Matches = pairs.filter((_, index) => index % 2 === 1).length;
-      
-      const newPlayers = sortPlayersByID(prev.players.map(player => ({
-        ...player,
-        score: player.id === 1 ? player1Matches : player2Matches
-      })));
-      
-      return {
-        ...prev,
-        cards: newCards,
-        players: newPlayers,
-        selectedCards: []
-      };
-    });
-  }, []);
-
-  // Set full game state (for online multiplayer sync)
-  const setFullGameState = useCallback((newState: GameState) => {
-    setGameState(newState);
-  }, []);
-
-  return {
-    gameState,
-    setFullGameState,
-    showStartModal,
-    setShowStartModal,
-    cardSize,
-    autoSizeEnabled,
-    useWhiteCardBackground,
-    flipDuration,
-    emojiSizePercentage,
-    ttsEnabled,
-    initializeGame,
-    startGame,
-    startGameWithFirstPlayer,
-    showStartGameModal,
-    updatePlayerName,
-    updatePlayerColor,
-    increaseCardSize,
-    decreaseCardSize,
-    toggleWhiteCardBackground,
-    toggleAutoSize,
-    increaseFlipDuration,
-    decreaseFlipDuration,
-    increaseEmojiSize,
-    decreaseEmojiSize,
-    toggleTtsEnabled,
-    flipCard,
-    endTurn,
-    resetGame,
-    isAnimatingCards,
-    flipAllExceptLastPair,
-    endGameEarly,
-    toggleAllCardsFlipped,
-    allCardsFlipped,
-    updateAutoSizeMetrics,
-    calculateOptimalCardSizeForCount
-  };
+	const [gameState, setGameState] = useState<GameState>(() => {
+		// Try to load saved game state from sessionStorage
+		const savedGameState = sessionStorage.getItem("gameState");
+		if (savedGameState) {
+			try {
+				const parsed = JSON.parse(savedGameState);
+				// Validate that we have a valid game state with cards
+				if (
+					parsed &&
+					parsed.cards &&
+					Array.isArray(parsed.cards) &&
+					parsed.cards.length > 0
+				) {
+					// Clean up transient states that shouldn't persist (like animation states)
+					const cleanedCards = parsed.cards.map((card: Card) => ({
+						...card,
+						isFlyingToPlayer: false, // Don't persist animation state
+						// Keep isFlipped and isMatched as they represent actual game state
+					}));
+
+					const players =
+						parsed.players &&
+						Array.isArray(parsed.players) &&
+						parsed.players.length >= 2
+							? sortPlayersByID(parsed.players)
+							: [
+									{ id: 1, name: "Player 1", color: "#3b82f6" },
+									{ id: 2, name: "Player 2", color: "#10b981" },
+								];
+
+					return {
+						cards: cleanedCards,
+						players,
+						currentPlayer: parsed.currentPlayer || 1,
+						selectedCards: [], // Reset selected cards on reload
+						gameStatus: parsed.gameStatus || "setup",
+						winner: parsed.winner || null,
+						isTie: parsed.isTie || false,
+					};
+				}
+			} catch (e) {
+				console.warn("Failed to load saved game state:", e);
+			}
+		}
+
+		// Load player names from localStorage (fallback)
+		const savedPlayer1Name = localStorage.getItem("player1Name") || "Player 1";
+		const savedPlayer2Name = localStorage.getItem("player2Name") || "Player 2";
+		const savedPlayer1Color = localStorage.getItem("player1Color") || "#3b82f6"; // Default blue
+		const savedPlayer2Color = localStorage.getItem("player2Color") || "#10b981"; // Default green
+		const savedFirstPlayer = parseInt(
+			localStorage.getItem("firstPlayer") || "1",
+		) as 1 | 2;
+
+		const initialPlayers: Player[] = [
+			{ id: 1, name: savedPlayer1Name, color: savedPlayer1Color },
+			{ id: 2, name: savedPlayer2Name, color: savedPlayer2Color },
+		];
+
+		return {
+			cards: [],
+			players: initialPlayers,
+			currentPlayer: savedFirstPlayer,
+			selectedCards: [],
+			gameStatus: "setup",
+			winner: null,
+			isTie: false,
+		};
+	});
+
+	const [showStartModal, setShowStartModal] = useState(false);
+	const [cardSize, setCardSize] = useState(() => {
+		// Load card size from localStorage
+		const savedCardSize = localStorage.getItem("cardSize");
+		return savedCardSize ? parseInt(savedCardSize, 10) : 100;
+	});
+	const [autoSizeEnabled, setAutoSizeEnabled] = useState(() => {
+		// Load auto-size preference from localStorage, default to true
+		const saved = localStorage.getItem("autoSizeEnabled");
+		return saved === null ? true : saved === "true";
+	});
+	const [layoutMetrics, setLayoutMetrics] = useState({
+		boardWidth: 0,
+		boardAvailableHeight: 0,
+		scoreboardHeight: 0,
+	});
+	const [useWhiteCardBackground, setUseWhiteCardBackground] = useState(() => {
+		// Load white card background preference from localStorage
+		const saved = localStorage.getItem("useWhiteCardBackground");
+		return saved === "true"; // Default to false (use colorized backgrounds)
+	});
+	const [isAnimatingCards, setIsAnimatingCards] = useState(false);
+	const isInitialLoadRef = useRef(true);
+	const matchCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
+	const isCheckingMatchRef = useRef(false);
+	const [flipDuration, setFlipDuration] = useState(() => {
+		// Load flip duration from localStorage, default to 2000ms (2 seconds)
+		const saved = localStorage.getItem("flipDuration");
+		return saved ? parseInt(saved, 10) : 2000;
+	});
+	const [emojiSizePercentage, setEmojiSizePercentage] = useState(() => {
+		// Load emoji size percentage from localStorage, default to 72 (matches current default: 0.4 * 1.8 = 0.72)
+		const saved = localStorage.getItem("emojiSizePercentage");
+		return saved ? parseInt(saved, 10) : 72;
+	});
+
+	const [ttsEnabled, setTtsEnabled] = useState(() => {
+		// Load TTS enabled preference from localStorage, default to true
+		const saved = localStorage.getItem("ttsEnabled");
+		return saved === null ? true : saved === "true";
+	});
+
+	const [allCardsFlipped, setAllCardsFlipped] = useState(false);
+
+	// Initialize text-to-speech
+	const {
+		speakPlayerTurn,
+		speakMatchFound,
+		isAvailable,
+		cancel: cancelTTS,
+	} = useTextToSpeech();
+	const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const updateAutoSizeMetrics = useCallback(
+		(metrics: {
+			boardWidth: number;
+			boardAvailableHeight: number;
+			scoreboardHeight: number;
+		}) => {
+			setLayoutMetrics((prev) => {
+				const roundedPrev = {
+					boardWidth: Math.round(prev.boardWidth),
+					boardAvailableHeight: Math.round(prev.boardAvailableHeight),
+					scoreboardHeight: Math.round(prev.scoreboardHeight),
+				};
+				const roundedNext = {
+					boardWidth: Math.round(metrics.boardWidth),
+					boardAvailableHeight: Math.round(metrics.boardAvailableHeight),
+					scoreboardHeight: Math.round(metrics.scoreboardHeight),
+				};
+
+				if (
+					roundedPrev.boardWidth === roundedNext.boardWidth &&
+					roundedPrev.boardAvailableHeight ===
+						roundedNext.boardAvailableHeight &&
+					roundedPrev.scoreboardHeight === roundedNext.scoreboardHeight
+				) {
+					return prev;
+				}
+
+				return metrics;
+			});
+		},
+		[],
+	);
+
+	const calculateOptimalCardSize = useCallback(
+		(
+			cardCount: number,
+			metricsOverride?: {
+				boardWidth: number;
+				boardAvailableHeight: number;
+				scoreboardHeight: number;
+			},
+		) => {
+			if (!autoSizeEnabled || cardCount === 0) {
+				return Math.min(Math.max(cardSize, 60), 300);
+			}
+
+			const viewportWidth = window.innerWidth;
+			const viewportHeight = window.innerHeight;
+
+			const horizontalPadding = 80;
+			const gapSize = 8;
+			const totalHorizontalGaps = 7 * gapSize;
+
+			// Use provided metrics override, or fall back to state layoutMetrics
+			const metrics = metricsOverride || layoutMetrics;
+
+			// Use measured width if available, otherwise calculate from viewport
+			const measuredBoardWidth =
+				metrics.boardWidth > 0 ? metrics.boardWidth : 0;
+			const effectiveBoardWidth = Math.max(
+				measuredBoardWidth || viewportWidth - horizontalPadding,
+				0,
+			);
+
+			const actualRows = Math.max(Math.ceil(cardCount / 8), 1);
+			const widthForCards = Math.max(
+				effectiveBoardWidth - totalHorizontalGaps,
+				actualRows,
+			);
+			const maxWidthBasedSize = Math.floor(widthForCards / 8);
+
+			const totalVerticalGaps = (actualRows - 1) * gapSize;
+			const safetyMargin = 10;
+
+			// Use measured metrics if available, otherwise use viewport-based fallback
+			// Scoreboard is typically ~90px + padding + gap, so reserve ~150px to be safe
+			const scoreboardReserve =
+				metrics.scoreboardHeight > 0 ? metrics.scoreboardHeight + 50 : 150;
+
+			// Calculate available height: use measured if available, otherwise viewport minus reserve
+			// When measured metrics aren't available, be more conservative with the reserve
+			const measuredAvailableHeight =
+				metrics.boardAvailableHeight > 0
+					? metrics.boardAvailableHeight
+					: Math.max(viewportHeight - scoreboardReserve - 20, actualRows); // Extra 20px buffer when using fallback
+
+			const effectiveAvailableHeight = Math.max(
+				measuredAvailableHeight - safetyMargin,
+				actualRows,
+			);
+			const heightForCards = Math.max(
+				effectiveAvailableHeight - totalVerticalGaps,
+				actualRows,
+			);
+			const maxHeightBasedSize = Math.floor(heightForCards / actualRows);
+
+			const optimalSize = Math.min(
+				300,
+				Math.max(60, Math.min(maxWidthBasedSize, maxHeightBasedSize)),
+			);
+
+			console.log("[AUTO-SIZE] Calculated optimal size", {
+				cardCount,
+				actualRows,
+				viewportWidth,
+				viewportHeight,
+				availableWidth: effectiveBoardWidth,
+				availableHeight: effectiveAvailableHeight,
+				totalVerticalGaps,
+				maxWidthBasedSize,
+				maxHeightBasedSize,
+				optimalSize,
+				verticalReserved: scoreboardReserve,
+				usingMeasuredMetrics:
+					metrics.boardWidth > 0 || metrics.boardAvailableHeight > 0,
+				metricsOverrideProvided: !!metricsOverride,
+			});
+
+			return optimalSize;
+		},
+		[autoSizeEnabled, cardSize, layoutMetrics],
+	);
+
+	// Exported function for calculating card size based on card count
+	// Can be called externally (e.g., when pack is selected) before cards are created
+	// Optional metricsOverride allows passing measured metrics directly to bypass state timing issues
+	const calculateOptimalCardSizeForCount = useCallback(
+		(
+			cardCount: number,
+			metricsOverride?: {
+				boardWidth: number;
+				boardAvailableHeight: number;
+				scoreboardHeight: number;
+			},
+		) => {
+			if (!autoSizeEnabled || cardCount === 0) {
+				return;
+			}
+
+			const optimalSize = calculateOptimalCardSize(cardCount, metricsOverride);
+			if (optimalSize !== cardSize) {
+				setCardSize(optimalSize);
+				localStorage.setItem("cardSize", optimalSize.toString());
+			}
+		},
+		[autoSizeEnabled, calculateOptimalCardSize, cardSize],
+	);
+
+	useEffect(() => {
+		if (!autoSizeEnabled || gameState.cards.length === 0) return;
+
+		const optimalSize = calculateOptimalCardSize(gameState.cards.length);
+		if (optimalSize !== cardSize) {
+			setCardSize(optimalSize);
+			localStorage.setItem("cardSize", optimalSize.toString());
+		}
+	}, [
+		autoSizeEnabled,
+		calculateOptimalCardSize,
+		cardSize,
+		gameState.cards.length,
+	]);
+
+	// Save game state to sessionStorage whenever it changes
+	useEffect(() => {
+		// Only save if we have cards (game is in progress or finished)
+		if (gameState.cards.length > 0) {
+			// Create a clean state without transient animation properties
+			const stateToSave = {
+				...gameState,
+				cards: gameState.cards.map((card) => ({
+					id: card.id,
+					imageId: card.imageId,
+					imageUrl: card.imageUrl,
+					gradient: card.gradient,
+					isFlipped: card.isFlipped,
+					isMatched: card.isMatched,
+					matchedByPlayerId: card.matchedByPlayerId,
+					// Exclude isFlyingToPlayer and flyingToPlayerId as they're transient
+				})),
+				players: sortPlayersByID(gameState.players), // Ensure players are sorted before saving
+			};
+			sessionStorage.setItem("gameState", JSON.stringify(stateToSave));
+		} else {
+			// Clear saved state if no cards (game reset or not started)
+			sessionStorage.removeItem("gameState");
+		}
+	}, [gameState]);
+
+	const initializeGame = useCallback(
+		(
+			images: { id: string; url: string; gradient?: string }[],
+			startPlaying: boolean = false,
+		) => {
+			// Cancel any pending match check
+			if (matchCheckTimeoutRef.current) {
+				clearTimeout(matchCheckTimeoutRef.current);
+				matchCheckTimeoutRef.current = null;
+			}
+			isCheckingMatchRef.current = false;
+
+			const cards: Card[] = [];
+
+			// Note: Card size is calculated in handleStartGame before initializeGame is called
+			// with measured metrics passed directly to avoid state timing issues
+
+			// Create pairs of cards
+			images.forEach((image, index) => {
+				cards.push({
+					id: `card-${index * 2}`,
+					imageId: image.id,
+					imageUrl: image.url,
+					gradient: image.gradient,
+					isFlipped: false,
+					isMatched: false,
+				});
+				cards.push({
+					id: `card-${index * 2 + 1}`,
+					imageId: image.id,
+					imageUrl: image.url,
+					gradient: image.gradient,
+					isFlipped: false,
+					isMatched: false,
+				});
+			});
+
+			// Shuffle cards
+			const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
+
+			if (startPlaying) {
+				// Start animation sequence
+				setIsAnimatingCards(true);
+				setGameState((prev) => ({
+					...prev,
+					cards: shuffledCards,
+					selectedCards: [],
+					gameStatus: "playing",
+					winner: null,
+					isTie: false,
+				}));
+
+				// After animation completes, mark animation as done
+				// 900ms per card animation + 30ms delay between cards
+				const totalAnimationTime = shuffledCards.length * 30 + 900;
+				setTimeout(() => {
+					setIsAnimatingCards(false);
+				}, totalAnimationTime);
+			} else {
+				setGameState((prev) => ({
+					...prev,
+					cards: shuffledCards,
+					selectedCards: [],
+					gameStatus: "setup",
+					winner: null,
+					isTie: false,
+				}));
+			}
+		},
+		[],
+	);
+
+	const startGame = useCallback(
+		(player1Name: string, player2Name: string, firstPlayer: number) => {
+			const savedPlayer1Color =
+				localStorage.getItem("player1Color") || "#3b82f6";
+			const savedPlayer2Color =
+				localStorage.getItem("player2Color") || "#10b981";
+			const players = sortPlayersByID([
+				{ id: 1, name: player1Name, color: savedPlayer1Color },
+				{ id: 2, name: player2Name, color: savedPlayer2Color },
+			]);
+			setGameState({
+				cards: [],
+				players,
+				currentPlayer: firstPlayer,
+				selectedCards: [],
+				gameStatus: "setup",
+				winner: null,
+				isTie: false,
+			});
+			// Don't show modal yet - wait for cards to be initialized
+		},
+		[],
+	);
+
+	const startGameWithFirstPlayer = useCallback(
+		(firstPlayer: number) => {
+			setGameState((prev) => {
+				const firstPlayerName =
+					prev.players.find((p) => p.id === firstPlayer)?.name ||
+					`Player ${firstPlayer}`;
+
+				// Announce first player's turn after a short delay
+				if (ttsEnabled && isAvailable()) {
+					setTimeout(() => {
+						speakPlayerTurn(firstPlayerName);
+					}, 400);
+				}
+
+				return {
+					...prev,
+					currentPlayer: firstPlayer,
+					gameStatus: "playing" as const,
+				};
+			});
+			setShowStartModal(false);
+			localStorage.setItem("firstPlayer", firstPlayer.toString());
+			isInitialLoadRef.current = false;
+		},
+		[speakPlayerTurn, isAvailable, ttsEnabled],
+	);
+
+	const showStartGameModal = useCallback(() => {
+		console.log("showStartGameModal called"); // Debug log
+		setShowStartModal(true);
+	}, []);
+
+	const increaseCardSize = useCallback(() => {
+		setCardSize((prev) => {
+			const newSize = Math.min(prev + 10, 300); // Max 300px
+			localStorage.setItem("cardSize", newSize.toString());
+			return newSize;
+		});
+	}, []);
+
+	const decreaseCardSize = useCallback(() => {
+		setCardSize((prev) => {
+			const newSize = Math.max(prev - 10, 60); // Min 60px
+			localStorage.setItem("cardSize", newSize.toString());
+			return newSize;
+		});
+	}, []);
+
+	const toggleWhiteCardBackground = useCallback(() => {
+		setUseWhiteCardBackground((prev) => {
+			const newValue = !prev;
+			localStorage.setItem("useWhiteCardBackground", newValue.toString());
+			return newValue;
+		});
+	}, []);
+
+	const toggleAutoSize = useCallback(() => {
+		setAutoSizeEnabled((prev) => {
+			const newValue = !prev;
+			localStorage.setItem("autoSizeEnabled", newValue.toString());
+			return newValue;
+		});
+	}, []);
+
+	const updatePlayerName = useCallback((playerId: 1 | 2, newName: string) => {
+		const trimmedName = newName.trim();
+		// Save to localStorage
+		localStorage.setItem(`player${playerId}Name`, trimmedName);
+
+		// Use GameEngine to update player name
+		setGameState((prev) => engineUpdatePlayerName(prev, playerId, trimmedName));
+	}, []);
+
+	const updatePlayerColor = useCallback((playerId: 1 | 2, newColor: string) => {
+		// Save to localStorage
+		localStorage.setItem(`player${playerId}Color`, newColor);
+
+		// Use GameEngine to update player color
+		setGameState((prev) => engineUpdatePlayerColor(prev, playerId, newColor));
+	}, []);
+
+	const resetGame = useCallback(() => {
+		// Cancel any pending match check
+		if (matchCheckTimeoutRef.current) {
+			clearTimeout(matchCheckTimeoutRef.current);
+			matchCheckTimeoutRef.current = null;
+		}
+		// Cancel any pending TTS
+		if (ttsDelayTimeoutRef.current) {
+			clearTimeout(ttsDelayTimeoutRef.current);
+			ttsDelayTimeoutRef.current = null;
+		}
+		cancelTTS();
+		isCheckingMatchRef.current = false;
+		setAllCardsFlipped(false);
+
+		// Clear saved game state from sessionStorage
+		sessionStorage.removeItem("gameState");
+
+		// Reset clears cards and goes back to setup mode
+		// The actual reset flow will be handled by App.tsx
+		setGameState((prev) => {
+			const player1 = getPlayerById(prev.players, 1);
+			const player2 = getPlayerById(prev.players, 2);
+			const players = sortPlayersByID([
+				{
+					id: 1,
+					name: player1?.name || "Player 1",
+					color: player1?.color || "#3b82f6",
+				},
+				{
+					id: 2,
+					name: player2?.name || "Player 2",
+					color: player2?.color || "#10b981",
+				},
+			]);
+			return {
+				...prev,
+				cards: [],
+				players,
+				selectedCards: [],
+				gameStatus: "setup",
+				winner: null,
+				isTie: false,
+			};
+		});
+	}, [cancelTTS]);
+
+	const checkForMatch = useCallback(
+		(selectedIds: string[]) => {
+			// Prevent duplicate match checks
+			if (isCheckingMatchRef.current) {
+				console.log(
+					"[MATCH CHECK] Match check already in progress, ignoring duplicate call",
+					JSON.stringify({ selectedIds }),
+				);
+				return;
+			}
+
+			isCheckingMatchRef.current = true;
+			matchCheckTimeoutRef.current = null;
+
+			console.log(
+				"[MATCH CHECK] Starting match check",
+				JSON.stringify({ selectedIds, timestamp: new Date().toISOString() }),
+			);
+
+			setGameState((prev) => {
+				const [firstId, secondId] = selectedIds;
+
+				// Verify the cards are still selected (prevent race conditions)
+				if (
+					prev.selectedCards.length !== 2 ||
+					!prev.selectedCards.includes(firstId) ||
+					!prev.selectedCards.includes(secondId)
+				) {
+					console.log(
+						"[MATCH CHECK] Cards no longer selected, ignoring",
+						JSON.stringify({
+							selectedIds,
+							currentSelectedCards: prev.selectedCards,
+						}),
+					);
+					isCheckingMatchRef.current = false;
+					return prev;
+				}
+
+				// Use GameEngine to check for match
+				const matchResult = checkMatch(prev);
+
+				if (!matchResult) {
+					console.warn("[MATCH CHECK] Cards not found!");
+					isCheckingMatchRef.current = false;
+					return prev;
+				}
+
+				const { isMatch, firstCard, secondCard } = matchResult;
+				const cardIds: [string, string] = [firstCard.id, secondCard.id];
+
+				console.log(
+					"[MATCH CHECK] Match result",
+					JSON.stringify({
+						isMatch,
+						imageId1: firstCard.imageId,
+						imageId2: secondCard.imageId,
+					}),
+				);
+
+				if (isMatch) {
+					const currentPlayerId = prev.currentPlayer;
+					const matchedPlayerName =
+						getPlayerById(prev.players, currentPlayerId)?.name ||
+						`Player ${currentPlayerId}`;
+
+					console.log(
+						"[MATCH CHECK] ✓ MATCH FOUND! Marking cards as flying to player",
+						JSON.stringify({
+							cardIds,
+							playerId: currentPlayerId,
+							playerName: matchedPlayerName,
+						}),
+					);
+
+					// Use GameEngine for Phase 1: flying animation
+					const flyingState = startMatchAnimation(
+						prev,
+						cardIds,
+						currentPlayerId,
+					);
+
+					// Announce match found immediately (don't wait for animation)
+					if (ttsEnabled && isAvailable()) {
+						if (ttsDelayTimeoutRef.current) {
+							clearTimeout(ttsDelayTimeoutRef.current);
+						}
+						ttsDelayTimeoutRef.current = setTimeout(() => {
+							speakMatchFound(matchedPlayerName);
+							ttsDelayTimeoutRef.current = null;
+						}, 400);
+					}
+
+					// After animation completes, mark as matched using GameEngine
+					setTimeout(() => {
+						console.log(
+							"[MATCH CHECK] Animation timeout fired, marking cards as matched",
+							JSON.stringify({
+								cardIds,
+								matchedByPlayerId: currentPlayerId,
+								timestamp: new Date().toISOString(),
+							}),
+						);
+
+						setGameState((prevState) => {
+							// Use GameEngine for Phase 2: complete match
+							const matchedState = completeMatchAnimation(
+								prevState,
+								cardIds,
+								currentPlayerId,
+							);
+
+							// Use GameEngine to check if game is finished
+							const finalState = checkAndFinishGame(matchedState);
+
+							console.log(
+								"[MATCH CHECK] Cards marked as matched",
+								JSON.stringify({
+									matchedCount: finalState.cards.filter((c) => c.isMatched)
+										.length,
+									gameStatus: finalState.gameStatus,
+								}),
+							);
+
+							return finalState;
+						});
+					}, 3000); // Match animation duration (matches CSS animation length)
+
+					// Reset checking flag
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => {
+							isCheckingMatchRef.current = false;
+						});
+					});
+
+					return flyingState;
+				} else {
+					// Use GameEngine for no match: flip back and switch player
+					console.log(
+						"[MATCH CHECK] ✗ NO MATCH - Flipping cards back",
+						JSON.stringify({
+							cardIds,
+							currentPlayer: prev.currentPlayer,
+						}),
+					);
+
+					const noMatchState = applyNoMatchWithReset(prev, cardIds);
+					const nextPlayer = noMatchState.currentPlayer;
+
+					console.log(
+						"[MATCH CHECK] State update complete",
+						JSON.stringify({
+							cardsCount: noMatchState.cards.length,
+							currentPlayer: nextPlayer,
+						}),
+					);
+
+					// Announce next player's turn
+					if (ttsEnabled && isAvailable()) {
+						if (ttsDelayTimeoutRef.current) {
+							clearTimeout(ttsDelayTimeoutRef.current);
+						}
+						ttsDelayTimeoutRef.current = setTimeout(() => {
+							const nextPlayerName =
+								getPlayerById(noMatchState.players, nextPlayer)?.name ||
+								`Player ${nextPlayer}`;
+							speakPlayerTurn(nextPlayerName);
+							ttsDelayTimeoutRef.current = null;
+						}, 400);
+					}
+
+					// Reset the checking flag
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => {
+							isCheckingMatchRef.current = false;
+						});
+					});
+
+					return noMatchState;
+				}
+			});
+		},
+		[speakPlayerTurn, speakMatchFound, isAvailable, ttsEnabled],
+	);
+
+	const endTurn = useCallback(() => {
+		// Cancel any pending match check
+		if (matchCheckTimeoutRef.current) {
+			clearTimeout(matchCheckTimeoutRef.current);
+			matchCheckTimeoutRef.current = null;
+		}
+		// Cancel any pending TTS
+		if (ttsDelayTimeoutRef.current) {
+			clearTimeout(ttsDelayTimeoutRef.current);
+			ttsDelayTimeoutRef.current = null;
+		}
+		cancelTTS();
+		isCheckingMatchRef.current = false;
+
+		setGameState((prev) => {
+			// Use GameEngine to end the turn
+			const newState = engineEndTurn(prev);
+
+			console.log(
+				"[END TURN] Manually ending turn",
+				JSON.stringify({
+					previousPlayer: prev.currentPlayer,
+					nextPlayer: newState.currentPlayer,
+					flippedCardsCount: prev.cards.filter(
+						(c) => c.isFlipped && !c.isMatched,
+					).length,
+					timestamp: new Date().toISOString(),
+				}),
+			);
+
+			return newState;
+		});
+	}, [cancelTTS]);
+
+	const increaseFlipDuration = useCallback(() => {
+		setFlipDuration((prev) => {
+			const newDuration = Math.min(prev + 500, 10000); // Max 10 seconds
+			localStorage.setItem("flipDuration", newDuration.toString());
+			return newDuration;
+		});
+	}, []);
+
+	const decreaseFlipDuration = useCallback(() => {
+		setFlipDuration((prev) => {
+			const newDuration = Math.max(prev - 500, 500); // Min 0.5 seconds
+			localStorage.setItem("flipDuration", newDuration.toString());
+			return newDuration;
+		});
+	}, []);
+
+	const increaseEmojiSize = useCallback(() => {
+		setEmojiSizePercentage((prev) => {
+			const newPercentage = Math.min(prev + 5, 150); // Max 150%
+			localStorage.setItem("emojiSizePercentage", newPercentage.toString());
+			return newPercentage;
+		});
+	}, []);
+
+	const decreaseEmojiSize = useCallback(() => {
+		setEmojiSizePercentage((prev) => {
+			const newPercentage = Math.max(prev - 5, 20); // Min 20%
+			localStorage.setItem("emojiSizePercentage", newPercentage.toString());
+			return newPercentage;
+		});
+	}, []);
+
+	const toggleTtsEnabled = useCallback(() => {
+		setTtsEnabled((prev) => {
+			const newValue = !prev;
+			localStorage.setItem("ttsEnabled", newValue.toString());
+			// Cancel any ongoing TTS when disabling
+			if (!newValue) {
+				cancelTTS();
+				if (ttsDelayTimeoutRef.current) {
+					clearTimeout(ttsDelayTimeoutRef.current);
+					ttsDelayTimeoutRef.current = null;
+				}
+			}
+			return newValue;
+		});
+	}, [cancelTTS]);
+
+	const flipCard = useCallback(
+		(cardId: string) => {
+			// Prevent card flips during match checks to avoid race conditions
+			if (isCheckingMatchRef.current) {
+				console.log(
+					"[FLIP CARD] Match check in progress, ignoring card click",
+					JSON.stringify({
+						cardId,
+						timestamp: new Date().toISOString(),
+					}),
+				);
+				return;
+			}
+
+			setGameState((prev) => {
+				console.log(
+					"[FLIP CARD] Card clicked",
+					JSON.stringify({
+						cardId,
+						gameStatus: prev.gameStatus,
+						selectedCardsCount: prev.selectedCards.length,
+						selectedCards: prev.selectedCards,
+						timestamp: new Date().toISOString(),
+					}),
+				);
+
+				// Use GameEngine to validate if card can be flipped
+				if (!canFlipCard(prev, cardId)) {
+					console.log(
+						"[FLIP CARD] Card cannot be flipped (validated by GameEngine)",
+					);
+					return prev;
+				}
+
+				// Use GameEngine to flip the card
+				const newState = engineFlipCard(prev, cardId);
+
+				console.log(
+					"[FLIP CARD] Card flipped, new selected cards",
+					JSON.stringify({
+						newSelectedCards: newState.selectedCards,
+						willCheckMatch: newState.selectedCards.length === 2,
+					}),
+				);
+
+				// Check for match when two cards are selected
+				if (newState.selectedCards.length === 2) {
+					// Cancel any existing match check timeout
+					if (matchCheckTimeoutRef.current) {
+						console.log("[FLIP CARD] Cancelling existing match check timeout");
+						clearTimeout(matchCheckTimeoutRef.current);
+						matchCheckTimeoutRef.current = null;
+					}
+
+					console.log(
+						"[FLIP CARD] Scheduling match check",
+						JSON.stringify({
+							selectedCards: newState.selectedCards,
+							duration: flipDuration,
+						}),
+					);
+					matchCheckTimeoutRef.current = setTimeout(() => {
+						console.log(
+							"[FLIP CARD] Match check timeout fired, calling checkForMatch",
+						);
+						matchCheckTimeoutRef.current = null;
+						checkForMatch(newState.selectedCards);
+					}, flipDuration);
+				}
+
+				return newState;
+			});
+		},
+		[checkForMatch, flipDuration],
+	);
+
+	const endGameEarly = useCallback(() => {
+		setGameState((prev) => {
+			if (prev.gameStatus !== "playing" || prev.cards.length === 0) {
+				return prev;
+			}
+
+			// Set up test state: Player 1 gets 10 matches, Player 2 gets 9 matches
+			// This leaves 1 pair (2 cards) unmatched for easy testing
+
+			// Get all unmatched cards
+			const unmatchedCards = prev.cards.filter((c) => !c.isMatched);
+
+			// Group unmatched cards by imageId to get pairs
+			const cardPairs: { [imageId: string]: Card[] } = {};
+			unmatchedCards.forEach((card) => {
+				if (!cardPairs[card.imageId]) {
+					cardPairs[card.imageId] = [];
+				}
+				cardPairs[card.imageId].push(card);
+			});
+
+			// Get complete pairs only (should be exactly 2 cards each)
+			const pairs = Object.values(cardPairs).filter(
+				(pair) => pair.length === 2,
+			);
+
+			// Find the last pair to leave unmatched
+			const lastPair = pairs[pairs.length - 1];
+			const lastPairImageId = lastPair?.[0]?.imageId;
+
+			// Create a map of card ID to assigned player ID
+			const cardToPlayerMap = new Map<string, number>();
+
+			// Distribute pairs: 10 to Player 1, 9 to Player 2
+			// Skip the last pair (leave it unmatched)
+			const pairsToAssign = pairs.slice(0, -1);
+			pairsToAssign.forEach((pair, index) => {
+				// First 10 pairs go to Player 1, next 9 pairs go to Player 2
+				const assignedPlayer = index < 10 ? 1 : 2;
+				// Assign both cards in the pair to the same player
+				pair.forEach((card) => {
+					cardToPlayerMap.set(card.id, assignedPlayer);
+				});
+			});
+
+			// Update cards
+			const newCards = prev.cards.map((card) => {
+				// Keep already matched cards as is
+				if (card.isMatched) {
+					return card;
+				}
+
+				// Keep the last pair unflipped and unmatched
+				if (card.imageId === lastPairImageId) {
+					return { ...card, isFlipped: false, isMatched: false };
+				}
+
+				// Check if this card should be matched
+				const matchedByPlayerId = cardToPlayerMap.get(card.id);
+				if (matchedByPlayerId !== undefined) {
+					return {
+						...card,
+						isFlipped: true,
+						isMatched: true,
+						matchedByPlayerId,
+					};
+				}
+
+				return card;
+			});
+
+			// Keep game in "playing" status so user can complete the final match
+			return {
+				...prev,
+				cards: newCards,
+				selectedCards: [],
+				// gameStatus stays "playing" - don't finish the game yet
+			};
+		});
+	}, []);
+
+	const toggleAllCardsFlipped = useCallback(() => {
+		setGameState((prev) => {
+			if (prev.cards.length === 0) return prev;
+
+			// Check if all unmatched cards are currently flipped
+			const unmatchedCards = prev.cards.filter(
+				(c) => !c.isMatched && !c.isFlyingToPlayer,
+			);
+			const allFlipped =
+				unmatchedCards.length > 0 && unmatchedCards.every((c) => c.isFlipped);
+			const newFlippedState = !allFlipped;
+
+			setAllCardsFlipped(newFlippedState);
+
+			const newCards = prev.cards.map((card) => {
+				// Don't flip matched cards or cards that are currently flying
+				if (card.isMatched || card.isFlyingToPlayer) {
+					return card;
+				}
+				return { ...card, isFlipped: newFlippedState };
+			});
+
+			return {
+				...prev,
+				cards: newCards,
+				selectedCards: [], // Clear selected cards when toggling
+			};
+		});
+	}, []);
+
+	// Test function: Advance game to end state - flip all cards except last pair, mark them as matched, and distribute evenly between players
+	const flipAllExceptLastPair = useCallback(() => {
+		setGameState((prev) => {
+			if (prev.cards.length === 0) return prev;
+
+			// Find the last pair (cards with the same imageId that appear last)
+			const lastPairImageId = prev.cards[prev.cards.length - 1]?.imageId;
+			if (!lastPairImageId) return prev;
+
+			// Get all cards that should be matched (all except the last pair)
+			const cardsToMatch: Card[] = [];
+
+			prev.cards.forEach((card) => {
+				if (card.imageId !== lastPairImageId && !card.isMatched) {
+					cardsToMatch.push(card);
+				}
+			});
+
+			// Group cards by imageId to get pairs
+			const cardPairs: { [imageId: string]: Card[] } = {};
+			cardsToMatch.forEach((card) => {
+				if (!cardPairs[card.imageId]) {
+					cardPairs[card.imageId] = [];
+				}
+				cardPairs[card.imageId].push(card);
+			});
+
+			// Get complete pairs only (should be exactly 2 cards each)
+			const pairs = Object.values(cardPairs).filter(
+				(pair) => pair.length === 2,
+			);
+
+			// Create a map of card ID to assigned player ID
+			const cardToPlayerMap = new Map<string, number>();
+
+			// Distribute pairs evenly between players
+			pairs.forEach((pair, index) => {
+				const assignedPlayer = index % 2 === 0 ? 1 : 2;
+				// Assign both cards in the pair to the same player
+				pair.forEach((card) => {
+					cardToPlayerMap.set(card.id, assignedPlayer);
+				});
+			});
+
+			// Update cards
+			const newCards = prev.cards.map((card) => {
+				// Keep the last pair unflipped and unmatched
+				if (card.imageId === lastPairImageId) {
+					return { ...card, isFlipped: false, isMatched: false };
+				}
+
+				// If already matched, keep as is
+				if (card.isMatched) {
+					return card;
+				}
+
+				// Check if this card should be matched
+				const matchedByPlayerId = cardToPlayerMap.get(card.id);
+				if (matchedByPlayerId !== undefined) {
+					return {
+						...card,
+						isFlipped: true,
+						isMatched: true,
+						matchedByPlayerId,
+					};
+				}
+
+				return card;
+			});
+
+			// Score is now derived from cards - no need to update player.score
+
+			return {
+				...prev,
+				cards: newCards,
+				selectedCards: [],
+			};
+		});
+	}, []);
+
+	// Set full game state (for online multiplayer sync)
+	const setFullGameState = useCallback((newState: GameState) => {
+		setGameState(newState);
+	}, []);
+
+	return {
+		gameState,
+		setFullGameState,
+		showStartModal,
+		setShowStartModal,
+		cardSize,
+		autoSizeEnabled,
+		useWhiteCardBackground,
+		flipDuration,
+		emojiSizePercentage,
+		ttsEnabled,
+		initializeGame,
+		startGame,
+		startGameWithFirstPlayer,
+		showStartGameModal,
+		updatePlayerName,
+		updatePlayerColor,
+		increaseCardSize,
+		decreaseCardSize,
+		toggleWhiteCardBackground,
+		toggleAutoSize,
+		increaseFlipDuration,
+		decreaseFlipDuration,
+		increaseEmojiSize,
+		decreaseEmojiSize,
+		toggleTtsEnabled,
+		flipCard,
+		endTurn,
+		resetGame,
+		isAnimatingCards,
+		flipAllExceptLastPair,
+		endGameEarly,
+		toggleAllCardsFlipped,
+		allCardsFlipped,
+		updateAutoSizeMetrics,
+		calculateOptimalCardSizeForCount,
+	};
 };

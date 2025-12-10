@@ -1,17 +1,19 @@
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { Player } from '../types';
+import { Player, Card } from '../types';
+import { getPlayerScore } from '../services/game/GameEngine';
 
 interface GameOverProps {
   winner: Player | null;
   players: Player[];
+  cards: Card[];
   isTie: boolean;
   onPlayAgain: () => void;
   onExploreCards: () => void;
   onClose: () => void;
 }
 
-export const GameOver = ({ winner, players, isTie, onPlayAgain, onExploreCards, onClose }: GameOverProps) => {
+export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExploreCards, onClose }: GameOverProps) => {
   useEffect(() => {
     // Full-screen confetti celebration
     const duration = 3000;
@@ -73,12 +75,12 @@ export const GameOver = ({ winner, players, isTie, onPlayAgain, onExploreCards, 
                 It's a tie! Both players win! 🎊
               </p>
               <p className="text-lg text-gray-500">
-                {players.find(p => p.id === 1)?.name || 'Player 1'} and {players.find(p => p.id === 2)?.name || 'Player 2'} both scored {players.find(p => p.id === 1)?.score || 0} pairs!
+                {players.find(p => p.id === 1)?.name || 'Player 1'} and {players.find(p => p.id === 2)?.name || 'Player 2'} both scored {getPlayerScore(cards, 1)} pairs!
               </p>
             </div>
           ) : (
             <p className="text-xl text-gray-600 mb-6">
-              {winner?.name} wins with {winner?.score} pairs!
+              {winner?.name} wins with {getPlayerScore(cards, winner.id)} pairs!
             </p>
           )}
           <div className="flex flex-col gap-3">

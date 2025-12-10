@@ -13,8 +13,8 @@ export interface Card {
 export interface Player {
 	id: number;
 	name: string;
-	score: number;
 	color: string; // Hex color code for the player
+	// score removed - derived from cards via getPlayerScore()
 }
 
 export type GameStatus = "setup" | "playing" | "finished";
@@ -88,6 +88,7 @@ export interface RoomConfig {
 export interface OnlineGameState extends GameState {
 	syncVersion: number; // For optimistic concurrency control
 	lastUpdatedBy?: number; // Player slot (1 or 2) who made the last update - used to skip self-updates
+	gameRound: number; // Increments each time a new game starts - used to detect resets
 }
 
 export interface Room {
