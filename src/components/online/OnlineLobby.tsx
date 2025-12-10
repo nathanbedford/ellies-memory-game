@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { UserPlus, LogIn } from 'lucide-react';
 import { useOnlineStore } from '../../stores';
 import { useGameStore } from '../../stores';
 import { ConnectionStatus } from './ConnectionStatus';
@@ -44,6 +45,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     clearError,
     playerName,
     setPlayerNamePreference,
+    getLastOnlinePreferences,
   } = useOnlineStore();
 
   useEffect(() => {
@@ -150,12 +152,15 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     try {
       const preferredName = playerNameInput.trim() || 'Player';
       setPlayerNamePreference(preferredName);
+
+      // Get stored online preferences, fall back to local game settings
+      const storedPrefs = getLastOnlinePreferences();
       await createRoom({
         hostName: preferredName,
         hostColor: settings.player1Color,
-        cardPack: settings.cardPack,
-        background: settings.background,
-        cardBack: settings.cardBack,
+        cardPack: (storedPrefs.cardPack as CardPack) || settings.cardPack,
+        background: storedPrefs.background || settings.background,
+        cardBack: storedPrefs.cardBack || settings.cardBack,
       });
     } catch {
       setIsLoading(false);
@@ -248,6 +253,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl mx-auto">
               <button
+                type="button"
                 onClick={() => {
                   setView('create');
                   handleCreateRoom();
@@ -256,8 +262,8 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
                 className="p-8 rounded-xl border-3 border-gray-200 bg-white hover:border-blue-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50"
               >
                 <div className="space-y-4">
-                  <div className="text-5xl group-hover:scale-110 transition-transform">
-                    +
+                  <div className="flex justify-center">
+                    <UserPlus className="w-14 h-14 text-blue-500 transition-transform group-hover:scale-110" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-800">Create Room</h3>
                   <p className="text-gray-600 text-sm">
@@ -267,13 +273,14 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
               </button>
 
               <button
+                type="button"
                 onClick={() => setView('join')}
                 disabled={isLoading}
                 className="p-8 rounded-xl border-3 border-gray-200 bg-white hover:border-purple-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50"
               >
                 <div className="space-y-4">
-                  <div className="text-5xl group-hover:scale-110 transition-transform">
-                    {"->"}
+                  <div className="flex justify-center">
+                    <LogIn className="w-14 h-14 text-purple-500 transition-transform group-hover:scale-110" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-800">Join Room</h3>
                   <p className="text-gray-600 text-sm">
@@ -329,9 +336,11 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* Connection Status */}
-      <div className="flex justify-end mb-4">
-        <ConnectionStatus status={connectionStatus} />
+      {/* Connection Status - fixed top left, aligned with reload button */}
+      <div className="fixed top-5 left-[3.75rem] z-10 flex items-center">
+        <div className="px-2 py-2">
+          <ConnectionStatus status={connectionStatus} />
+        </div>
       </div>
 
       {/* Room Code (when in room) */}

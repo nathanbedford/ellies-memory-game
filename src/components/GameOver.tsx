@@ -10,10 +10,11 @@ interface GameOverProps {
   isTie: boolean;
   onPlayAgain: () => void;
   onExploreCards: () => void;
+  onViewBackground: () => void;
   onClose: () => void;
 }
 
-export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExploreCards, onClose }: GameOverProps) => {
+export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExploreCards, onViewBackground, onClose }: GameOverProps) => {
   useEffect(() => {
     // Full-screen confetti celebration
     const duration = 3000;
@@ -95,6 +96,13 @@ export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExplore
               className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
             >
               Explore All Cards
+            </button>
+            <button
+              type="button"
+              onClick={onViewBackground}
+              className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
+            >
+              View Background
             </button>
           </div>
         </div>

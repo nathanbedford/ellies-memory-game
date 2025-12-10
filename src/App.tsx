@@ -21,6 +21,7 @@ import { ResetConfirmationModal } from './components/ResetConfirmationModal';
 import { SettingsMenu } from './components/SettingsMenu';
 import { PlayerMatchesModal } from './components/PlayerMatchesModal';
 import { CardExplorerModal } from './components/CardExplorerModal';
+import { BackgroundViewer } from './components/BackgroundViewer';
 import { Pong } from './components/Pong';
 import { MobileWarningModal } from './components/MobileWarningModal';
 import { PWAInstallModal } from './components/PWAInstallModal';
@@ -96,6 +97,7 @@ function App() {
   const testComboSequenceRef = useRef<string[]>([]);
   const testComboTimeoutRef = useRef<number | null>(null);
   const [showCardExplorer, setShowCardExplorer] = useState(false);
+  const [showBackgroundViewer, setShowBackgroundViewer] = useState(false);
   const [showAdminSidebar, setShowAdminSidebar] = useState(false);
   const [adminEnabled, setAdminEnabled] = useState(false); // In-memory only, resets on refresh
   const [showMobileWarning, setShowMobileWarning] = useState(false);
@@ -1428,6 +1430,7 @@ function App() {
             isTie={gameState.isTie}
             onPlayAgain={handleResetClick}
             onExploreCards={() => setShowCardExplorer(true)}
+            onViewBackground={() => setShowBackgroundViewer(true)}
             onClose={() => {
               resetGame();
               guardedSetSetupStep(null, 'game over close');
@@ -1579,6 +1582,13 @@ function App() {
           useWhiteCardBackground={useWhiteCardBackground}
           emojiSizePercentage={emojiSizePercentage}
           cardBack={effectiveCardBack}
+        />
+
+        {/* Background Viewer */}
+        <BackgroundViewer
+          isOpen={showBackgroundViewer}
+          onClose={() => setShowBackgroundViewer(false)}
+          background={currentBackground}
         />
 
         {/* Admin Sidebar */}

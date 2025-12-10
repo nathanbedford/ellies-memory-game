@@ -114,6 +114,18 @@ interface OnlineStoreActions {
 	updatePlayerColor: (color: string) => Promise<void>;
 	setPlayerNamePreference: (name: string) => void;
 
+	// Preference actions
+	setLastOnlinePreferences: (
+		cardPack: CardPack,
+		background: string,
+		cardBack: string,
+	) => void;
+	getLastOnlinePreferences: () => {
+		cardPack: CardPack | null;
+		background: string | null;
+		cardBack: string | null;
+	};
+
 	// Presence actions
 	subscribeToPresence: (roomCode: string) => () => void;
 	setPresenceData: (data: Record<string, PresenceData>) => void;
@@ -143,6 +155,9 @@ const initialState: OnlineStoreState = {
 };
 
 const ONLINE_NAME_STORAGE_KEY = "onlinePlayerName";
+const ONLINE_CARD_PACK_KEY = "onlineCardPack";
+const ONLINE_BACKGROUND_KEY = "onlineBackground";
+const ONLINE_CARD_BACK_KEY = "onlineCardBack";
 
 const getStoredOnlinePlayerName = (): string => {
 	if (typeof window === "undefined") {
@@ -154,6 +169,28 @@ const getStoredOnlinePlayerName = (): string => {
 	}
 	const fallback = localStorage.getItem("player1Name");
 	return fallback && fallback.trim().length > 0 ? fallback.trim() : "Player";
+};
+
+const getStoredOnlineCardPack = (): CardPack | null => {
+	if (typeof window === "undefined") {
+		return null;
+	}
+	const stored = localStorage.getItem(ONLINE_CARD_PACK_KEY);
+	return (stored as CardPack) || null;
+};
+
+const getStoredOnlineBackground = (): string | null => {
+	if (typeof window === "undefined") {
+		return null;
+	}
+	return localStorage.getItem(ONLINE_BACKGROUND_KEY);
+};
+
+const getStoredOnlineCardBack = (): string | null => {
+	if (typeof window === "undefined") {
+		return null;
+	}
+	return localStorage.getItem(ONLINE_CARD_BACK_KEY);
 };
 
 // ============================================
@@ -222,7 +259,7 @@ export const useOnlineStore = create<OnlineStore>()(
 
 		// Room actions
 		createRoom: async (options) => {
-			const { odahId } = get();
+			const { odahId, setLastOnlinePreferences } = get();
 			if (!odahId) {
 				throw new Error("Not connected");
 			}
@@ -239,6 +276,13 @@ export const useOnlineStore = create<OnlineStore>()(
 					background: options.background,
 					cardBack: options.cardBack,
 				});
+
+				// Save preferences after creating room
+				setLastOnlinePreferences(
+					options.cardPack,
+					options.background,
+					options.cardBack,
+				);
 
 				set({
 					roomCode,
@@ -327,7 +371,7 @@ export const useOnlineStore = create<OnlineStore>()(
 
 		// Room config (host only)
 		updateRoomConfig: async (config) => {
-			const { roomCode, isHost } = get();
+			const { roomCode, isHost, setLastOnlinePreferences } = get();
 			if (!roomCode || !isHost) {
 				throw new Error("Only host can update room config");
 			}
@@ -337,6 +381,23 @@ export const useOnlineStore = create<OnlineStore>()(
 			try {
 				const adapter = getFirestoreSyncAdapter();
 				await adapter.updateRoomConfig(roomCode, config);
+
+				// Save preferences when config is updated
+				if (config.cardPack || config.background || config.cardBack) {
+					const { room } = get();
+					if (room?.config) {
+						const finalCardPack = config.cardPack || room.config.cardPack;
+						const finalBackground = config.background || room.config.background;
+						const finalCardBack = config.cardBack || room.config.cardBack;
+						if (finalCardPack && finalBackground && finalCardBack) {
+							setLastOnlinePreferences(
+								finalCardPack,
+								finalBackground,
+								finalCardBack,
+							);
+						}
+					}
+				}
 			} catch (error) {
 				set({
 					error:
@@ -385,6 +446,27 @@ export const useOnlineStore = create<OnlineStore>()(
 				localStorage.setItem(ONLINE_NAME_STORAGE_KEY, trimmed);
 			}
 			set({ playerName: trimmed });
+		},
+
+		// Preference actions
+		setLastOnlinePreferences: (
+			cardPack: CardPack,
+			background: string,
+			cardBack: string,
+		) => {
+			if (typeof window !== "undefined") {
+				localStorage.setItem(ONLINE_CARD_PACK_KEY, cardPack);
+				localStorage.setItem(ONLINE_BACKGROUND_KEY, background);
+				localStorage.setItem(ONLINE_CARD_BACK_KEY, cardBack);
+			}
+		},
+
+		getLastOnlinePreferences: () => {
+			return {
+				cardPack: getStoredOnlineCardPack(),
+				background: getStoredOnlineBackground(),
+				cardBack: getStoredOnlineCardBack(),
+			};
 		},
 
 		// Presence actions
