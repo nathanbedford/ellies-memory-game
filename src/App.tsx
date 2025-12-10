@@ -74,6 +74,7 @@ function App() {
   const [originalBackground, setOriginalBackground] = useState<BackgroundTheme | null>(null);
   const [originalCardBack, setOriginalCardBack] = useState<CardBackType | null>(null);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [showReloadConfirmation, setShowReloadConfirmation] = useState(false);
   const [lastConfig, setLastConfig] = useState<{
     pack: string;
     background: BackgroundTheme;
@@ -866,23 +867,24 @@ function App() {
     <div className={`${backgroundClass} ${gameState.gameStatus === 'playing' ? 'pt-4' : 'py-8'}`} style={backgroundStyle}>
       <div className="container mx-auto px-4 max-w-full">
         {gameState.gameStatus === 'setup' ? (
-          <header className="text-center mb-8 relative">
-            {/* Reload Button - upper left during setup */}
+          <>
+            {/* Fixed position controls during setup */}
+            {/* Reload Button - fixed top left */}
             <button
-              onClick={() => window.location.reload()}
-              className="absolute top-0 left-0 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+              onClick={() => setShowReloadConfirmation(true)}
+              className="fixed top-5 left-5 z-10 p-2 text-gray-400 hover:text-gray-600 hover:bg-white/50 rounded-lg transition-colors duration-200"
               title="Reload App"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
             </button>
 
-            {/* Fullscreen Button */}
+            {/* Fullscreen Button - fixed top right */}
             {screenfull.isEnabled && (
               <button
                 onClick={toggleFullscreen}
-                className="absolute top-0 right-0 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
+                className="fixed top-5 right-5 z-10 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
                 title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
               >
                 {isFullscreen ? (
@@ -896,7 +898,7 @@ function App() {
                 )}
               </button>
             )}
-          </header>
+          </>
         ) : (
           <>
             {/* Fixed position controls */}
@@ -976,6 +978,7 @@ function App() {
                           setShowAdminSidebar(true);
                         }}
                         onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
+                        onReloadApp={() => setShowReloadConfirmation(true)}
                       />
             </div>
             
@@ -1244,6 +1247,38 @@ function App() {
             onChangeMode={handleBackToModeSelect}
             onCancel={() => setShowResetConfirmation(false)}
           />
+        </Modal>
+
+        {/* Reload App Confirmation Modal */}
+        <Modal
+          isOpen={showReloadConfirmation}
+          onClose={() => setShowReloadConfirmation(false)}
+          title="Reload App"
+        >
+          <div className="text-center space-y-6">
+            <div>
+              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+              </div>
+              <p className="text-gray-600">This will refresh the app. Any unsaved progress may be lost.</p>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowReloadConfirmation(false)}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+              >
+                Reload
+              </button>
+            </div>
+          </div>
         </Modal>
 
         {/* Game Start Modal */}

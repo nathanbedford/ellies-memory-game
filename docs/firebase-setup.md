@@ -182,8 +182,7 @@ VITE_FIREBASE_APP_ID=1:123456789:web:abc123...
 VITE_FIREBASE_DATABASE_URL=https://your-project-default-rtdb.firebaseio.com
 
 # Only if your Firestore database is not named "(default)"
-VITE_FIREBASE_FIRESTORE_DB=main-firestore
-```
+ P```
 
 ---
 
