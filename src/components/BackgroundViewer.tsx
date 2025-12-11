@@ -67,3 +67,4 @@ export const BackgroundViewer = ({ isOpen, onClose, background }: BackgroundView
     </button>
   );
 };
+
