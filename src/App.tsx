@@ -649,15 +649,16 @@ function App() {
     }
   }, [gameState.currentPlayer, gameState.gameStatus]);
 
-  // Reconcile scores when total reaches 20 (game complete) - fixes race condition
+  // Reconcile scores when total matches pair count (game complete) - fixes race condition
   useEffect(() => {
     if (gameState.gameStatus === 'playing' && gameState.cards.length > 0) {
       const player1Score = getPlayerScore(gameState.cards, 1);
       const player2Score = getPlayerScore(gameState.cards, 2);
       const totalScore = player1Score + player2Score;
+      const expectedPairCount = gameState.cards.length / 2;
 
-      if (totalScore === 20) {
-        console.log('[RECONCILE] Total score reached 20, reconciling matched cards');
+      if (totalScore === expectedPairCount) {
+        console.log(`[RECONCILE] Total score reached ${expectedPairCount} (game complete), reconciling matched cards`);
         reconcileScores();
       }
     }
