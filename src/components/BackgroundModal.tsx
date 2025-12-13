@@ -16,7 +16,7 @@ interface BackgroundModalProps {
   isResetting?: boolean;
 }
 
-export const BackgroundModal = ({ selectedBackground, onSelect, onClose: _onClose, onBack: _onBack, isResetting: _isResetting = false }: BackgroundModalProps) => {
+export const BackgroundModal = ({ selectedBackground, onSelect }: BackgroundModalProps) => {
   const [activeTab, setActiveTab] = useState<'colors' | 'pictures'>('colors');
 
   const handleSelect = (e: React.MouseEvent, backgroundId: string) => {

@@ -586,11 +586,23 @@ function App() {
       return;
     }
 
-    // Small delay to ensure layout is rendered
+    // Increased delay to ensure layout is rendered, especially for guests joining online games
+    // Use requestAnimationFrame to ensure DOM is ready before measuring
     const timeoutId = setTimeout(() => {
-      const metrics = computeLayoutMetrics();
-      calculateOptimalCardSizeForCount(gameState.cards.length, metrics);
-    }, 50);
+      requestAnimationFrame(() => {
+        // Double-check refs are attached before computing metrics
+        if (boardWrapperRef.current && scoreboardRef.current && gameBoardContainerRef.current) {
+          const metrics = computeLayoutMetrics();
+          calculateOptimalCardSizeForCount(gameState.cards.length, metrics);
+        } else {
+          // Fallback: try again after another frame if refs aren't ready
+          requestAnimationFrame(() => {
+            const metrics = computeLayoutMetrics();
+            calculateOptimalCardSizeForCount(gameState.cards.length, metrics);
+          });
+        }
+      });
+    }, 150);
 
     return () => clearTimeout(timeoutId);
   }, [autoSizeEnabled, gameState.cards.length, computeLayoutMetrics, calculateOptimalCardSizeForCount]);
@@ -837,7 +849,7 @@ function App() {
     setSelectedCardBack(lastConfig.cardBack);
     setShowResetConfirmation(false);
     setIsReplaying(true);
-  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig]);
+  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig, setSelectedPack, setSelectedBackground, setSelectedCardBack]);
 
   const handleNewGame = () => {
     // Start new game setup flow using the current game configuration as the baseline
@@ -1366,7 +1378,7 @@ function App() {
             </div>
           )}
 
-          {gameState.gameStatus === 'playing' && (
+          {gameState.gameStatus === 'playing' && setupStep === null && (!isOnlineMode || room?.status === 'playing') && (
             <div ref={boardWrapperRef} className="flex flex-col gap-6 items-center w-full max-w-full">
               {/* Compact Header - Players Points and Current Player */}
               <div ref={scoreboardRef} className="w-full max-w-2xl mx-auto">

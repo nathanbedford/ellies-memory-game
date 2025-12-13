@@ -6,17 +6,18 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { Room, CardPack } from '../../types';
+import type { Room, CardPack, GameTheme } from '../../types';
 import { CARD_PACKS } from '../../hooks/useCardPacks';
 import { BACKGROUND_OPTIONS } from '../../hooks/useBackgroundSelector';
 import { CARD_BACK_OPTIONS } from '../../hooks/useCardBackSelector';
 import { useOnlineStore } from '../../stores/onlineStore';
 import { Modal } from '../Modal';
+import { ThemeSelectorModal } from '../ThemeSelectorModal';
 import { CardPackModal } from '../CardPackModal';
 import { BackgroundModal } from '../BackgroundModal';
 import { CardBackModal } from '../CardBackModal';
 
-type OpenModal = 'none' | 'cardPack' | 'background' | 'cardBack';
+type OpenModal = 'none' | 'theme' | 'cardPack' | 'background' | 'cardBack';
 
 interface WaitingRoomProps {
   roomCode: string;
@@ -98,6 +99,22 @@ export const WaitingRoom = ({
   const backgroundInfo = BACKGROUND_OPTIONS.find(b => b.id === currentBackground);
   const cardBackInfo = CARD_BACK_OPTIONS.find(c => c.id === currentCardBack);
 
+  // Handle theme selection (host only)
+  const handleThemeSelect = async (theme: GameTheme) => {
+    if (!isHost) return;
+    await updateRoomConfig({
+      cardPack: theme.cardPack as CardPack,
+      background: theme.background,
+      cardBack: theme.cardBack,
+    });
+    setOpenModal('none');
+  };
+
+  const handleBuildCustom = () => {
+    if (!isHost) return;
+    setOpenModal('cardPack'); // Start the existing sequential flow
+  };
+
   // Handle settings changes (host only) - sequential wizard flow
   const handleCardPackChange = async (packId: CardPack) => {
     if (!isHost) return;
@@ -136,22 +153,22 @@ export const WaitingRoom = ({
       }}
       disabled={!isHost}
       title={isHost ? `Change ${label.toLowerCase()}` : undefined}
-      className={`p-3 rounded-lg border-2 transition-all text-left w-full ${isHost
+      className={`p-2 rounded-lg border-2 transition-all text-left w-full ${isHost
         ? 'hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
         : 'cursor-default'
         } border-gray-200 bg-white`}
     >
-      <div className="flex items-center gap-3">
-        <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2">
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden">
           {preview}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-          <p className="font-medium text-gray-800 truncate">{displayName}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide leading-tight">{label}</p>
+          <p className="font-medium text-gray-800 truncate text-xs">{displayName}</p>
         </div>
         {isHost && (
           <svg
-            className="w-5 h-5 text-gray-400"
+            className="w-4 h-4 text-gray-400 flex-shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -166,7 +183,7 @@ export const WaitingRoom = ({
 
   // Render card pack preview
   const renderCardPackPreview = () => (
-    <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-2xl">
+    <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-lg">
       {cardPackInfo?.emoji || '🃏'}
     </div>
   );
@@ -201,7 +218,7 @@ export const WaitingRoom = ({
     if (cardBackInfo?.solidColor) {
       return (
         <div
-          className="w-full h-full flex items-center justify-center text-white font-bold text-xl"
+          className="w-full h-full flex items-center justify-center text-white font-bold text-sm"
           style={{ backgroundColor: cardBackInfo.solidColor }}
         >
           ?
@@ -209,19 +226,19 @@ export const WaitingRoom = ({
       );
     }
     return (
-      <div className={`w-full h-full bg-gradient-to-br ${cardBackInfo?.gradient || 'from-indigo-500 to-purple-600'} flex items-center justify-center text-white font-bold text-xl`}>
+      <div className={`w-full h-full bg-gradient-to-br ${cardBackInfo?.gradient || 'from-indigo-500 to-purple-600'} flex items-center justify-center text-white font-bold text-sm`}>
         {cardBackInfo?.emoji || '?'}
       </div>
     );
   };
 
   return (
-    <div className="text-center space-y-6">
+    <div className="text-center space-y-3">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+        <h2 className="text-xl font-bold text-gray-800 mb-1">
           {isHost ? 'Waiting for Player' : 'Waiting for Host'}
         </h2>
-        <p className="text-gray-600">
+        <p className="text-sm text-gray-600">
           {isHost
             ? hasOpponent
               ? 'Player joined! Configure settings and start when ready.'
@@ -230,36 +247,33 @@ export const WaitingRoom = ({
         </p>
       </div>
 
-      {/* Players + Settings Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        {/* Players */}
-        <div className="grid grid-cols-2 gap-4">
+      {/* Players + Settings Horizontal Layout */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        {/* Players - Compact Horizontal Cards */}
+        <div className="flex flex-col gap-2 w-full lg:w-auto lg:min-w-[200px]">
           {sortedPlayers.map(([odahId, player]) => (
             <div
               key={odahId}
-              className="p-4 rounded-xl border-3 transition-all"
+              className="p-2 rounded-lg border-2 transition-all flex items-center gap-2"
               style={{
                 borderColor: player.color,
                 backgroundColor: `${player.color}15`,
               }}
             >
-              <div className="space-y-2">
-                <div
-                  className="w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl font-bold text-white"
-                  style={{ backgroundColor: player.color }}
-                >
-                  {player.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-bold text-gray-800 text-sm">{player.name}</p>
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                style={{ backgroundColor: player.color }}
+              >
+                {player.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="font-bold text-gray-800 text-xs leading-tight">{player.name}</p>
+                <div className="flex items-center gap-1">
                   <p className="text-xs text-gray-500">
                     {player.slot === 1 ? 'Host' : 'Guest'}
                   </p>
-                </div>
-                {/* Connection status */}
-                <div className="flex items-center justify-center gap-1">
                   <div
-                    className={`w-2 h-2 rounded-full ${player.slot === 1 || opponentConnected
+                    className={`w-1.5 h-1.5 rounded-full ${player.slot === 1 || opponentConnected
                       ? 'bg-green-500'
                       : 'bg-gray-400 animate-pulse'
                       }`}
@@ -274,17 +288,15 @@ export const WaitingRoom = ({
 
           {/* Empty slot placeholder */}
           {!hasOpponent && (
-            <div className="p-4 rounded-xl border-3 border-dashed border-gray-300 bg-gray-50">
-              <div className="space-y-2">
-                <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl bg-gray-200 text-gray-400">
-                  ?
-                </div>
-                <div>
-                  <p className="font-medium text-gray-400 text-sm">Waiting...</p>
+            <div className="p-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-gray-200 text-gray-400 flex-shrink-0">
+                ?
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="font-medium text-gray-400 text-xs leading-tight">Waiting...</p>
+                <div className="flex items-center gap-1">
                   <p className="text-xs text-gray-400">for player to join</p>
-                </div>
-                <div className="flex items-center justify-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-gray-300 animate-pulse" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-pulse" />
                   <span className="text-xs text-gray-400">Waiting</span>
                 </div>
               </div>
@@ -292,53 +304,88 @@ export const WaitingRoom = ({
           )}
         </div>
 
-        {/* Game Settings */}
-        <div className="bg-gray-50 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-gray-700">
-              Game Settings
-            </p>
-            {!isHost && (
-              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
-                Host controls
-              </span>
+        {/* Game Settings - 2x2 Grid */}
+        <div className="bg-gray-50 rounded-xl px-3 pb-3 pt-0 flex-1">
+          <div className="space-y-2 pt-0">
+            {/* Choose Theme Button - Host only - Prominent First Option */}
+            {isHost && (
+              <button
+                type="button"
+                onClick={() => setOpenModal('theme')}
+                className="p-3 rounded-lg border-2 border-purple-400 bg-gradient-to-br from-purple-100 to-blue-100 hover:border-purple-500 hover:from-purple-200 hover:to-blue-200 hover:ring-2 hover:ring-purple-300 hover:ring-opacity-50 transition-all duration-200 text-left w-full shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-xl shadow-md">
+                    🎨
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-purple-700 uppercase tracking-wide font-semibold">Quick Setup</p>
+                    <p className="font-bold text-gray-900 text-sm">Choose Theme</p>
+                  </div>
+                  <svg
+                    className="w-5 h-5 text-purple-600 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
             )}
-          </div>
 
-          <div className="space-y-2">
-            {/* Card Pack */}
-            {renderSettingTile(
-              'Card Pack',
-              'cardPack',
-              renderCardPackPreview(),
-              cardPackInfo?.name || currentCardPack
-            )}
+            {/* Other Settings - 2x2 Grid */}
+            <div className="grid grid-cols-2 gap-2">
+              {/* Card Pack */}
+              {renderSettingTile(
+                'Card Pack',
+                'cardPack',
+                renderCardPackPreview(),
+                cardPackInfo?.name || currentCardPack
+              )}
 
-            {/* Background */}
-            {renderSettingTile(
-              'Background',
-              'background',
-              renderBackgroundPreview(),
-              backgroundInfo?.name || currentBackground
-            )}
+              {/* Background */}
+              {renderSettingTile(
+                'Background',
+                'background',
+                renderBackgroundPreview(),
+                backgroundInfo?.name || currentBackground
+              )}
 
-            {/* Card Back */}
-            {renderSettingTile(
-              'Card Back',
-              'cardBack',
-              renderCardBackPreview(),
-              cardBackInfo?.name || currentCardBack
-            )}
+              {/* Card Back */}
+              {renderSettingTile(
+                'Card Back',
+                'cardBack',
+                renderCardBackPreview(),
+                cardBackInfo?.name || currentCardBack
+              )}
+
+              {/* Empty space if host, or placeholder if guest */}
+              {!isHost && (
+                <div className="p-2 rounded-lg border-2 border-gray-200 bg-gray-50 opacity-50">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-sm text-gray-400">
+                      ⚙️
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide leading-tight">Settings</p>
+                      <p className="font-medium text-gray-400 truncate text-xs">Host controls</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex gap-4 justify-center">
+      <div className="flex gap-3 justify-center">
         <button
           type="button"
           onClick={onLeave}
-          className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors"
+          className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors text-sm"
         >
           Leave Room
         </button>
@@ -347,7 +394,7 @@ export const WaitingRoom = ({
             type="button"
             onClick={onStartGame}
             disabled={!canStart}
-            className={`px-8 py-3 font-bold rounded-lg transition-all flex items-center gap-2 ${canStart
+            className={`px-6 py-2 font-bold rounded-lg transition-all flex items-center gap-2 text-sm ${canStart
               ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
@@ -359,7 +406,7 @@ export const WaitingRoom = ({
 
       {/* Helper text for host */}
       {isHost && !canStart && (
-        <p className="text-sm text-gray-500">
+        <p className="text-xs text-gray-500">
           {!hasOpponent
             ? 'Waiting for another player to join...'
             : !opponentConnected
@@ -369,6 +416,19 @@ export const WaitingRoom = ({
       )}
 
       {/* Wizard Modals */}
+      {/* Theme Selector Modal */}
+      <Modal
+        isOpen={openModal === 'theme'}
+        onClose={() => setOpenModal('none')}
+        title="Choose Your Theme"
+      >
+        <ThemeSelectorModal
+          onSelectTheme={handleThemeSelect}
+          onBuildCustom={handleBuildCustom}
+          onClose={() => setOpenModal('none')}
+        />
+      </Modal>
+
       {/* Card Pack Modal */}
       <Modal
         isOpen={openModal === 'cardPack'}

@@ -15,7 +15,7 @@ interface CardBackModalProps {
   isResetting?: boolean;
 }
 
-export const CardBackModal = ({ selectedCardBack, onSelect, onClose: _onClose, onBack: _onBack, isResetting: _isResetting = false }: CardBackModalProps) => {
+export const CardBackModal = ({ selectedCardBack, onSelect }: CardBackModalProps) => {
   const handleSelect = (e: React.MouseEvent, cardBackId: string) => {
     e.stopPropagation(); // Prevent event bubbling
     logWizardInteraction('Card back selected', { cardBackId, currentCardBack: selectedCardBack });

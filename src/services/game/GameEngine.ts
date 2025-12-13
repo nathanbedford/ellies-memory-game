@@ -280,15 +280,16 @@ export function completeMatchAnimation(
 	// Mark cards as matched and clear flying state
 	const newCards = state.cards.map((c) =>
 		c.id === firstId || c.id === secondId
-			? (() => {
-					const { flyingToPlayerId: _omit, ...rest } = c;
-					return {
-						...rest,
-						isMatched: true,
-						isFlyingToPlayer: false,
-						matchedByPlayerId: playerId,
-					};
-				})()
+			? {
+					id: c.id,
+					imageId: c.imageId,
+					imageUrl: c.imageUrl,
+					gradient: c.gradient,
+					isFlipped: c.isFlipped,
+					isMatched: true,
+					isFlyingToPlayer: false,
+					matchedByPlayerId: playerId,
+				}
 			: c,
 	);
 
@@ -311,14 +312,16 @@ export function applyNoMatchWithReset(
 	// Flip cards back and clear any animation state
 	const newCards = state.cards.map((c) =>
 		c.id === firstId || c.id === secondId
-			? (() => {
-					const { flyingToPlayerId: _omit, ...rest } = c;
-					return {
-						...rest,
-						isFlipped: false,
-						isFlyingToPlayer: false,
-					};
-				})()
+			? {
+					id: c.id,
+					imageId: c.imageId,
+					imageUrl: c.imageUrl,
+					gradient: c.gradient,
+					isFlipped: false,
+					isMatched: c.isMatched,
+					isFlyingToPlayer: false,
+					matchedByPlayerId: c.matchedByPlayerId,
+				}
 			: c,
 	);
 

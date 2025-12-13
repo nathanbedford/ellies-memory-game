@@ -119,31 +119,11 @@ export abstract class BaseSyncAdapter implements ISyncAdapter {
   abstract subscribeToState(callback: (state: GameState) => void): () => void;
 
   // Optional methods - default to throwing "not supported"
-  createRoom(_options: CreateRoomOptions): Promise<string> {
-    throw new Error('createRoom not supported in this adapter');
-  }
-
-  joinRoom(_roomCode: string, _options: JoinRoomOptions): Promise<Room> {
-    throw new Error('joinRoom not supported in this adapter');
-  }
-
-  leaveRoom(): Promise<void> {
-    throw new Error('leaveRoom not supported in this adapter');
-  }
-
-  getRoom(_roomCode: string): Promise<Room | null> {
-    throw new Error('getRoom not supported in this adapter');
-  }
-
-  subscribeToRoom(_roomCode: string, _callback: (room: Room | null) => void): () => void {
-    throw new Error('subscribeToRoom not supported in this adapter');
-  }
-
-  updateRoomConfig(_roomCode: string, _config: Partial<RoomConfig>): Promise<void> {
-    throw new Error('updateRoomConfig not supported in this adapter');
-  }
-
-  startGame(_roomCode: string, _initialState: GameState): Promise<void> {
-    throw new Error('startGame not supported in this adapter');
-  }
+  createRoom?(_options: CreateRoomOptions): Promise<string>;
+  joinRoom?(_roomCode: string, _options: JoinRoomOptions): Promise<Room>;
+  leaveRoom?(): Promise<void>;
+  getRoom?(_roomCode: string): Promise<Room | null>;
+  subscribeToRoom?(_roomCode: string, _callback: (room: Room | null) => void): () => void;
+  updateRoomConfig?(_roomCode: string, _config: Partial<RoomConfig>): Promise<void>;
+  startGame?(_roomCode: string, _initialState: GameState): Promise<void>;
 }

@@ -18,7 +18,7 @@ interface GameStartModalProps {
   isResetting?: boolean;
 }
 
-export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNameChange, onPlayerColorChange, onBack: _onBack, isResetting = false }: GameStartModalProps) => {
+export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNameChange, onPlayerColorChange }: GameStartModalProps) => {
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2>(currentPlayer as 1 | 2);
   const [editingPlayer, setEditingPlayer] = useState<1 | 2 | null>(null);
   const player1 = players.find(p => p.id === 1);
@@ -51,7 +51,6 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
       selectedPlayer,
       tempNames,
       tempColors,
-      isResetting,
     });
     const currentPlayer1 = players.find(p => p.id === 1);
     const currentPlayer2 = players.find(p => p.id === 2);
@@ -97,7 +96,6 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
     logWizardInteraction('Player selection toggled', {
       playerId,
       previousSelection: selectedPlayer,
-      isResetting,
     });
     setSelectedPlayer(playerId);
   };

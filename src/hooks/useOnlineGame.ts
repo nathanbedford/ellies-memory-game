@@ -42,6 +42,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		null,
 	);
 	const isCheckingMatchRef = useRef(false);
+	const checkForMatchRef = useRef<((selectedIds: string[], currentState: GameState) => void) | null>(null);
 
 	// Stuck game detection - track when cards were flipped
 	const cardsFlippedAtRef = useRef<number | null>(null);
@@ -312,7 +313,9 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 						firedAt: new Date().toISOString(),
 					});
 					matchCheckTimeoutRef.current = null;
-					checkForMatch(newState.selectedCards, newState);
+					if (checkForMatchRef.current) {
+						checkForMatchRef.current(newState.selectedCards, newState);
+					}
 				}, flipDuration);
 			}
 		},
@@ -477,6 +480,11 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		},
 		[localPlayerSlot, syncToFirestore],
 	);
+
+	// Update ref whenever checkForMatch changes
+	useEffect(() => {
+		checkForMatchRef.current = checkForMatch;
+	}, [checkForMatch]);
 
 	// Reset game (for when leaving online mode)
 	const resetGame = useCallback(() => {

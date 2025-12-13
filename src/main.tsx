@@ -8,7 +8,11 @@ const posthogKey = "phc_LMb2gHTzOA8grLHOZJFsGvfiX2Adcb41Nqbux1EW0yH";
 const posthogHost = "https://us.i.posthog.com";
 const isLocalDev = import.meta.env.MODE === 'development';
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('Root element not found');
+}
+createRoot(rootElement).render(
   <>
     {isLocalDev ? (
       <App />
