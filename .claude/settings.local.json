@@ -5,7 +5,8 @@
       "Bash(done)",
       "Bash(for deck in */)",
       "Bash(find:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(bun --version:*)"
     ],
     "deny": [],
     "ask": []

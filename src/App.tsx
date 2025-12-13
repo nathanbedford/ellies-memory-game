@@ -8,7 +8,7 @@ import { useOnlineStore } from './stores/onlineStore';
 import { useCursorSync } from './hooks/useCursorSync';
 import { CardPack, GameMode, OnlineGameState } from './types';
 import { CARD_DECKS } from './data/cardDecks';
-import { initializeCards, createInitialState, startGameWithCards, getPlayerScore } from './services/game/GameEngine';
+import { initializeCards, createInitialState, startGameWithCards, getPlayerScore, reconcileMatchedCards } from './services/game/GameEngine';
 import { getFirestoreSyncAdapter } from './services/sync/FirestoreSyncAdapter';
 import { GameBoard } from './components/GameBoard';
 import { GameOver } from './components/GameOver';
@@ -291,6 +291,51 @@ function App() {
       updatePlayerName(playerId, name);
     }
   }, [isOnlineMode, onlineGame, localPlayerSlot, setPlayerNamePreference, updatePlayerName]);
+
+  // Reconciliation helper - fixes race condition where matchedByPlayerId is set but isMatched is false
+  const reconcileScores = useCallback(async () => {
+    const reconciledState = reconcileMatchedCards(gameState);
+    
+    // Only update if reconciliation actually changed something
+    if (reconciledState !== gameState) {
+      console.log('[RECONCILE] Reconciling matched cards', {
+        cardsNeedingReconciliation: gameState.cards.filter(
+          c => c.matchedByPlayerId !== undefined && !c.isMatched
+        ).length,
+      });
+      
+      if (isOnlineMode) {
+        // For online mode, update state and sync to Firestore
+        setFullGameState(reconciledState);
+        
+        // Manually sync to Firestore
+        try {
+          const adapter = getFirestoreSyncAdapter();
+          const currentVersion = (reconciledState as OnlineGameState).syncVersion || 0;
+          const newVersion = currentVersion + 1;
+          const onlineState: OnlineGameState = {
+            ...reconciledState,
+            syncVersion: newVersion,
+            lastUpdatedBy: localPlayerSlot || 1,
+            gameRound: (reconciledState as OnlineGameState).gameRound || 0,
+          };
+          await adapter.setState(onlineState);
+          console.log('[RECONCILE] Synced reconciled state to Firestore', { version: newVersion });
+        } catch (error) {
+          console.error('[RECONCILE] Failed to sync reconciled state:', error);
+        }
+      } else {
+        // For local mode, just update state
+        setFullGameState(reconciledState);
+      }
+    }
+  }, [gameState, isOnlineMode, setFullGameState, localPlayerSlot]);
+
+  // Handler for opening player matches modal - reconciles before opening
+  const handleOpenPlayerMatches = useCallback((playerId: number) => {
+    reconcileScores();
+    setSelectedPlayerForMatches(playerId);
+  }, [reconcileScores]);
 
   const boardWrapperRef = useRef<HTMLDivElement>(null);
   const scoreboardRef = useRef<HTMLDivElement>(null);
@@ -578,6 +623,20 @@ function App() {
       prevCurrentPlayerRef.current = null;
     }
   }, [gameState.currentPlayer, gameState.gameStatus]);
+
+  // Reconcile scores when total reaches 20 (game complete) - fixes race condition
+  useEffect(() => {
+    if (gameState.gameStatus === 'playing' && gameState.cards.length > 0) {
+      const player1Score = getPlayerScore(gameState.cards, 1);
+      const player2Score = getPlayerScore(gameState.cards, 2);
+      const totalScore = player1Score + player2Score;
+
+      if (totalScore === 20) {
+        console.log('[RECONCILE] Total score reached 20, reconciling matched cards');
+        reconcileScores();
+      }
+    }
+  }, [gameState.cards, gameState.gameStatus, reconcileScores]);
 
   // Helper function to convert hex color to RGB
   const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
@@ -1108,8 +1167,8 @@ function App() {
               </svg>
             </button>
 
-            {/* Fullscreen Button - fixed top right */}
-            {screenfull.isEnabled && (
+            {/* Top right - Fullscreen Button or Settings Button (if fullscreen not available) */}
+            {screenfull.isEnabled ? (
               <button
                 onClick={toggleFullscreen}
                 className="fixed top-5 right-5 z-10 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
@@ -1124,6 +1183,17 @@ function App() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                   </svg>
                 )}
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="fixed top-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+                title="Settings"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
               </button>
             )}
           </>
@@ -1159,11 +1229,27 @@ function App() {
               )}
             </div>
 
-            {/* Right side - Settings Button */}
-            <div className="fixed top-5 right-5 z-10">
+            {/* Top right - Fullscreen Button or Settings Button (if fullscreen not available) */}
+            {screenfull.isEnabled ? (
+              <button
+                onClick={toggleFullscreen}
+                className="fixed top-5 right-5 z-10 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                {isFullscreen ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                )}
+              </button>
+            ) : (
               <button
                 onClick={() => setIsSettingsOpen(true)}
-                className="p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+                className="fixed top-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
                 title="Settings"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1171,51 +1257,66 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </button>
-            </div>
-
-            {/* Settings Slide-over Menu */}
-            <div
-              className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'
-                }`}
-            >
-              <SettingsMenu
-                cardSize={cardSize}
-                autoSizeEnabled={autoSizeEnabled}
-                useWhiteCardBackground={useWhiteCardBackground}
-                flipDuration={flipDuration}
-                emojiSizePercentage={emojiSizePercentage}
-                ttsEnabled={ttsEnabled}
-                onIncreaseSize={increaseCardSize}
-                onDecreaseSize={decreaseCardSize}
-                onToggleAutoSize={toggleAutoSize}
-                onToggleWhiteCardBackground={toggleWhiteCardBackground}
-                onIncreaseFlipDuration={increaseFlipDuration}
-                onDecreaseFlipDuration={decreaseFlipDuration}
-                onIncreaseEmojiSize={increaseEmojiSize}
-                onDecreaseEmojiSize={decreaseEmojiSize}
-                onToggleTtsEnabled={toggleTtsEnabled}
-                onClose={() => setIsSettingsOpen(false)}
-                onToggleFullscreen={toggleFullscreen}
-                isFullscreen={isFullscreen}
-                onEndTurn={endTurn}
-                gameStatus={gameState.gameStatus}
-                onEnableAdmin={() => {
-                  setAdminEnabled(true);
-                  setShowAdminSidebar(true);
-                }}
-                onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
-                onReloadApp={() => setShowReloadConfirmation(true)}
-              />
-            </div>
-
-            {/* Backdrop when settings menu is open */}
-            {isSettingsOpen && (
-              <div
-                className="fixed inset-0 bg-black bg-opacity-50 z-40"
-                onClick={() => setIsSettingsOpen(false)}
-              />
             )}
+
           </>
+        )}
+
+        {/* Settings Slide-over Menu - Available in both setup and gameplay */}
+        <div
+          className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}
+        >
+          <SettingsMenu
+            cardSize={cardSize}
+            autoSizeEnabled={autoSizeEnabled}
+            useWhiteCardBackground={useWhiteCardBackground}
+            flipDuration={flipDuration}
+            emojiSizePercentage={emojiSizePercentage}
+            ttsEnabled={ttsEnabled}
+            onIncreaseSize={increaseCardSize}
+            onDecreaseSize={decreaseCardSize}
+            onToggleAutoSize={toggleAutoSize}
+            onToggleWhiteCardBackground={toggleWhiteCardBackground}
+            onIncreaseFlipDuration={increaseFlipDuration}
+            onDecreaseFlipDuration={decreaseFlipDuration}
+            onIncreaseEmojiSize={increaseEmojiSize}
+            onDecreaseEmojiSize={decreaseEmojiSize}
+            onToggleTtsEnabled={toggleTtsEnabled}
+            onClose={() => setIsSettingsOpen(false)}
+            onToggleFullscreen={toggleFullscreen}
+            isFullscreen={isFullscreen}
+            onEndTurn={endTurn}
+            gameStatus={gameState.gameStatus}
+            onEnableAdmin={() => {
+              setAdminEnabled(true);
+              setShowAdminSidebar(true);
+            }}
+            onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
+            onReloadApp={() => setShowReloadConfirmation(true)}
+          />
+        </div>
+
+        {/* Backdrop when settings menu is open - Available in both setup and gameplay */}
+        {isSettingsOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setIsSettingsOpen(false)}
+          />
+        )}
+
+        {/* Settings Button - fixed bottom right, only visible when fullscreen is enabled */}
+        {screenfull.isEnabled && (
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="fixed bottom-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+            title="Settings"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         )}
 
         <main>
@@ -1309,14 +1410,14 @@ function App() {
                     >
                       <div className="flex items-baseline gap-2">
                         <button
-                          onClick={() => setSelectedPlayerForMatches(1)}
+                          onClick={() => handleOpenPlayerMatches(1)}
                           className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
                           title="Click to view matches"
                         >
                           {gameState.players.find(p => p.id === 1)?.name || 'Player 1'}:
                         </button>
                         <button
-                          onClick={() => setSelectedPlayerForMatches(1)}
+                          onClick={() => handleOpenPlayerMatches(1)}
                           className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
                           style={gameState.currentPlayer === 1 ? { color: gameState.players.find(p => p.id === 1)?.color || '#3b82f6' } : {}}
                           title="Click to view matches"
@@ -1387,14 +1488,14 @@ function App() {
                     >
                       <div className="flex items-baseline gap-2">
                         <button
-                          onClick={() => setSelectedPlayerForMatches(2)}
+                          onClick={() => handleOpenPlayerMatches(2)}
                           className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
                           title="Click to view matches"
                         >
                           {gameState.players.find(p => p.id === 2)?.name || 'Player 2'}:
                         </button>
                         <button
-                          onClick={() => setSelectedPlayerForMatches(2)}
+                          onClick={() => handleOpenPlayerMatches(2)}
                           className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
                           style={gameState.currentPlayer === 2 ? { color: gameState.players.find(p => p.id === 2)?.color || '#10b981' } : {}}
                           title="Click to view matches"

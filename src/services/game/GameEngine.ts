@@ -638,3 +638,31 @@ export function validateState(state: unknown): state is GameState {
 
 	return true;
 }
+
+/**
+ * Reconcile matched cards - fixes race condition where matchedByPlayerId is set
+ * but isMatched is false (e.g., during flying animation or sync delays).
+ * This ensures consistency between ScoreBoard (which uses matchedByPlayerId)
+ * and PlayerMatchesModal (which requires both isMatched && matchedByPlayerId).
+ */
+export function reconcileMatchedCards(state: GameState): GameState {
+	const cardsNeedingReconciliation = state.cards.filter(
+		(c) => c.matchedByPlayerId !== undefined && !c.isMatched,
+	);
+
+	if (cardsNeedingReconciliation.length === 0) {
+		return state; // No changes needed
+	}
+
+	const newCards = state.cards.map((c) =>
+		c.matchedByPlayerId !== undefined && !c.isMatched
+			? {
+					...c,
+					isMatched: true,
+					isFlyingToPlayer: false,
+				}
+			: c,
+	);
+
+	return { ...state, cards: newCards };
+}
