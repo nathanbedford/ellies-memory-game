@@ -341,13 +341,36 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 
 		// Preserve sync version and gameRound (version is managed by useOnlineGame hook)
 		const existingState = state as OnlineGameState;
+		
+		// Clean undefined values from cards (Firestore doesn't accept undefined)
+		const cleanedCards = state.cards.map((card) => {
+			const cleaned: any = {
+				id: card.id,
+				imageId: card.imageId,
+				imageUrl: card.imageUrl,
+				isFlipped: card.isFlipped,
+				isMatched: card.isMatched,
+			};
+			// Only include optional fields if they have values
+			if (card.gradient !== undefined) cleaned.gradient = card.gradient;
+			if (card.isFlyingToPlayer !== undefined) cleaned.isFlyingToPlayer = card.isFlyingToPlayer;
+			if (card.flyingToPlayerId !== undefined) cleaned.flyingToPlayerId = card.flyingToPlayerId;
+			if (card.matchedByPlayerId !== undefined) cleaned.matchedByPlayerId = card.matchedByPlayerId;
+			return cleaned;
+		});
+		
 		const onlineState: OnlineGameState = {
 			...state,
+			cards: cleanedCards,
 			winner: state.winner ?? null, // Ensure null, not undefined (for Firestore)
 			isTie: state.isTie ?? false, // Ensure boolean value
 			syncVersion: existingState.syncVersion || 0,
 			gameRound: existingState.gameRound ?? 0, // Preserve gameRound if present
 		};
+		// Only include lastUpdatedBy if it exists
+		if (onlineState.lastUpdatedBy === undefined) {
+			delete (onlineState as any).lastUpdatedBy;
+		}
 
 		await updateDoc(roomRef, {
 			gameState: onlineState,
