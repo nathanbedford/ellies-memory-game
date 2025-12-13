@@ -30,9 +30,11 @@ import { PWAInstallModal } from './components/PWAInstallModal';
 import { AdminSidebar } from './components/AdminSidebar';
 import { ModeSelector, OnlineLobby, OpponentDisconnectOverlay } from './components/online';
 import { useOpponentDisconnect } from './hooks/useOpponentDisconnect';
+import { PairCountModal } from './components/PairCountModal';
+import { useGameStore } from './stores/gameStore';
 import screenfull from 'screenfull';
 
-type SetupStep = 'modeSelect' | 'theme' | 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
+type SetupStep = 'modeSelect' | 'theme' | 'cardPack' | 'background' | 'cardBack' | 'pairCount' | 'startGame' | null;
 
 const ENABLE_SETUP_DEBUG_LOGS = true;
 
@@ -52,7 +54,13 @@ const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
 const TEST_COMBO_SEQUENCE = ['1', '2', '2', '5', '1', '2', '2', '5'];
 
 function App() {
-  const { selectedPack, setSelectedPack, getCurrentPackImages, cardPacks } = useCardPacks();
+  const { selectedPack, setSelectedPack, getCurrentPackImages, getPackImagesForPairCount, cardPacks } = useCardPacks();
+  
+  // Get pair count settings from game store
+  const localPairCount = useGameStore((state) => state.settings.localPairCount);
+  const onlinePairCount = useGameStore((state) => state.settings.onlinePairCount);
+  const setLocalPairCount = useGameStore((state) => state.setLocalPairCount);
+  const setOnlinePairCount = useGameStore((state) => state.setOnlinePairCount);
   // Local game hook - always used for settings, and for game logic in local mode
   const localGame = useMemoryGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
@@ -113,7 +121,7 @@ function App() {
   }, []);
 
   const startOnlineRound = useCallback(
-    async (options: { firstPlayer: 1 | 2; pack: CardPack; background: BackgroundTheme; cardBack: CardBackType }) => {
+    async (options: { firstPlayer: 1 | 2; pack: CardPack; background: BackgroundTheme; cardBack: CardBackType; pairCount?: number }) => {
       if (!roomCode || !room || !isHost) {
         console.warn('[Online] Only the host can start a new round');
         return;
@@ -130,7 +138,14 @@ function App() {
           return;
         }
 
-        const cards = initializeCards(getPackImagesById(options.pack));
+        // Get images for the pack, filtered by pair count if specified
+        const allPackImages = getPackImagesById(options.pack);
+        const pairCount = options.pairCount || 20;
+        const imagesToUse = pairCount < allPackImages.length
+          ? allPackImages.sort(() => Math.random() - 0.5).slice(0, pairCount)
+          : allPackImages;
+        
+        const cards = initializeCards(imagesToUse);
         const initialState = createInitialState(
           hostPlayer.name,
           guestPlayer.name,
@@ -153,10 +168,11 @@ function App() {
 
         await adapter.setState(onlineState);
 
-        const configUpdates: { cardPack?: CardPack; background?: string; cardBack?: string } = {};
+        const configUpdates: { cardPack?: CardPack; background?: string; cardBack?: string; pairCount?: number } = {};
         if (room.config?.cardPack !== options.pack) configUpdates.cardPack = options.pack;
         if (room.config?.background !== options.background) configUpdates.background = options.background;
         if (room.config?.cardBack !== options.cardBack) configUpdates.cardBack = options.cardBack;
+        if (room.config?.pairCount !== pairCount) configUpdates.pairCount = pairCount;
         if (Object.keys(configUpdates).length > 0) {
           await updateRoomConfig(configUpdates);
         }
@@ -330,7 +346,7 @@ function App() {
 
   // Guarded setSetupStep that prevents unintended backward navigation
   const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
-    const stepOrder: SetupStep[] = ['modeSelect', 'theme', 'cardPack', 'background', 'cardBack', 'startGame'];
+    const stepOrder: SetupStep[] = ['modeSelect', 'theme', 'cardPack', 'background', 'cardBack', 'pairCount', 'startGame'];
     const diagnosticBase = {
       from: setupStep,
       to: newStep,
@@ -773,8 +789,8 @@ function App() {
     setSelectedBackground(theme.background as BackgroundTheme);
     setSelectedCardBack(theme.cardBack as CardBackType);
     setCameFromTheme(true); // Mark that we came from theme selection
-    // Skip directly to start game
-    guardedSetSetupStep('startGame', 'theme selected');
+    // Go to pair count selection before start game
+    guardedSetSetupStep('pairCount', 'theme selected');
   };
 
   const handleBuildCustom = () => {
@@ -796,7 +812,26 @@ function App() {
   const handleCardBackChange = (newCardBack: CardBackType) => {
     setSelectedCardBack(newCardBack);
     setCameFromTheme(false); // Mark that we came from custom build flow
-    guardedSetSetupStep('startGame', 'card back selected');
+    guardedSetSetupStep('pairCount', 'card back selected');
+  };
+
+  const handlePairCountChange = (count: number) => {
+    // Store pair count based on game mode
+    if (gameMode === 'online') {
+      setOnlinePairCount(count);
+    } else {
+      setLocalPairCount(count);
+    }
+    guardedSetSetupStep('startGame', 'pair count selected');
+  };
+
+  const handlePairCountModalBack = () => {
+    isBackNavigationRef.current = true;
+    if (cameFromTheme) {
+      guardedSetSetupStep('theme', 'back button from pair count modal (from theme)');
+    } else {
+      guardedSetSetupStep('cardBack', 'back button from pair count modal (from custom)');
+    }
   };
 
   const handleResetClick = () => {
@@ -929,13 +964,9 @@ function App() {
   }, [leaveRoom, resetGame, guardedSetSetupStep]);
 
   const handleStartModalBack = () => {
-    // Go back based on where we came from
+    // Go back to pair count selection (always, since it's the step before startGame)
     isBackNavigationRef.current = true;
-    if (cameFromTheme) {
-      guardedSetSetupStep('theme', 'back button from start modal (from theme)');
-    } else {
-      guardedSetSetupStep('cardBack', 'back button from start modal (from custom)');
-    }
+    guardedSetSetupStep('pairCount', 'back button from start modal');
   };
 
   const handleCardBackModalBack = () => {
@@ -952,6 +983,9 @@ function App() {
 
   const handleStartGame = (firstPlayer: number) => {
     const normalizedFirstPlayer = (firstPlayer === 2 ? 2 : 1) as 1 | 2;
+    
+    // Get the appropriate pair count based on game mode
+    const activePairCount = gameMode === 'online' ? onlinePairCount : localPairCount;
 
     if (isOnlineMode) {
       if (!isHost) {
@@ -964,6 +998,7 @@ function App() {
         pack: selectedPack,
         background: selectedBackground,
         cardBack: selectedCardBack,
+        pairCount: activePairCount,
       });
 
       guardedSetSetupStep(null, 'game started');
@@ -977,7 +1012,8 @@ function App() {
       return;
     }
 
-    const images = getCurrentPackImages();
+    // Get a random subset of images based on selected pair count
+    const images = getPackImagesForPairCount(activePairCount);
     initializeGame(images, true); // true = start playing with animation
     startGameWithFirstPlayer(firstPlayer);
     guardedSetSetupStep(null, 'game started');
@@ -1345,7 +1381,7 @@ function App() {
           )}
 
           {/* Online Lobby */}
-          {setupStep === 'modeSelect' && gameMode === 'online' && (
+          {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode === 'online' && (
             <div className="flex flex-col items-center min-h-[60vh] overflow-y-auto max-h-[calc(100vh-4rem)] py-4">
               <OnlineLobby
                 onBack={() => {
@@ -1605,7 +1641,7 @@ function App() {
           isOpen={setupStep === 'startGame'}
           onClose={cancelSetupFlow}
           onBack={handleStartModalBack}
-          title={cameFromTheme ? "Step 2: Who Goes First?" : (isResetting ? "Step 4: Who Goes First?" : "Step 4: Who Goes First?")}
+          title={cameFromTheme ? "Step 3: Who Goes First?" : (isResetting ? "Step 5: Who Goes First?" : "Step 6: Who Goes First?")}
         >
           <GameStartModal
             players={gameState.players}
@@ -1678,6 +1714,20 @@ function App() {
             onClose={cancelSetupFlow}
             onBack={handleCardBackModalBack}
             isResetting={isResetting}
+          />
+        </Modal>
+
+        {/* Pair Count Modal */}
+        <Modal
+          isOpen={setupStep === 'pairCount'}
+          onClose={cancelSetupFlow}
+          onBack={handlePairCountModalBack}
+          title={cameFromTheme ? "Step 2: How Many Pairs?" : (isResetting ? "Step 4: How Many Pairs?" : "Step 5: How Many Pairs?")}
+        >
+          <PairCountModal
+            selectedPairCount={gameMode === 'online' ? onlinePairCount : localPairCount}
+            onSelect={handlePairCountChange}
+            onClose={cancelSetupFlow}
           />
         </Modal>
 

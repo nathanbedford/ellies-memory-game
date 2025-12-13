@@ -4,6 +4,7 @@ import { Card } from './Card';
 import { RemoteCursor } from './online/RemoteCursor';
 import type { Card as CardType, CursorPosition } from '../types';
 import type { CardBackOption } from '../hooks/useCardBackSelector';
+import { calculateGridDimensions } from '../utils/gridLayout';
 
 interface RemoteCursorData {
   position: CursorPosition;
@@ -19,6 +20,8 @@ interface GameBoardProps {
   useWhiteCardBackground?: boolean;
   emojiSizePercentage?: number;
   cardBack?: CardBackOption;
+  // Grid configuration - if not provided, derived from card count
+  columns?: number;
   // Cursor tracking props (for online mode)
   onCursorMove?: (event: React.MouseEvent<HTMLDivElement>, boardRect: DOMRect) => void;
   onCursorLeave?: () => void;
@@ -31,10 +34,20 @@ interface CardAnimationData {
   rotation: number;
 }
 
-export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack, onCursorMove, onCursorLeave, remoteCursor }: GameBoardProps) => {
+export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack, columns: columnsProp, onCursorMove, onCursorLeave, remoteCursor }: GameBoardProps) => {
   const [lightboxCardId, setLightboxCardId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Calculate columns from card count if not provided
+  const columns = useMemo(() => {
+    if (columnsProp) return columnsProp;
+    // Derive pair count from card count (cards / 2)
+    const pairCount = Math.floor(cards.length / 2);
+    return calculateGridDimensions(pairCount).columns;
+  }, [columnsProp, cards.length]);
+
+  const gap = 8; // Gap between cards in pixels
 
   // Handle mouse move on the board
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -76,15 +89,15 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
     const viewportHeight = window.innerHeight;
 
     return cards.map((_, index) => {
-      // Calculate card's position in grid
-      const col = index % 8;
-      const row = Math.floor(index / 8);
+      // Calculate card's position in grid using dynamic columns
+      const col = index % columns;
+      const row = Math.floor(index / columns);
 
       // Estimate card's final position (center of game board)
-      const boardWidth = (cardSize * 8) + (8 * 7); // 8 cards + 7 gaps
+      const boardWidth = (cardSize * columns) + (gap * (columns - 1));
       const boardLeft = (viewportWidth - boardWidth) / 2;
-      const cardCenterX = boardLeft + (col * (cardSize + 8)) + (cardSize / 2);
-      const cardCenterY = viewportHeight / 2 + (row * (cardSize + 8)) - (cardSize / 2);
+      const cardCenterX = boardLeft + (col * (cardSize + gap)) + (cardSize / 2);
+      const cardCenterY = viewportHeight / 2 + (row * (cardSize + gap)) - (cardSize / 2);
 
       // Random edge: 0 = top, 1 = right, 2 = bottom, 3 = left
       const edge = Math.floor(Math.random() * 4);
@@ -123,7 +136,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         rotation
       };
     });
-  }, [isAnimating, cardSize, cards]);
+  }, [isAnimating, cardSize, cards, columns, gap]);
 
   // Calculate fly-to-player animation data
   const flyToPlayerData = useMemo(() => {
@@ -294,10 +307,11 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
 
       <div
         ref={boardRef}
-        className="grid grid-cols-8 gap-2 max-w-none mx-auto justify-center relative"
+        className="grid gap-2 max-w-none mx-auto justify-center relative"
         style={{
           perspective: '1000px',
-          width: `${(cardSize * 8) + (8 * 7)}px` // 8 cards + 7 gaps
+          gridTemplateColumns: `repeat(${columns}, ${cardSize}px)`,
+          width: `${(cardSize * columns) + (gap * (columns - 1))}px`
         }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}

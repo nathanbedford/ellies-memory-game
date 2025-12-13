@@ -107,6 +107,7 @@ interface OnlineStoreActions {
 		cardPack?: CardPack;
 		background?: string;
 		cardBack?: string;
+		pairCount?: number;
 	}) => Promise<void>;
 
 	// Player actions

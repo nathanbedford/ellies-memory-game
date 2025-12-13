@@ -290,6 +290,9 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		if (config.cardBack !== undefined) {
 			updates["config.cardBack"] = config.cardBack;
 		}
+		if (config.pairCount !== undefined) {
+			updates["config.pairCount"] = config.pairCount;
+		}
 
 		await updateDoc(roomRef, updates);
 	}

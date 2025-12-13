@@ -97,6 +97,7 @@ export interface RoomConfig {
 	cardPack: CardPack;
 	background: string;
 	cardBack: string;
+	pairCount?: number; // Number of pairs (4-20), defaults to 20 if not set
 	createdAt: number;
 	lastActivity: number;
 }
@@ -115,6 +116,7 @@ export interface Room {
 		cardPack: CardPack;
 		background: string;
 		cardBack: string;
+		pairCount?: number; // Number of pairs (4-20), defaults to 20 if not set
 	} | null;
 	players: Record<
 		string,

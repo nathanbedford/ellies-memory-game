@@ -15,6 +15,7 @@ import {
 	updatePlayerName as engineUpdatePlayerName,
 	updatePlayerColor as engineUpdatePlayerColor,
 } from "../services/game/GameEngine";
+import { calculateGridDimensions } from "../utils/gridLayout";
 
 // Helper function to format imageId into a readable name for TTS
 const formatCardNameForSpeech = (imageId: string): string => {
@@ -155,9 +156,13 @@ export const useMemoryGame = () => {
 			const viewportWidth = window.innerWidth;
 			const viewportHeight = window.innerHeight;
 
+			// Calculate grid dimensions based on pair count
+			const pairCount = Math.floor(cardCount / 2);
+			const { columns, rows: gridRows } = calculateGridDimensions(pairCount);
+
 			const horizontalPadding = 80;
 			const gapSize = 8;
-			const totalHorizontalGaps = 7 * gapSize;
+			const totalHorizontalGaps = (columns - 1) * gapSize;
 
 			// Use provided metrics override, or fall back to state layoutMetrics
 			const metrics = metricsOverride || layoutMetrics;
@@ -170,12 +175,12 @@ export const useMemoryGame = () => {
 				0,
 			);
 
-			const actualRows = Math.max(Math.ceil(cardCount / 8), 1);
+			const actualRows = Math.max(gridRows, 1);
 			const widthForCards = Math.max(
 				effectiveBoardWidth - totalHorizontalGaps,
-				actualRows,
+				columns,
 			);
-			const maxWidthBasedSize = Math.floor(widthForCards / 8);
+			const maxWidthBasedSize = Math.floor(widthForCards / columns);
 
 			const totalVerticalGaps = (actualRows - 1) * gapSize;
 			const safetyMargin = 10;
@@ -209,6 +214,8 @@ export const useMemoryGame = () => {
 
 			console.log("[AUTO-SIZE] Calculated optimal size", {
 				cardCount,
+				pairCount,
+				columns,
 				actualRows,
 				viewportWidth,
 				viewportHeight,
