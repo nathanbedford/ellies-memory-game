@@ -17,6 +17,8 @@ import { CardPackModal } from './components/CardPackModal';
 import { BackgroundModal } from './components/BackgroundModal';
 import { CardBackModal } from './components/CardBackModal';
 import { GameStartModal } from './components/GameStartModal';
+import { ThemeSelectorModal } from './components/ThemeSelectorModal';
+import { GameTheme } from './types';
 import { ResetConfirmationModal } from './components/ResetConfirmationModal';
 import { SettingsMenu } from './components/SettingsMenu';
 import { PlayerMatchesModal } from './components/PlayerMatchesModal';
@@ -30,7 +32,7 @@ import { ModeSelector, OnlineLobby, OpponentDisconnectOverlay } from './componen
 import { useOpponentDisconnect } from './hooks/useOpponentDisconnect';
 import screenfull from 'screenfull';
 
-type SetupStep = 'modeSelect' | 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
+type SetupStep = 'modeSelect' | 'theme' | 'cardPack' | 'background' | 'cardBack' | 'startGame' | null;
 
 const ENABLE_SETUP_DEBUG_LOGS = true;
 
@@ -75,6 +77,7 @@ function App() {
     return (saved as SetupStep) || null;
   });
   const [isResetting, setIsResetting] = useState(false);
+  const [cameFromTheme, setCameFromTheme] = useState(false); // Track if we came from theme selection
   const [originalPack, setOriginalPack] = useState<string | null>(null);
   const [originalBackground, setOriginalBackground] = useState<BackgroundTheme | null>(null);
   const [originalCardBack, setOriginalCardBack] = useState<CardBackType | null>(null);
@@ -299,7 +302,7 @@ function App() {
 
   // Guarded setSetupStep that prevents unintended backward navigation
   const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
-    const stepOrder: SetupStep[] = ['modeSelect', 'cardPack', 'background', 'cardBack', 'startGame'];
+    const stepOrder: SetupStep[] = ['modeSelect', 'theme', 'cardPack', 'background', 'cardBack', 'startGame'];
     const diagnosticBase = {
       from: setupStep,
       to: newStep,
@@ -696,6 +699,22 @@ function App() {
     }
   };
 
+  const handleThemeSelect = (theme: GameTheme) => {
+    // Apply theme settings
+    setSelectedPack(theme.cardPack as CardPack);
+    setSelectedBackground(theme.background as BackgroundTheme);
+    setSelectedCardBack(theme.cardBack as CardBackType);
+    setCameFromTheme(true); // Mark that we came from theme selection
+    // Skip directly to start game
+    guardedSetSetupStep('startGame', 'theme selected');
+  };
+
+  const handleBuildCustom = () => {
+    setCameFromTheme(false); // Mark that we're building custom
+    // Continue to card pack selection
+    guardedSetSetupStep('cardPack', 'build custom selected');
+  };
+
   const handlePackChange = (newPack: string) => {
     setSelectedPack(newPack as CardPack);
     guardedSetSetupStep('background', 'pack selected');
@@ -708,6 +727,7 @@ function App() {
 
   const handleCardBackChange = (newCardBack: CardBackType) => {
     setSelectedCardBack(newCardBack);
+    setCameFromTheme(false); // Mark that we came from custom build flow
     guardedSetSetupStep('startGame', 'card back selected');
   };
 
@@ -782,8 +802,9 @@ function App() {
     }
 
     setIsResetting(true);
+    setCameFromTheme(false); // Reset theme tracking
     resetGame();
-    guardedSetSetupStep('cardPack', 'new game clicked');
+    guardedSetSetupStep('theme', 'new game clicked');
     setShowResetConfirmation(false);
   };
 
@@ -821,6 +842,7 @@ function App() {
       }
       setIsResetting(false);
     }
+    setCameFromTheme(false); // Reset theme tracking
     guardedSetSetupStep(null, 'cancel setup flow');
   };
 
@@ -839,9 +861,13 @@ function App() {
   }, [leaveRoom, resetGame, guardedSetSetupStep]);
 
   const handleStartModalBack = () => {
-    // Go back to card back selection (intentional backward navigation)
+    // Go back based on where we came from
     isBackNavigationRef.current = true;
-    guardedSetSetupStep('cardBack', 'back button from start modal');
+    if (cameFromTheme) {
+      guardedSetSetupStep('theme', 'back button from start modal (from theme)');
+    } else {
+      guardedSetSetupStep('cardBack', 'back button from start modal (from custom)');
+    }
   };
 
   const handleCardBackModalBack = () => {
@@ -1219,7 +1245,7 @@ function App() {
                   onSelectMode={(mode: GameMode) => {
                     setGameMode(mode);
                     if (mode === 'local') {
-                      guardedSetSetupStep('cardPack', 'local mode selected');
+                      guardedSetSetupStep('theme', 'local mode selected');
                     }
                     // For online mode, stay on modeSelect but render OnlineLobby
                   }}
@@ -1489,7 +1515,7 @@ function App() {
           isOpen={setupStep === 'startGame'}
           onClose={cancelSetupFlow}
           onBack={handleStartModalBack}
-          title={isResetting ? "Step 4: Who Goes First?" : "Step 4: Who Goes First?"}
+          title={cameFromTheme ? "Step 2: Who Goes First?" : (isResetting ? "Step 4: Who Goes First?" : "Step 4: Who Goes First?")}
         >
           <GameStartModal
             players={gameState.players}
@@ -1502,11 +1528,28 @@ function App() {
           />
         </Modal>
 
+        {/* Theme Selector Modal */}
+        <Modal
+          isOpen={setupStep === 'theme'}
+          onClose={cancelSetupFlow}
+          onBack={() => {
+            isBackNavigationRef.current = true;
+            guardedSetSetupStep('modeSelect', 'back button from theme modal');
+          }}
+          title={isResetting ? "Step 1: Choose Your Theme" : "Step 1: Choose Your Theme"}
+        >
+          <ThemeSelectorModal
+            onSelectTheme={handleThemeSelect}
+            onBuildCustom={handleBuildCustom}
+            onClose={cancelSetupFlow}
+          />
+        </Modal>
+
         {/* Card Pack Modal */}
         <Modal
           isOpen={setupStep === 'cardPack'}
           onClose={cancelSetupFlow}
-          title={isResetting ? "Step 1: Choose Your Card Pack" : "Step 1: Choose Your Card Pack"}
+          title={isResetting ? "Step 1: Choose Your Card Pack" : "Step 2: Choose Your Card Pack"}
         >
           <CardPackModal
             cardPacks={cardPacks}
@@ -1521,7 +1564,7 @@ function App() {
           isOpen={setupStep === 'background'}
           onClose={cancelSetupFlow}
           onBack={handleBackgroundModalBack}
-          title={isResetting ? "Step 2: Choose Your Background" : "Step 2: Choose Your Background"}
+          title={isResetting ? "Step 2: Choose Your Background" : "Step 3: Choose Your Background"}
         >
           <BackgroundModal
             selectedBackground={selectedBackground}
@@ -1537,7 +1580,7 @@ function App() {
           isOpen={setupStep === 'cardBack'}
           onClose={cancelSetupFlow}
           onBack={handleCardBackModalBack}
-          title={isResetting ? "Step 3: Choose Your Card Back" : "Step 3: Choose Your Card Back"}
+          title={isResetting ? "Step 3: Choose Your Card Back" : "Step 4: Choose Your Card Back"}
         >
           <CardBackModal
             selectedCardBack={selectedCardBack}

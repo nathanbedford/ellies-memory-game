@@ -55,6 +55,21 @@ export interface CardPackOption {
 }
 
 // ============================================
+// Game Theme Types
+// ============================================
+
+export interface GameTheme {
+	id: string;
+	name: string;
+	description: string;
+	category: 'holiday' | 'nature' | 'kids' | 'educational';
+	cardPack: CardPack;
+	background: string; // BackgroundTheme as string
+	cardBack: string; // CardBackType as string
+	previewEmoji: string; // For quick visual identification
+}
+
+// ============================================
 // Online Multiplayer Types
 // ============================================
 
