@@ -7,23 +7,12 @@ interface TextToSpeechOptions {
   lang?: string;
 }
 
-/**
- * Formats an imageId (e.g., "juvenile-trex") into a readable name for speech (e.g., "Juvenile Trex")
- */
-export const formatCardNameForSpeech = (imageId: string): string => {
-	return imageId
-		.split('-')
-		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(' ');
-};
-
 export const useTextToSpeech = () => {
   const speechSynthesisRef = useRef<typeof speechSynthesis | null>(null);
   const isSpeakingRef = useRef(false);
   const voicesLoadedRef = useRef(false);
   const lastSpeakTimeRef = useRef(0);
   const lastTextRef = useRef<string>('');
-  const delayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Initialize speechSynthesis
   useEffect(() => {
@@ -142,62 +131,15 @@ export const useTextToSpeech = () => {
   }, [speak]);
 
   // Helper function to speak a match found message
-  const speakMatchFound = useCallback((playerName: string, cardName?: string) => {
-    if (cardName) {
-      speak(`${playerName} found a ${cardName}! It's still their turn.`);
-    } else {
-      speak(`${playerName} found a match! It's still their turn`);
-    }
+  const speakMatchFound = useCallback((playerName: string) => {
+    speak(`${playerName} found a match! It's still their turn`);
   }, [speak]);
-
-  // Cancel any pending delayed announcements
-  const cancelPendingAnnouncements = useCallback(() => {
-    if (delayTimeoutRef.current) {
-      clearTimeout(delayTimeoutRef.current);
-      delayTimeoutRef.current = null;
-    }
-  }, []);
-
-  // Speak a match announcement with delay (debounced)
-  const speakMatchWithDelay = useCallback((
-    playerName: string,
-    cardName: string,
-    delayMs: number = 400
-  ) => {
-    cancelPendingAnnouncements();
-    delayTimeoutRef.current = setTimeout(() => {
-      speakMatchFound(playerName, cardName);
-      delayTimeoutRef.current = null;
-    }, delayMs);
-  }, [speakMatchFound, cancelPendingAnnouncements]);
-
-  // Speak a turn announcement with delay (debounced)
-  const speakTurnWithDelay = useCallback((
-    playerName: string,
-    delayMs: number = 400
-  ) => {
-    cancelPendingAnnouncements();
-    delayTimeoutRef.current = setTimeout(() => {
-      speakPlayerTurn(playerName);
-      delayTimeoutRef.current = null;
-    }, delayMs);
-  }, [speakPlayerTurn, cancelPendingAnnouncements]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cancelPendingAnnouncements();
-    };
-  }, [cancelPendingAnnouncements]);
 
   return {
     isAvailable,
     speak,
     speakPlayerTurn,
     speakMatchFound,
-    speakMatchWithDelay,
-    speakTurnWithDelay,
-    cancelPendingAnnouncements,
     cancel
   };
 };

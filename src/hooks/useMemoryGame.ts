@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { Card, Player, GameState } from "../types";
-import { useTextToSpeech, formatCardNameForSpeech } from "./useTextToSpeech";
+import { useTextToSpeech } from "./useTextToSpeech";
 import {
 	sortPlayersByID,
 	getPlayerById,
@@ -15,6 +15,14 @@ import {
 	updatePlayerName as engineUpdatePlayerName,
 	updatePlayerColor as engineUpdatePlayerColor,
 } from "../services/game/GameEngine";
+
+// Helper function to format imageId into a readable name for TTS
+const formatCardNameForSpeech = (imageId: string): string => {
+	return imageId
+		.split('-')
+		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ');
+};
 
 export const useMemoryGame = () => {
 	const [gameState, setGameState] = useState<GameState>(() => {
@@ -135,12 +143,12 @@ export const useMemoryGame = () => {
 
 	// Initialize text-to-speech
 	const {
-		speakMatchWithDelay,
-		speakTurnWithDelay,
+		speakPlayerTurn,
+		speak,
 		isAvailable,
-		cancelPendingAnnouncements,
 		cancel: cancelTTS,
 	} = useTextToSpeech();
+	const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const updateAutoSizeMetrics = useCallback(
 		(metrics: {
@@ -436,7 +444,9 @@ export const useMemoryGame = () => {
 
 				// Announce first player's turn after a short delay
 				if (ttsEnabled && isAvailable()) {
-					speakTurnWithDelay(firstPlayerName);
+					setTimeout(() => {
+						speakPlayerTurn(firstPlayerName);
+					}, 400);
 				}
 
 				return {
@@ -449,7 +459,7 @@ export const useMemoryGame = () => {
 			localStorage.setItem("firstPlayer", firstPlayer.toString());
 			isInitialLoadRef.current = false;
 		},
-		[speakTurnWithDelay, isAvailable, ttsEnabled],
+		[speakPlayerTurn, isAvailable, ttsEnabled],
 	);
 
 	const showStartGameModal = useCallback(() => {
@@ -513,7 +523,10 @@ export const useMemoryGame = () => {
 			matchCheckTimeoutRef.current = null;
 		}
 		// Cancel any pending TTS
-		cancelPendingAnnouncements();
+		if (ttsDelayTimeoutRef.current) {
+			clearTimeout(ttsDelayTimeoutRef.current);
+			ttsDelayTimeoutRef.current = null;
+		}
 		cancelTTS();
 		isCheckingMatchRef.current = false;
 		setAllCardsFlipped(false);
@@ -636,7 +649,13 @@ export const useMemoryGame = () => {
 
 					// Announce match found immediately (don't wait for animation)
 					if (ttsEnabled && isAvailable()) {
-						speakMatchWithDelay(matchedPlayerName, matchedCardName);
+						if (ttsDelayTimeoutRef.current) {
+							clearTimeout(ttsDelayTimeoutRef.current);
+						}
+						ttsDelayTimeoutRef.current = setTimeout(() => {
+							speak(`${matchedPlayerName} found a ${matchedCardName}! It's still their turn.`);
+							ttsDelayTimeoutRef.current = null;
+						}, 400);
 					}
 
 					// After animation completes, mark as matched using GameEngine
@@ -705,10 +724,16 @@ export const useMemoryGame = () => {
 
 					// Announce next player's turn
 					if (ttsEnabled && isAvailable()) {
-						const nextPlayerName =
-							getPlayerById(noMatchState.players, nextPlayer)?.name ||
-							`Player ${nextPlayer}`;
-						speakTurnWithDelay(nextPlayerName);
+						if (ttsDelayTimeoutRef.current) {
+							clearTimeout(ttsDelayTimeoutRef.current);
+						}
+						ttsDelayTimeoutRef.current = setTimeout(() => {
+							const nextPlayerName =
+								getPlayerById(noMatchState.players, nextPlayer)?.name ||
+								`Player ${nextPlayer}`;
+							speakPlayerTurn(nextPlayerName);
+							ttsDelayTimeoutRef.current = null;
+						}, 400);
 					}
 
 					// Reset the checking flag
@@ -722,7 +747,7 @@ export const useMemoryGame = () => {
 				}
 			});
 		},
-		[speakMatchWithDelay, speakTurnWithDelay, isAvailable, ttsEnabled],
+		[speakPlayerTurn, speak, isAvailable, ttsEnabled],
 	);
 
 	const endTurn = useCallback(() => {
@@ -732,7 +757,10 @@ export const useMemoryGame = () => {
 			matchCheckTimeoutRef.current = null;
 		}
 		// Cancel any pending TTS
-		cancelPendingAnnouncements();
+		if (ttsDelayTimeoutRef.current) {
+			clearTimeout(ttsDelayTimeoutRef.current);
+			ttsDelayTimeoutRef.current = null;
+		}
 		cancelTTS();
 		isCheckingMatchRef.current = false;
 
@@ -795,7 +823,10 @@ export const useMemoryGame = () => {
 			// Cancel any ongoing TTS when disabling
 			if (!newValue) {
 				cancelTTS();
-				cancelPendingAnnouncements();
+				if (ttsDelayTimeoutRef.current) {
+					clearTimeout(ttsDelayTimeoutRef.current);
+					ttsDelayTimeoutRef.current = null;
+				}
 			}
 			return newValue;
 		});

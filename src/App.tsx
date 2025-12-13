@@ -118,7 +118,6 @@ function App() {
     localPlayerSlot: localPlayerSlot || 1,
     flipDuration: localGame.flipDuration,
     initialGameState: room?.gameState || localGame.gameState,
-    ttsEnabled: localGame.ttsEnabled,
   });
 
   const getPackImagesById = useCallback((packId: CardPack) => {
