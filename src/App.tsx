@@ -1366,7 +1366,7 @@ function App() {
         <main>
           {/* Mode Selection Screen (merged with Welcome) */}
           {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode !== 'online' && (
-            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="fixed inset-0 flex items-center justify-center z-0">
               <div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
                 <ModeSelector
                   onSelectMode={(mode: GameMode) => {
