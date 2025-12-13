@@ -16,8 +16,10 @@ import { ThemeSelectorModal } from '../ThemeSelectorModal';
 import { CardPackModal } from '../CardPackModal';
 import { BackgroundModal } from '../BackgroundModal';
 import { CardBackModal } from '../CardBackModal';
+import { PairCountModal } from '../PairCountModal';
+import { DEFAULT_PAIR_COUNT } from '../../utils/gridLayout';
 
-type OpenModal = 'none' | 'theme' | 'cardPack' | 'background' | 'cardBack';
+type OpenModal = 'none' | 'theme' | 'cardPack' | 'background' | 'cardBack' | 'pairCount';
 
 interface WaitingRoomProps {
   roomCode: string;
@@ -79,6 +81,7 @@ export const WaitingRoom = ({
   const currentCardPack = room.config?.cardPack || initialSettings.cardPack;
   const currentBackground = room.config?.background || initialSettings.background;
   const currentCardBack = room.config?.cardBack || initialSettings.cardBack;
+  const currentPairCount = room.config?.pairCount ?? DEFAULT_PAIR_COUNT;
 
   // Load stored preferences into room config if host and no config exists
   useEffect(() => {
@@ -133,6 +136,13 @@ export const WaitingRoom = ({
   const handleCardBackChange = async (cardBackId: string) => {
     if (!isHost) return;
     await updateRoomConfig({ cardBack: cardBackId });
+    // Advance to pair count modal
+    setOpenModal('pairCount');
+  };
+
+  const handlePairCountChange = async (pairCount: number) => {
+    if (!isHost) return;
+    await updateRoomConfig({ pairCount });
     // Close wizard - all settings configured
     setOpenModal('none');
   };
@@ -361,6 +371,16 @@ export const WaitingRoom = ({
                 cardBackInfo?.name || currentCardBack
               )}
 
+              {/* Pair Count */}
+              {renderSettingTile(
+                'Cards',
+                'pairCount',
+                <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-sm">
+                  {currentPairCount * 2}
+                </div>,
+                `${currentPairCount} pairs`
+              )}
+
               {/* Empty space if host, or placeholder if guest */}
               {!isHost && (
                 <div className="p-2 rounded-lg border-2 border-gray-200 bg-gray-50 opacity-50">
@@ -470,6 +490,20 @@ export const WaitingRoom = ({
           onSelect={(cardBackId) => handleCardBackChange(cardBackId)}
           onClose={() => setOpenModal('none')}
           onBack={() => setOpenModal('background')}
+        />
+      </Modal>
+
+      {/* Pair Count Modal */}
+      <Modal
+        isOpen={openModal === 'pairCount'}
+        onClose={() => setOpenModal('none')}
+        onBack={() => setOpenModal('cardBack')}
+        title="Step 4: How Many Pairs?"
+      >
+        <PairCountModal
+          selectedPairCount={currentPairCount}
+          onSelect={(pairCount) => handlePairCountChange(pairCount)}
+          onClose={() => setOpenModal('none')}
         />
       </Modal>
     </div>

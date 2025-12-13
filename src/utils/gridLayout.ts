@@ -28,8 +28,8 @@ const OPTIMAL_LAYOUTS: Record<number, GridDimensions> = {
   14: { columns: 7, rows: 4 },   // 28 cards
   15: { columns: 6, rows: 5 },   // 30 cards
   16: { columns: 8, rows: 4 },   // 32 cards
-  17: { columns: 6, rows: 6 },   // 34 cards (with 2 empty spots conceptually)
-  18: { columns: 6, rows: 6 },   // 36 cards
+  17: { columns: 7, rows: 5 },   // 34 cards (with 1 empty spot)
+  18: { columns: 8, rows: 5 },   // 36 cards (with 4 empty spots)
   19: { columns: 8, rows: 5 },   // 38 cards (with 2 empty spots conceptually)
   20: { columns: 8, rows: 5 },   // 40 cards
 };
@@ -113,7 +113,7 @@ export function getGridDescription(pairCount: number): string {
  * Valid pair count options for the selector UI.
  * These are the recommended pair counts that produce nice layouts.
  */
-export const PAIR_COUNT_OPTIONS = [4, 5, 6, 8, 10, 12, 15, 16, 18, 20] as const;
+export const PAIR_COUNT_OPTIONS = [4, 6, 8, 10, 12, 15, 16, 20] as const;
 
 /**
  * Minimum and maximum pair counts.

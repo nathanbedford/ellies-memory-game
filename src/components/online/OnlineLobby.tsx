@@ -15,6 +15,7 @@ import { WaitingRoom } from './WaitingRoom';
 import { getFirestoreSyncAdapter } from '../../services/sync/FirestoreSyncAdapter';
 import { initializeCards, createInitialState, startGameWithCards } from '../../services/game/GameEngine';
 import { CARD_DECKS } from '../../data/cardDecks';
+import { DEFAULT_PAIR_COUNT } from '../../utils/gridLayout';
 import type { CardPack } from '../../types';
 
 type LobbyView = 'choice' | 'create' | 'join' | 'waiting';
@@ -71,7 +72,12 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     try {
       // Get card images for the selected pack
       const cardPack = room.config?.cardPack || settings.cardPack;
-      const images = getPackImages(cardPack);
+      const pairCount = room.config?.pairCount ?? DEFAULT_PAIR_COUNT;
+      
+      // Get all images then randomly select subset based on pair count
+      const allImages = getPackImages(cardPack);
+      const shuffled = [...allImages].sort(() => 0.5 - Math.random());
+      const images = shuffled.slice(0, pairCount);
 
       // Create initial game state
       const players = Object.entries(room.players);

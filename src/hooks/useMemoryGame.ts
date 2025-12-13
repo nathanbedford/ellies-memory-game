@@ -80,9 +80,9 @@ export const useMemoryGame = () => {
 	);
 	const isCheckingMatchRef = useRef(false);
 	const [flipDuration, setFlipDuration] = useState(() => {
-		// Load flip duration from localStorage, default to 2000ms (2 seconds)
+		// Load flip duration from localStorage, default to 1500ms (1.5 seconds)
 		const saved = localStorage.getItem("flipDuration");
-		return saved ? parseInt(saved, 10) : 2000;
+		return saved ? parseInt(saved, 10) : 1500;
 	});
 	const [emojiSizePercentage, setEmojiSizePercentage] = useState(() => {
 		// Load emoji size percentage from localStorage, default to 72 (matches current default: 0.4 * 1.8 = 0.72)

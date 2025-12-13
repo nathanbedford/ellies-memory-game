@@ -64,7 +64,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 	cardSize: 100,
 	autoSizeEnabled: true,
 	useWhiteCardBackground: false,
-	flipDuration: 2000,
+	flipDuration: 1500,
 	emojiSizePercentage: 72,
 	ttsEnabled: true,
 	cardPack: "animals",
