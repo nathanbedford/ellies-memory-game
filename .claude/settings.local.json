@@ -4,7 +4,8 @@
       "Bash(for dir in /Users/nathanbedford/dev/playground/memory-finally/public/deck-images/*/)",
       "Bash(done)",
       "Bash(for deck in */)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

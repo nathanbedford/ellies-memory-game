@@ -51,6 +51,11 @@ const getChristmasImageUrl = (itemId: string): string => {
   return `/deck-images/christmas/${itemId}.jpg`;
 };
 
+// Helper function to get image URL for dinos deck
+const getDinosImageUrl = (itemId: string): string => {
+  return `/deck-images/dinos/${itemId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -1976,6 +1981,33 @@ export const CARD_DECKS: CardDeck[] = [
         gradient: 'from-purple-500 to-yellow-600',
         imageUrl: getChristmasImageUrl('three-kings')
       }
+    ]
+  },
+  {
+    id: 'dinos',
+    name: 'Dinosaurs',
+    emoji: '',
+    cards: [
+      { id: 'amber-specimen', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('amber-specimen') },
+      { id: 'ammonite', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('ammonite') },
+      { id: 'ankylosaurus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('ankylosaurus') },
+      { id: 'archelon', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('archelon') },
+      { id: 'asteroid-impact', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('asteroid-impact') },
+      { id: 'brachiosaurus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('brachiosaurus') },
+      { id: 'dinosaur-eggs', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('dinosaur-eggs') },
+      { id: 'hatching-dinosaur', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('hatching-dinosaur') },
+      { id: 'juvenile-trex', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('juvenile-trex') },
+      { id: 'pachycephalosaurus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('pachycephalosaurus') },
+      { id: 'parasaurolophus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('parasaurolophus') },
+      { id: 'pteranodon', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('pteranodon') },
+      { id: 'sarcosuchus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('sarcosuchus') },
+      { id: 'spinosaurus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('spinosaurus') },
+      { id: 'stegosaurus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('stegosaurus') },
+      { id: 'triceratops', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('triceratops') },
+      { id: 'trilobite', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('trilobite') },
+      { id: 'tyrannosaurus-rex', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('tyrannosaurus-rex') },
+      { id: 'velociraptor', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('velociraptor') },
+      { id: 'volcanic-eruption', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('volcanic-eruption') }
     ]
   }
 ];

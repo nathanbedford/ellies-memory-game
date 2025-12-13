@@ -45,7 +45,8 @@ export type CardPack =
 	| "plush-cute-animals-real"
 	| "animals-from-china-real"
 	| "thanksgiving"
-	| "christmas";
+	| "christmas"
+	| "dinos";
 
 export interface CardPackOption {
 	id: CardPack;
