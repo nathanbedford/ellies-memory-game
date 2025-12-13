@@ -26,55 +26,11 @@ const formatCardNameForSpeech = (imageId: string): string => {
 
 export const useMemoryGame = () => {
 	const [gameState, setGameState] = useState<GameState>(() => {
-		// Try to load saved game state from sessionStorage
-		const savedGameState = sessionStorage.getItem("gameState");
-		if (savedGameState) {
-			try {
-				const parsed = JSON.parse(savedGameState);
-				// Validate that we have a valid game state with cards
-				if (
-					parsed &&
-					parsed.cards &&
-					Array.isArray(parsed.cards) &&
-					parsed.cards.length > 0
-				) {
-					// Clean up transient states that shouldn't persist (like animation states)
-					const cleanedCards = parsed.cards.map((card: Card) => ({
-						...card,
-						isFlyingToPlayer: false, // Don't persist animation state
-						// Keep isFlipped and isMatched as they represent actual game state
-					}));
-
-					const players =
-						parsed.players &&
-						Array.isArray(parsed.players) &&
-						parsed.players.length >= 2
-							? sortPlayersByID(parsed.players)
-							: [
-									{ id: 1, name: "Player 1", color: "#3b82f6" },
-									{ id: 2, name: "Player 2", color: "#10b981" },
-								];
-
-					return {
-						cards: cleanedCards,
-						players,
-						currentPlayer: parsed.currentPlayer || 1,
-						selectedCards: [], // Reset selected cards on reload
-						gameStatus: parsed.gameStatus || "setup",
-						winner: parsed.winner || null,
-						isTie: parsed.isTie || false,
-					};
-				}
-			} catch (e) {
-				console.warn("Failed to load saved game state:", e);
-			}
-		}
-
-		// Load player names from localStorage (fallback)
+		// Load player names and colors from localStorage (preferences, not game state)
 		const savedPlayer1Name = localStorage.getItem("player1Name") || "Player 1";
 		const savedPlayer2Name = localStorage.getItem("player2Name") || "Player 2";
-		const savedPlayer1Color = localStorage.getItem("player1Color") || "#3b82f6"; // Default blue
-		const savedPlayer2Color = localStorage.getItem("player2Color") || "#10b981"; // Default green
+		const savedPlayer1Color = localStorage.getItem("player1Color") || "#3b82f6";
+		const savedPlayer2Color = localStorage.getItem("player2Color") || "#10b981";
 		const savedFirstPlayer = parseInt(
 			localStorage.getItem("firstPlayer") || "1",
 		) as 1 | 2;
@@ -313,31 +269,7 @@ export const useMemoryGame = () => {
 		gameState.cards.length,
 	]);
 
-	// Save game state to sessionStorage whenever it changes
-	useEffect(() => {
-		// Only save if we have cards (game is in progress or finished)
-		if (gameState.cards.length > 0) {
-			// Create a clean state without transient animation properties
-			const stateToSave = {
-				...gameState,
-				cards: gameState.cards.map((card) => ({
-					id: card.id,
-					imageId: card.imageId,
-					imageUrl: card.imageUrl,
-					gradient: card.gradient,
-					isFlipped: card.isFlipped,
-					isMatched: card.isMatched,
-					matchedByPlayerId: card.matchedByPlayerId,
-					// Exclude isFlyingToPlayer and flyingToPlayerId as they're transient
-				})),
-				players: sortPlayersByID(gameState.players), // Ensure players are sorted before saving
-			};
-			sessionStorage.setItem("gameState", JSON.stringify(stateToSave));
-		} else {
-			// Clear saved state if no cards (game reset or not started)
-			sessionStorage.removeItem("gameState");
-		}
-	}, [gameState]);
+	// Game state is no longer persisted - always starts fresh on refresh
 
 	const initializeGame = useCallback(
 		(
@@ -413,6 +345,7 @@ export const useMemoryGame = () => {
 
 	const startGame = useCallback(
 		(player1Name: string, player2Name: string, firstPlayer: number) => {
+			// Load player colors from localStorage (preferences)
 			const savedPlayer1Color =
 				localStorage.getItem("player1Color") || "#3b82f6";
 			const savedPlayer2Color =
@@ -501,17 +434,15 @@ export const useMemoryGame = () => {
 
 	const updatePlayerName = useCallback((playerId: 1 | 2, newName: string) => {
 		const trimmedName = newName.trim();
-		// Save to localStorage
+		// Save to localStorage (preference, not game state)
 		localStorage.setItem(`player${playerId}Name`, trimmedName);
-
 		// Use GameEngine to update player name
 		setGameState((prev) => engineUpdatePlayerName(prev, playerId, trimmedName));
 	}, []);
 
 	const updatePlayerColor = useCallback((playerId: 1 | 2, newColor: string) => {
-		// Save to localStorage
+		// Save to localStorage (preference, not game state)
 		localStorage.setItem(`player${playerId}Color`, newColor);
-
 		// Use GameEngine to update player color
 		setGameState((prev) => engineUpdatePlayerColor(prev, playerId, newColor));
 	}, []);

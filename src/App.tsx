@@ -58,24 +58,7 @@ function App() {
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [setupStep, setSetupStep] = useState<SetupStep>(() => {
-    // Only restore wizard state if no game is in progress
-    const savedGameState = sessionStorage.getItem('gameState');
-    if (savedGameState) {
-      try {
-        const parsed = JSON.parse(savedGameState);
-        // If we have cards, don't restore wizard state
-        if (parsed && parsed.cards && parsed.cards.length > 0) {
-          return null;
-        }
-      } catch {
-        // Invalid saved state, continue to restore wizard
-      }
-    }
-    // Restore wizard step if no game in progress
-    const saved = sessionStorage.getItem('setupStep');
-    return (saved as SetupStep) || null;
-  });
+  const [setupStep, setSetupStep] = useState<SetupStep>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [cameFromTheme, setCameFromTheme] = useState(false); // Track if we came from theme selection
   const [originalPack, setOriginalPack] = useState<string | null>(null);
@@ -401,6 +384,20 @@ function App() {
       stack: error.stack,
     });
   }, [setupStep]);
+
+  // Clear game state on page refresh - restart from scratch
+  // But keep player preferences (names, colors, firstPlayer) and deck options
+  useEffect(() => {
+    // Clear sessionStorage game state
+    sessionStorage.removeItem('gameState');
+    sessionStorage.removeItem('setupStep');
+    sessionStorage.removeItem('mobileWarningDismissed');
+    
+    // Note: We keep localStorage items for player names, colors, firstPlayer
+    // and card pack/background/cardBack preferences - only game state is cleared
+    
+    console.log('[REFRESH] Cleared game state from storage (kept player preferences)');
+  }, []); // Run once on mount
 
   // Check if screen is mobile-sized (< 768px)
   const isMobileScreen = () => {
@@ -959,7 +956,6 @@ function App() {
 
       guardedSetSetupStep(null, 'game started');
       setIsResetting(false);
-      localStorage.setItem('hasPlayedBefore', 'true');
       setLastConfig({
         pack: selectedPack,
         background: selectedBackground,
@@ -974,7 +970,6 @@ function App() {
     startGameWithFirstPlayer(firstPlayer);
     guardedSetSetupStep(null, 'game started');
     setIsResetting(false);
-    localStorage.setItem('hasPlayedBefore', 'true');
 
     if (autoSizeEnabled) {
       setTimeout(() => {
