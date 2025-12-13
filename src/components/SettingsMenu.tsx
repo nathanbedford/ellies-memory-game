@@ -191,7 +191,7 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
             </div>
           </label>
           <p className="text-xs text-gray-500 mt-2 px-4">
-            Announce whose turn it is after each pair is picked
+            Announce turns and matches with card names
           </p>
         </div>
 

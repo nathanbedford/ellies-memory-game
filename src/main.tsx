@@ -9,7 +9,7 @@ const posthogHost = "https://us.i.posthog.com";
 const isLocalDev = import.meta.env.MODE === 'development';
 
 createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+  <>
     {isLocalDev ? (
       <App />
     ) : (
@@ -24,5 +24,5 @@ createRoot(document.getElementById('root')!).render(
         <App />
       </PostHogProvider>
     )}
-  </React.StrictMode>
+  </>
 )

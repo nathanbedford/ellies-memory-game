@@ -16,6 +16,14 @@ import {
 	updatePlayerColor as engineUpdatePlayerColor,
 } from "../services/game/GameEngine";
 
+// Helper function to format imageId into a readable name for TTS
+const formatCardNameForSpeech = (imageId: string): string => {
+	return imageId
+		.split('-')
+		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ');
+};
+
 export const useMemoryGame = () => {
 	const [gameState, setGameState] = useState<GameState>(() => {
 		// Try to load saved game state from sessionStorage
@@ -136,7 +144,7 @@ export const useMemoryGame = () => {
 	// Initialize text-to-speech
 	const {
 		speakPlayerTurn,
-		speakMatchFound,
+		speak,
 		isAvailable,
 		cancel: cancelTTS,
 	} = useTextToSpeech();
@@ -620,6 +628,7 @@ export const useMemoryGame = () => {
 					const matchedPlayerName =
 						getPlayerById(prev.players, currentPlayerId)?.name ||
 						`Player ${currentPlayerId}`;
+					const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
 
 					console.log(
 						"[MATCH CHECK] ✓ MATCH FOUND! Marking cards as flying to player",
@@ -627,6 +636,7 @@ export const useMemoryGame = () => {
 							cardIds,
 							playerId: currentPlayerId,
 							playerName: matchedPlayerName,
+							cardName: matchedCardName,
 						}),
 					);
 
@@ -643,7 +653,7 @@ export const useMemoryGame = () => {
 							clearTimeout(ttsDelayTimeoutRef.current);
 						}
 						ttsDelayTimeoutRef.current = setTimeout(() => {
-							speakMatchFound(matchedPlayerName);
+							speak(`${matchedPlayerName} found a ${matchedCardName}! It's still their turn.`);
 							ttsDelayTimeoutRef.current = null;
 						}, 400);
 					}
@@ -737,7 +747,7 @@ export const useMemoryGame = () => {
 				}
 			});
 		},
-		[speakPlayerTurn, speakMatchFound, isAvailable, ttsEnabled],
+		[speakPlayerTurn, speak, isAvailable, ttsEnabled],
 	);
 
 	const endTurn = useCallback(() => {
