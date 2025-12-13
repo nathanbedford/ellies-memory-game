@@ -339,14 +339,13 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 
 		const roomRef = doc(db, "rooms", this.roomCode);
 
-		// Increment sync version for optimistic concurrency
-		// Preserve gameRound if already present
+		// Preserve sync version and gameRound (version is managed by useOnlineGame hook)
 		const existingState = state as OnlineGameState;
 		const onlineState: OnlineGameState = {
 			...state,
 			winner: state.winner ?? null, // Ensure null, not undefined (for Firestore)
 			isTie: state.isTie ?? false, // Ensure boolean value
-			syncVersion: (existingState.syncVersion || 0) + 1,
+			syncVersion: existingState.syncVersion || 0,
 			gameRound: existingState.gameRound ?? 0, // Preserve gameRound if present
 		};
 
