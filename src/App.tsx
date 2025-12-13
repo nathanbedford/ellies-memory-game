@@ -1327,26 +1327,8 @@ function App() {
         )}
 
         <main>
-          {/* Welcome Screen */}
-          {gameState.cards.length === 0 && setupStep === null && (
-            <div className="flex flex-col items-center justify-center min-h-[60vh]">
-              <div className="text-center space-y-6">
-                <h2 className="text-5xl font-bold text-gray-800 mb-4">Welcome!</h2>
-                <p className="text-xl text-gray-600 mb-8">Ready to play Matchimus?</p>
-                <button
-                  onClick={() => {
-                    guardedSetSetupStep('modeSelect', 'welcome screen start button');
-                  }}
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
-                >
-                  Start Game
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Mode Selection Screen */}
-          {setupStep === 'modeSelect' && gameMode !== 'online' && (
+          {/* Mode Selection Screen (merged with Welcome) */}
+          {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode !== 'online' && (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
               <div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
                 <ModeSelector
@@ -1556,7 +1538,7 @@ function App() {
           />
         )}
 
-        {gameState.gameStatus === 'finished' && (gameState.winner !== null || gameState.isTie === true) && (
+        {gameState.gameStatus === 'finished' && setupStep === null && (gameState.winner !== null || gameState.isTie === true) && (
           <GameOver
             winner={gameState.winner}
             players={gameState.players}
