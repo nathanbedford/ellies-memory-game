@@ -13,6 +13,7 @@ import { getFirestoreSyncAdapter } from "../services/sync/FirestoreSyncAdapter";
 import type { GameState, OnlineGameState } from "../types";
 import {
 	getPlayerScore,
+	getPlayerById,
 	canFlipCard,
 	flipCard as engineFlipCard,
 	checkMatch,
@@ -23,19 +24,29 @@ import {
 	endTurn as engineEndTurn,
 	updatePlayerName as engineUpdatePlayerName,
 } from "../services/game/GameEngine";
+import { useTextToSpeech, formatCardNameForSpeech } from "./useTextToSpeech";
 
 interface UseOnlineGameOptions {
 	roomCode: string;
 	localPlayerSlot: number;
 	flipDuration: number;
 	initialGameState: GameState;
+	ttsEnabled: boolean;
 }
 
 export function useOnlineGame(options: UseOnlineGameOptions) {
-	const { roomCode, localPlayerSlot, flipDuration, initialGameState } = options;
+	const { roomCode, localPlayerSlot, flipDuration, initialGameState, ttsEnabled } = options;
 
 	// Game state - starts with initial state from room
 	const [gameState, setGameState] = useState<GameState>(initialGameState);
+
+	// Initialize text-to-speech
+	const {
+		speakMatchWithDelay,
+		speakTurnWithDelay,
+		isAvailable,
+		cancelPendingAnnouncements,
+	} = useTextToSpeech();
 
 	// Match check timer and guard
 	const matchCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -58,6 +69,11 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 	// Track game round to detect resets
 	const lastGameRoundRef = useRef(
 		(initialGameState as OnlineGameState).gameRound || 0,
+	);
+	// Track previous state for TTS announcements on remote updates
+	const prevCurrentPlayerRef = useRef(initialGameState.currentPlayer);
+	const prevMatchedCountRef = useRef(
+		initialGameState.cards.filter((c) => c.isMatched).length,
 	);
 
 	// Track if this client is authoritative (it's our turn)
@@ -238,6 +254,39 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 					winner: remoteState.winner ?? null,
 					isTie: remoteState.isTie ?? false,
 				};
+
+				// TTS announcements for remote updates (opponent's actions)
+				if (ttsEnabled && isAvailable() && lastUpdatedBy !== undefined && lastUpdatedBy !== localPlayerSlot) {
+					const newMatchedCount = matchedCards.length;
+					const playerChanged = onlineState.currentPlayer !== prevCurrentPlayerRef.current;
+					const matchWasMade = newMatchedCount > prevMatchedCountRef.current;
+
+					if (matchWasMade) {
+						// Opponent found a match - announce it
+						// Find the most recently matched cards (the ones that weren't matched before)
+						const newlyMatchedCard = onlineState.cards.find(
+							(c: { isMatched: boolean; imageId: string }) => c.isMatched
+						);
+						if (newlyMatchedCard) {
+							const opponentName =
+								getPlayerById(onlineState.players, lastUpdatedBy)?.name ||
+								`Player ${lastUpdatedBy}`;
+							const cardName = formatCardNameForSpeech(newlyMatchedCard.imageId);
+							speakMatchWithDelay(opponentName, cardName);
+						}
+					} else if (playerChanged && onlineState.currentPlayer === localPlayerSlot) {
+						// Turn changed to us - announce it's our turn
+						const localPlayerName =
+							getPlayerById(onlineState.players, localPlayerSlot)?.name ||
+							`Player ${localPlayerSlot}`;
+						speakTurnWithDelay(localPlayerName);
+					}
+				}
+
+				// Update refs for next comparison
+				prevCurrentPlayerRef.current = onlineState.currentPlayer;
+				prevMatchedCountRef.current = matchedCards.length;
+
 				setGameState(normalizedState);
 			} else {
 				console.log("[ONLINE GAME] Ignoring stale remote state", {
@@ -252,8 +301,9 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		return () => {
 			console.log("[ONLINE GAME] Cleaning up subscription");
 			unsubscribe();
+			cancelPendingAnnouncements();
 		};
-	}, [roomCode, localPlayerSlot]);
+	}, [roomCode, localPlayerSlot, ttsEnabled, isAvailable, cancelPendingAnnouncements]);
 
 	// Flip card - only works if authoritative
 	const flipCard = useCallback(
@@ -372,6 +422,10 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 
 			if (isMatch) {
 				const currentPlayerId = currentState.currentPlayer;
+				const matchedPlayerName =
+					getPlayerById(currentState.players, currentPlayerId)?.name ||
+					`Player ${currentPlayerId}`;
+				const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
 
 				// Use GameEngine for Phase 1: flying animation
 				const flyingState = startMatchAnimation(
@@ -388,6 +442,11 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 						newScore: getPlayerScore(flyingState.cards, currentPlayerId),
 					},
 				);
+
+				// Announce match found
+				if (ttsEnabled && isAvailable()) {
+					speakMatchWithDelay(matchedPlayerName, matchedCardName);
+				}
 
 				setGameState(flyingState);
 				syncToFirestore(
@@ -461,6 +520,14 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 					card0State: noMatchState.cards.find((c) => c.id === cardIds[0]),
 					card1State: noMatchState.cards.find((c) => c.id === cardIds[1]),
 				});
+
+				// Announce next player's turn
+				if (ttsEnabled && isAvailable()) {
+					const nextPlayerName =
+						getPlayerById(noMatchState.players, noMatchState.currentPlayer)?.name ||
+						`Player ${noMatchState.currentPlayer}`;
+					speakTurnWithDelay(nextPlayerName);
+				}
 
 				setGameState(noMatchState);
 				syncToFirestore(
