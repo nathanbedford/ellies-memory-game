@@ -28,6 +28,7 @@ import { Pong } from './components/Pong';
 import { MobileWarningModal } from './components/MobileWarningModal';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { AdminSidebar } from './components/AdminSidebar';
+import { LogViewerModal } from './components/LogViewerModal';
 import { ModeSelector, OnlineLobby, OpponentDisconnectOverlay } from './components/online';
 import { useOpponentDisconnect } from './hooks/useOpponentDisconnect';
 import { PairCountModal } from './components/PairCountModal';
@@ -94,6 +95,7 @@ function App() {
   const [showBackgroundViewer, setShowBackgroundViewer] = useState(false);
   const [showAdminSidebar, setShowAdminSidebar] = useState(false);
   const [adminEnabled, setAdminEnabled] = useState(false); // In-memory only, resets on refresh
+  const [showLogViewer, setShowLogViewer] = useState(false);
   const [showMobileWarning, setShowMobileWarning] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [showPWAInstall, setShowPWAInstall] = useState(false);
@@ -1776,7 +1778,7 @@ function App() {
         />
 
         {/* Admin Sidebar */}
-        {gameState.gameStatus === 'playing' && adminEnabled && (
+        {adminEnabled && (
           <AdminSidebar
             isOpen={showAdminSidebar}
             onClose={() => setShowAdminSidebar(false)}
@@ -1791,8 +1793,16 @@ function App() {
                 .filter(c => !c.isMatched && !c.isFlyingToPlayer)
                 .every(c => c.isFlipped)
             }
+            onViewLogs={() => setShowLogViewer(true)}
           />
         )}
+
+        {/* Log Viewer Modal */}
+        <LogViewerModal
+          isOpen={showLogViewer}
+          onClose={() => setShowLogViewer(false)}
+          roomCode={roomCode ?? undefined}
+        />
 
         {/* Mobile Warning Modal */}
         <MobileWarningModal

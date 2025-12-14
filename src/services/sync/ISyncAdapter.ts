@@ -7,123 +7,135 @@
  * the adapter syncs state to/from Firestore.
  */
 
-import type { GameState, Room, RoomConfig, CardPack } from '../../types';
+import type { GameState, Room, RoomConfig, CardPack } from "../../types";
 
 export interface CreateRoomOptions {
-  hostId: string;
-  hostName: string;
-  hostColor: string;
-  cardPack: CardPack;
-  background: string;
-  cardBack: string;
+	hostId: string;
+	hostName: string;
+	hostColor: string;
+	cardPack: CardPack;
+	background: string;
+	cardBack: string;
 }
 
 export interface JoinRoomOptions {
-  odahId: string;
-  name: string;
-  color: string;
+	odahId: string;
+	name: string;
+	color: string;
 }
 
 export interface ISyncAdapter {
-  // ============================================
-  // Connection Lifecycle
-  // ============================================
+	// ============================================
+	// Connection Lifecycle
+	// ============================================
 
-  /**
-   * Connect to the sync service (e.g., authenticate with Firebase)
-   */
-  connect(): Promise<void>;
+	/**
+	 * Connect to the sync service (e.g., authenticate with Firebase)
+	 */
+	connect(): Promise<void>;
 
-  /**
-   * Disconnect from the sync service
-   */
-  disconnect(): Promise<void>;
+	/**
+	 * Disconnect from the sync service
+	 */
+	disconnect(): Promise<void>;
 
-  /**
-   * Check if connected
-   */
-  isConnected(): boolean;
+	/**
+	 * Check if connected
+	 */
+	isConnected(): boolean;
 
-  // ============================================
-  // Game State Operations
-  // ============================================
+	// ============================================
+	// Game State Operations
+	// ============================================
 
-  /**
-   * Get the current game state
-   */
-  getState(): Promise<GameState | null>;
+	/**
+	 * Get the current game state
+	 */
+	getState(): Promise<GameState | null>;
 
-  /**
-   * Set/update the game state
-   */
-  setState(state: GameState): Promise<void>;
+	/**
+	 * Set/update the game state
+	 */
+	setState(state: GameState): Promise<void>;
 
-  /**
-   * Subscribe to game state changes
-   * @returns Unsubscribe function
-   */
-  subscribeToState(callback: (state: GameState) => void): () => void;
+	/**
+	 * Subscribe to game state changes
+	 * @returns Unsubscribe function
+	 */
+	subscribeToState(callback: (state: GameState) => void): () => void;
 
-  // ============================================
-  // Room Operations (Online mode only)
-  // ============================================
+	// ============================================
+	// Room Operations (Online mode only)
+	// ============================================
 
-  /**
-   * Create a new game room
-   * @returns Room code
-   */
-  createRoom?(options: CreateRoomOptions): Promise<string>;
+	/**
+	 * Create a new game room
+	 * @returns Room code
+	 */
+	createRoom?(options: CreateRoomOptions): Promise<string>;
 
-  /**
-   * Join an existing room
-   * @returns Room configuration
-   */
-  joinRoom?(roomCode: string, options: JoinRoomOptions): Promise<Room>;
+	/**
+	 * Join an existing room
+	 * @returns Room configuration
+	 */
+	joinRoom?(roomCode: string, options: JoinRoomOptions): Promise<Room>;
 
-  /**
-   * Leave the current room
-   */
-  leaveRoom?(): Promise<void>;
+	/**
+	 * Leave the current room
+	 */
+	leaveRoom?(): Promise<void>;
 
-  /**
-   * Get room info
-   */
-  getRoom?(roomCode: string): Promise<Room | null>;
+	/**
+	 * Get room info
+	 */
+	getRoom?(roomCode: string): Promise<Room | null>;
 
-  /**
-   * Subscribe to room changes
-   * @returns Unsubscribe function
-   */
-  subscribeToRoom?(roomCode: string, callback: (room: Room | null) => void): () => void;
+	/**
+	 * Subscribe to room changes
+	 * @returns Unsubscribe function
+	 */
+	subscribeToRoom?(
+		roomCode: string,
+		callback: (room: Room | null) => void,
+	): () => void;
 
-  /**
-   * Update room configuration (host only)
-   */
-  updateRoomConfig?(roomCode: string, config: Partial<RoomConfig>): Promise<void>;
+	/**
+	 * Update room configuration (host only)
+	 */
+	updateRoomConfig?(
+		roomCode: string,
+		config: Partial<RoomConfig>,
+	): Promise<void>;
 
-  /**
-   * Start the game (host only)
-   */
-  startGame?(roomCode: string, initialState: GameState): Promise<void>;
+	/**
+	 * Start the game (host only)
+	 */
+	startGame?(roomCode: string, initialState: GameState): Promise<void>;
 }
 
 /**
  * Base class with default no-op implementations for optional methods
  */
 export abstract class BaseSyncAdapter implements ISyncAdapter {
-  abstract connect(): Promise<void>;
-  abstract disconnect(): Promise<void>;
-  abstract isConnected(): boolean;
-  abstract getState(): Promise<GameState | null>;
-  abstract setState(state: GameState): Promise<void>;
-  abstract subscribeToState(callback: (state: GameState) => void): () => void;
+	abstract connect(): Promise<void>;
+	abstract disconnect(): Promise<void>;
+	abstract isConnected(): boolean;
+	abstract getState(): Promise<GameState | null>;
+	abstract setState(state: GameState): Promise<void>;
+	abstract subscribeToState(callback: (state: GameState) => void): () => void;
 
-  // Optional methods - default to throwing "not supported"
-  createRoom?(_options: CreateRoomOptions): Promise<string>;
-  joinRoom?(_roomCode: string, _options: JoinRoomOptions): Promise<Room>;
-  leaveRoom?(): Promise<void>;
-  getRoom?(_roomCode: string): Promise<Room | null>;
-  subscribeToRoom?(_roomCode: string, _callback: (room: Room | null) => void): () => void;
-  updateRoomConfig?(_roomCode: string, _config: Partial<RoomConfig>): Promise<void>;
-  startGame?(_roomCode: string, _initialState: GameState): Promise<void>;
+	// Optional methods - default to throwing "not supported"
+	createRoom?(_options: CreateRoomOptions): Promise<string>;
+	joinRoom?(_roomCode: string, _options: JoinRoomOptions): Promise<Room>;
+	leaveRoom?(): Promise<void>;
+	getRoom?(_roomCode: string): Promise<Room | null>;
+	subscribeToRoom?(
+		_roomCode: string,
+		_callback: (room: Room | null) => void,
+	): () => void;
+	updateRoomConfig?(
+		_roomCode: string,
+		_config: Partial<RoomConfig>,
+	): Promise<void>;
+	startGame?(_roomCode: string, _initialState: GameState): Promise<void>;
 }

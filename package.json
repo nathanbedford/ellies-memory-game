@@ -24,6 +24,7 @@
   "dependencies": {
     "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",
+    "dexie": "^4.2.1",
     "firebase": "^12.6.0",
     "lucide-react": "^0.556.0",
     "posthog-js": "^1.302.2",
