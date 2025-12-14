@@ -140,16 +140,22 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
   }, [roomCode, view]);
 
   // Auto-transition to game when host starts (for guest players)
+  // Game state is now in separate /games/{roomCode} document, so fetch it from adapter
   useEffect(() => {
     if (
       room?.status === 'playing' &&
-      room.gameState &&
       !hasStartedGame.current
     ) {
       hasStartedGame.current = true;
-      onGameStart(room.gameState);
+      // Fetch game state from separate Firestore document
+      const adapter = getFirestoreSyncAdapter();
+      adapter.getState().then((gameState) => {
+        if (gameState) {
+          onGameStart(gameState);
+        }
+      });
     }
-  }, [room?.status, room?.gameState, onGameStart]);
+  }, [room?.status, onGameStart]);
 
   const handleCreateRoom = async () => {
     setIsLoading(true);

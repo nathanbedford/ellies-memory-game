@@ -54,7 +54,8 @@ class LogDB {
 	}
 
 	async addLog(entry: Omit<LogEntry, "id">): Promise<number> {
-		return this.db.logs.add(entry as LogEntry);
+		const id = await this.db.logs.add(entry as LogEntry);
+		return id ?? 0;
 	}
 
 	async getLogs(query: LogQuery = {}): Promise<LogEntry[]> {
@@ -158,6 +159,30 @@ class LogDB {
 
 	async exportLogs(roomCode?: string): Promise<LogEntry[]> {
 		return this.getLogs({ roomCode });
+	}
+
+	async getUniqueRoomCodes(): Promise<{ roomCode: string; lastActivity: number }[]> {
+		// Get all logs with room codes, ordered by timestamp descending
+		const logs = await this.db.logs
+			.where("roomCode")
+			.notEqual("")
+			.toArray();
+
+		// Group by roomCode and find most recent timestamp for each
+		const roomMap = new Map<string, number>();
+		for (const log of logs) {
+			if (log.roomCode) {
+				const existing = roomMap.get(log.roomCode) || 0;
+				if (log.timestamp > existing) {
+					roomMap.set(log.roomCode, log.timestamp);
+				}
+			}
+		}
+
+		// Convert to array and sort by most recent first
+		return Array.from(roomMap.entries())
+			.map(([roomCode, lastActivity]) => ({ roomCode, lastActivity }))
+			.sort((a, b) => b.lastActivity - a.lastActivity);
 	}
 }
 

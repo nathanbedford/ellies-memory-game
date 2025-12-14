@@ -126,7 +126,6 @@ export interface Room {
 			color: string;
 		}
 	>;
-	gameState: OnlineGameState | null;
 	createdAt: number;
 	lastActivity: number;
 }

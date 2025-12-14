@@ -250,6 +250,30 @@ class LogService {
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
 	}
+
+	async getUniqueRoomCodes(): Promise<{ roomCode: string; lastActivity: number }[]> {
+		return logDB.getUniqueRoomCodes();
+	}
+
+	/**
+	 * Format logs as plain text for clipboard copy
+	 */
+	formatLogsAsText(logs: LogEntry[]): string {
+		return logs.map(log => {
+			const time = new Date(log.timestamp).toISOString().slice(11, 23);
+			const level = log.level.toUpperCase().padEnd(5);
+			const player = log.playerSlot ? `[P${log.playerSlot}]` : "";
+			const room = log.roomCode ? `[${log.roomCode}]` : "";
+
+			// Format context if present
+			const { roomCode, playerSlot, ...contextRest } = log.context || {};
+			const contextStr = Object.keys(contextRest).length > 0
+				? ` ${JSON.stringify(contextRest)}`
+				: "";
+
+			return `[${time}] [${level}]${room}${player} ${log.message}${contextStr}`;
+		}).join("\n");
+	}
 }
 
 // Singleton instance

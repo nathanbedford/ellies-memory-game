@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Copy, Check } from "lucide-react";
 import { Modal } from "./Modal";
 import { logger, type LogEntry, type LogLevel } from "../services/logging/LogService";
 
@@ -21,7 +22,7 @@ const LEVEL_OPTIONS: LogLevel[] = ["error", "warn", "info", "debug", "trace"];
 export const LogViewerModal = ({
 	isOpen,
 	onClose,
-	roomCode,
+	roomCode: initialRoomCode,
 }: LogViewerModalProps) => {
 	const [logs, setLogs] = useState<LogEntry[]>([]);
 	const [minLevel, setMinLevel] = useState<LogLevel>("debug");
@@ -31,12 +32,16 @@ export const LogViewerModal = ({
 	const [consoleLevel, setConsoleLevel] = useState<LogLevel>(
 		logger.getConsoleLevel(),
 	);
+	const [roomCodes, setRoomCodes] = useState<{ roomCode: string; lastActivity: number }[]>([]);
+	const [selectedRoomCode, setSelectedRoomCode] = useState<string>(initialRoomCode || "");
+	const [copied, setCopied] = useState(false);
 
 	const loadLogs = useCallback(async () => {
 		setIsLoading(true);
 		try {
+			const roomCodeFilter = selectedRoomCode || undefined;
 			const [fetchedLogs, count, size] = await Promise.all([
-				logger.getLogs({ roomCode, minLevel, limit: 500 }),
+				logger.getLogs({ roomCode: roomCodeFilter, minLevel, limit: 500 }),
 				logger.getLogCount(),
 				logger.getTotalSize(),
 			]);
@@ -47,13 +52,28 @@ export const LogViewerModal = ({
 		} finally {
 			setIsLoading(false);
 		}
-	}, [roomCode, minLevel]);
+	}, [selectedRoomCode, minLevel]);
+
+	const loadRoomCodes = useCallback(async () => {
+		try {
+			const codes = await logger.getUniqueRoomCodes();
+			setRoomCodes(codes);
+		} catch (err) {
+			console.error("Failed to load room codes:", err);
+		}
+	}, []);
 
 	useEffect(() => {
 		if (isOpen) {
 			loadLogs();
+			loadRoomCodes();
 		}
-	}, [isOpen, loadLogs]);
+	}, [isOpen, loadLogs, loadRoomCodes]);
+
+	// Reset selected room code when initial room code prop changes
+	useEffect(() => {
+		setSelectedRoomCode(initialRoomCode || "");
+	}, [initialRoomCode]);
 
 	const handleConsoleLevelChange = (level: LogLevel) => {
 		setConsoleLevel(level);
@@ -63,22 +83,43 @@ export const LogViewerModal = ({
 	const handleClearLogs = async () => {
 		if (
 			window.confirm(
-				roomCode
-					? `Clear all logs for room ${roomCode}?`
+				selectedRoomCode
+					? `Clear all logs for room ${selectedRoomCode}?`
 					: "Clear ALL logs? This cannot be undone.",
 			)
 		) {
-			if (roomCode) {
-				await logger.clearLogsForRoom(roomCode);
+			if (selectedRoomCode) {
+				await logger.clearLogsForRoom(selectedRoomCode);
 			} else {
 				await logger.clearLogs();
 			}
 			await loadLogs();
+			await loadRoomCodes();
 		}
 	};
 
 	const handleExport = async () => {
-		await logger.downloadLogs(roomCode);
+		await logger.downloadLogs(selectedRoomCode || undefined);
+	};
+
+	const handleCopyLogs = async () => {
+		const textLogs = logger.formatLogsAsText(filteredLogs);
+		try {
+			await navigator.clipboard.writeText(textLogs);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		} catch (err) {
+			console.error("Failed to copy logs:", err);
+			// Fallback for older browsers
+			const textarea = document.createElement("textarea");
+			textarea.value = textLogs;
+			document.body.appendChild(textarea);
+			textarea.select();
+			document.execCommand("copy");
+			document.body.removeChild(textarea);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		}
 	};
 
 	const filteredLogs = searchTerm
@@ -110,9 +151,59 @@ export const LogViewerModal = ({
 		return JSON.stringify(rest, null, 2);
 	};
 
+	const formatRelativeTime = (timestamp: number) => {
+		const diff = Date.now() - timestamp;
+		const minutes = Math.floor(diff / 60000);
+		const hours = Math.floor(diff / 3600000);
+		const days = Math.floor(diff / 86400000);
+		if (days > 0) return `${days}d ago`;
+		if (hours > 0) return `${hours}h ago`;
+		if (minutes > 0) return `${minutes}m ago`;
+		return "just now";
+	};
+
 	return (
 		<Modal isOpen={isOpen} onClose={onClose} title="Debug Logs">
 			<div className="space-y-4">
+				{/* Room Code Selector */}
+				<div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+					<label className="text-sm font-medium text-gray-700">Room:</label>
+					<select
+						value={selectedRoomCode}
+						onChange={(e) => setSelectedRoomCode(e.target.value)}
+						className="flex-1 border rounded px-3 py-1.5 text-sm bg-white"
+					>
+						<option value="">All Rooms</option>
+						{roomCodes.map(({ roomCode, lastActivity }) => (
+							<option key={roomCode} value={roomCode}>
+								{roomCode} ({formatRelativeTime(lastActivity)})
+							</option>
+						))}
+					</select>
+					<button
+						onClick={handleCopyLogs}
+						disabled={filteredLogs.length === 0}
+						className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
+							copied
+								? "bg-green-100 text-green-800"
+								: "bg-blue-100 hover:bg-blue-200 text-blue-800"
+						} disabled:opacity-50 disabled:cursor-not-allowed`}
+						title="Copy logs to clipboard"
+					>
+						{copied ? (
+							<>
+								<Check className="w-4 h-4" />
+								Copied!
+							</>
+						) : (
+							<>
+								<Copy className="w-4 h-4" />
+								Copy Logs
+							</>
+						)}
+					</button>
+				</div>
+
 				{/* Controls */}
 				<div className="flex flex-wrap gap-4 items-center justify-between">
 					{/* Filters */}
@@ -183,13 +274,6 @@ export const LogViewerModal = ({
 					</div>
 				</div>
 
-				{/* Room filter indicator */}
-				{roomCode && (
-					<div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded">
-						Showing logs for room: <strong>{roomCode}</strong>
-					</div>
-				)}
-
 				{/* Logs table */}
 				<div className="border rounded-lg overflow-hidden">
 					<div className="max-h-96 overflow-y-auto bg-gray-50">
@@ -207,7 +291,7 @@ export const LogViewerModal = ({
 										<th className="px-2 py-2 text-left font-medium text-gray-600 w-16">
 											Level
 										</th>
-										{!roomCode && (
+										{!selectedRoomCode && (
 											<th className="px-2 py-2 text-left font-medium text-gray-600 w-16">
 												Room
 											</th>
@@ -233,7 +317,7 @@ export const LogViewerModal = ({
 													{log.level.toUpperCase()}
 												</span>
 											</td>
-											{!roomCode && (
+											{!selectedRoomCode && (
 												<td className="px-2 py-1.5 text-gray-500">
 													{log.roomCode || "-"}
 												</td>

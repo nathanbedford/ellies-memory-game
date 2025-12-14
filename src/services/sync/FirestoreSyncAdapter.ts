@@ -105,7 +105,7 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			throw new Error("Failed to generate unique room code");
 		}
 
-		// Create room document
+		// Create room document (game state stored separately in /games/{roomCode})
 		const room: Room = {
 			roomCode,
 			hostId: options.hostId,
@@ -122,7 +122,6 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 					color: options.hostColor,
 				},
 			},
-			gameState: null,
 			createdAt: Date.now(),
 			lastActivity: Date.now(),
 		};
@@ -303,11 +302,12 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		}
 
 		const roomRef = doc(db, "rooms", roomCode);
+		const gameRef = doc(db, "games", roomCode);
 
-		// Get current room to check for existing gameRound
-		const roomSnap = await getDoc(roomRef);
-		const existingGameRound = roomSnap.exists()
-			? (roomSnap.data() as Room).gameState?.gameRound || 0
+		// Get current game to check for existing gameRound
+		const gameSnap = await getDoc(gameRef);
+		const existingGameRound = gameSnap.exists()
+			? (gameSnap.data() as OnlineGameState).gameRound || 0
 			: 0;
 		const newGameRound = existingGameRound + 1;
 
@@ -317,9 +317,12 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			gameRound: newGameRound,
 		};
 
+		// Create/update game document separately from room
+		await setDoc(gameRef, onlineState);
+
+		// Update room status only
 		await updateDoc(roomRef, {
 			status: "playing",
-			gameState: onlineState,
 			lastActivity: serverTimestamp(),
 		});
 	}
@@ -331,8 +334,14 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 	async getState(): Promise<GameState | null> {
 		if (!this.roomCode) return null;
 
-		const room = await this.getRoom(this.roomCode);
-		return room?.gameState || null;
+		const gameRef = doc(db, "games", this.roomCode);
+		const gameSnap = await getDoc(gameRef);
+
+		if (!gameSnap.exists()) {
+			return null;
+		}
+
+		return gameSnap.data() as OnlineGameState;
 	}
 
 	async setState(state: GameState): Promise<void> {
@@ -340,11 +349,12 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			throw new Error("Not in a room");
 		}
 
+		const gameRef = doc(db, "games", this.roomCode);
 		const roomRef = doc(db, "rooms", this.roomCode);
 
 		// Preserve sync version and gameRound (version is managed by useOnlineGame hook)
 		const existingState = state as OnlineGameState;
-		
+
 		// Clean undefined values from cards (Firestore doesn't accept undefined)
 		const cleanedCards = state.cards.map((card) => {
 			const cleaned: any = {
@@ -361,7 +371,7 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			if (card.matchedByPlayerId !== undefined) cleaned.matchedByPlayerId = card.matchedByPlayerId;
 			return cleaned;
 		});
-		
+
 		const onlineState: OnlineGameState = {
 			...state,
 			cards: cleanedCards,
@@ -375,31 +385,43 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			delete (onlineState as any).lastUpdatedBy;
 		}
 
+		// Write game state to separate document
+		await setDoc(gameRef, onlineState);
+
+		// Update room's lastActivity timestamp
 		await updateDoc(roomRef, {
-			gameState: onlineState,
 			lastActivity: serverTimestamp(),
 		});
 	}
 
 	subscribeToState(callback: (state: GameState) => void): () => void {
 		if (!this.roomCode) {
+			console.warn("[Adapter] subscribeToState called with no roomCode");
 			return () => {};
 		}
 
-		const roomRef = doc(db, "rooms", this.roomCode);
+		const roomCode = this.roomCode;
+		console.log(`[Adapter] Setting up state subscription for /games/${roomCode}`);
+		const gameRef = doc(db, "games", roomCode);
 
 		const unsubscribe = onSnapshot(
-			roomRef,
+			gameRef,
 			(snapshot) => {
+				console.log(`[Adapter] onSnapshot callback fired for /games/${roomCode}`, {
+					exists: snapshot.exists(),
+					fromCache: snapshot.metadata.fromCache,
+					hasPendingWrites: snapshot.metadata.hasPendingWrites,
+				});
 				if (snapshot.exists()) {
-					const room = snapshot.data() as Room;
-					if (room.gameState) {
-						callback(room.gameState);
-					}
+					const gameState = snapshot.data() as OnlineGameState;
+					console.log(`[Adapter] Calling callback with syncVersion=${(gameState as any).syncVersion}`);
+					callback(gameState);
+				} else {
+					console.warn(`[Adapter] Game document does not exist: /games/${roomCode}`);
 				}
 			},
 			(error) => {
-				console.error("State subscription error:", error);
+				console.error("[Adapter] State subscription error:", error);
 			},
 		);
 

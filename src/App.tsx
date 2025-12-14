@@ -106,11 +106,12 @@ function App() {
   const localPlayerSlot = room && odahId ? (room.players[odahId]?.slot ?? null) : null;
 
   // Online game hook - only meaningful when in online mode with valid room
+  // Game state is loaded from separate /games/{roomCode} document via Firestore subscription
   const onlineGame = useOnlineGame({
     roomCode: roomCode || '',
     localPlayerSlot: localPlayerSlot || 1,
     flipDuration: localGame.flipDuration,
-    initialGameState: room?.gameState || localGame.gameState,
+    initialGameState: localGame.gameState, // Used as fallback until Firestore snapshot arrives
   });
 
   const getPackImagesById = useCallback((packId: CardPack) => {
@@ -157,8 +158,8 @@ function App() {
         );
         const nextState = startGameWithCards(initialState, cards);
 
-        // Increment gameRound for new game - read current round or default to 0
-        const currentGameRound = (room.gameState as OnlineGameState)?.gameRound || 0;
+        // Increment gameRound for new game - read current round from online game state
+        const currentGameRound = (onlineGame.gameState as OnlineGameState)?.gameRound || 0;
         const newGameRound = currentGameRound + 1;
 
         // Create online state with incremented gameRound
@@ -859,7 +860,7 @@ function App() {
       const activeConfig = getActiveConfig();
       const configSource = lastConfig || {
         ...activeConfig,
-        firstPlayer: (room?.gameState?.currentPlayer as 1 | 2) || 1,
+        firstPlayer: (onlineGame.gameState?.currentPlayer as 1 | 2) || 1,
       };
 
       const normalizedConfig = {

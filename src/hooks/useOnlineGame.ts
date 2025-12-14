@@ -153,6 +153,12 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		}
 
 		const unsubscribe = adapter.subscribeToState((remoteState) => {
+			logger.debug("Subscription callback received state", {
+				syncVersion: (remoteState as OnlineGameState).syncVersion,
+				gameRound: (remoteState as OnlineGameState).gameRound,
+				lastUpdatedBy: (remoteState as OnlineGameState).lastUpdatedBy,
+			});
+
 			const onlineState = remoteState as OnlineGameState;
 			const remoteVersion = onlineState.syncVersion || 0;
 			const remoteGameRound = onlineState.gameRound || 0;
