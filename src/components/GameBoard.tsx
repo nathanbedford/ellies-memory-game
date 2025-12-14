@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { CardLightbox } from './CardLightbox';
 import { Card } from './Card';
 import { RemoteCursor } from './online/RemoteCursor';
@@ -34,10 +34,33 @@ interface CardAnimationData {
   rotation: number;
 }
 
+// Type for stored fly animation data
+interface FlyData {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  finalY: number;
+  rotationAngle: number;
+  playerId: number | undefined;
+}
+
+// Type for cached card position (captured when card is flipped)
+interface CachedCardPosition {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack, columns: columnsProp, onCursorMove, onCursorLeave, remoteCursor }: GameBoardProps) => {
   const [lightboxCardId, setLightboxCardId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Store fly data that persists across renders - key is card ID
+  const flyDataRef = useRef<Map<string, FlyData>>(new Map());
+  // Cache card positions when they get flipped - used to calculate fly data
+  const cardPositionCache = useRef<Map<string, CachedCardPosition>>(new Map());
 
   // Calculate columns from card count if not provided
   const columns = useMemo(() => {
@@ -138,35 +161,73 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
     });
   }, [isAnimating, cardSize, cards, columns, gap]);
 
-  // Calculate fly-to-player animation data
-  const flyToPlayerData = useMemo(() => {
-    const flyingCards = cards.filter(c => c.isFlyingToPlayer);
-    console.log('[FLY DATA] Calculating fly-to-player data', {
-      totalCards: cards.length,
-      flyingCardsCount: flyingCards.length,
-      flyingCards: flyingCards.map(c => ({
-        id: c.id,
-        isFlyingToPlayer: c.isFlyingToPlayer,
-        flyingToPlayerId: c.flyingToPlayerId
-      })),
-      cardSize,
-      viewport: { width: window.innerWidth, height: window.innerHeight }
-    });
+  // Cache card positions when they get flipped (before they might become flying)
+  // This ensures we have position data available when calculating fly animations
+  useLayoutEffect(() => {
+    // Find cards that are flipped but not matched (selected cards)
+    const selectedCards = cards.filter(c => c.isFlipped && !c.isMatched);
 
-    const result = cards.map((card) => {
+    for (const card of selectedCards) {
+      // Only cache if we don't already have a position for this card
+      if (!cardPositionCache.current.has(card.id)) {
+        const cardElement = cardRefs.current.get(card.id);
+        if (cardElement) {
+          const rect = cardElement.getBoundingClientRect();
+          cardPositionCache.current.set(card.id, {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height
+          });
+          console.log('[POSITION CACHE] Cached position for flipped card', { cardId: card.id, rect: { left: rect.left, top: rect.top } });
+        }
+      }
+    }
+
+    // Clean up cache for cards that are no longer relevant (not flipped and not flying)
+    for (const [cardId] of cardPositionCache.current) {
+      const card = cards.find(c => c.id === cardId);
+      if (card && !card.isFlipped && !card.isFlyingToPlayer) {
+        cardPositionCache.current.delete(cardId);
+      }
+    }
+  }, [cards]);
+
+  // Calculate fly-to-player animation data
+  // Uses cached positions from when cards were flipped
+  const flyToPlayerData = useMemo(() => {
+    return cards.map((card) => {
       if (!card.isFlyingToPlayer) return null;
 
-      // Get the actual DOM position of the card using the ref
-      const cardElement = cardRefs.current.get(card.id);
-      if (!cardElement) {
-        console.warn('[FLY DATA] Card element not found in refs', { cardId: card.id });
+      // Check if we already have calculated fly data for this card
+      const existingFlyData = flyDataRef.current.get(card.id);
+      if (existingFlyData) {
+        return existingFlyData;
+      }
+
+      // Try to get position from cache (captured when card was flipped)
+      let rect = cardPositionCache.current.get(card.id);
+
+      // Fallback: try to get from DOM ref (might still exist on first render)
+      if (!rect) {
+        const cardElement = cardRefs.current.get(card.id);
+        if (cardElement) {
+          const domRect = cardElement.getBoundingClientRect();
+          rect = {
+            left: domRect.left,
+            top: domRect.top,
+            width: domRect.width,
+            height: domRect.height
+          };
+        }
+      }
+
+      if (!rect) {
+        console.warn('[FLY DATA] No position data for flying card', { cardId: card.id });
         return null;
       }
 
-      // Get the actual bounding rectangle
-      const rect = cardElement.getBoundingClientRect();
-
-      // Calculate card's actual center position from DOM
+      // Calculate card's actual center position
       const cardCenterX = rect.left + rect.width / 2;
       const cardCenterY = rect.top + rect.height / 2;
 
@@ -186,7 +247,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       // Final position: continue off screen above the player name
       const finalY = -cardSize - 50; // Off screen above
 
-      const flyData = {
+      const flyData: FlyData = {
         startX: rect.left,
         startY: rect.top,
         endX: targetX - cardSize / 2,
@@ -198,28 +259,34 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
 
       console.log('[FLY DATA] Calculated fly data for card', {
         cardId: card.id,
-        actualRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        source: cardPositionCache.current.has(card.id) ? 'cache' : 'dom',
         positions: {
           start: { x: flyData.startX, y: flyData.startY },
-          end: { x: flyData.endX, y: flyData.endY },
-          final: { x: flyData.endX, y: flyData.finalY }
+          end: { x: flyData.endX, y: flyData.endY }
         },
         rotationAngle: flyData.rotationAngle,
         playerId: flyData.playerId
       });
 
+      // Store in ref so it persists across re-renders
+      flyDataRef.current.set(card.id, flyData);
+
       return flyData;
     });
-
-    const validResults = result.filter(r => r !== null);
-    console.log('[FLY DATA] Fly data calculation complete', {
-      totalResults: result.length,
-      validResults: validResults.length,
-      validCardIds: validResults.map((r) => cards.find(c => c.isFlyingToPlayer && result.indexOf(r) === cards.indexOf(c))?.id)
-    });
-
-    return result;
   }, [cards, cardSize]);
+
+  // Clean up fly data for cards that stopped flying
+  useEffect(() => {
+    const currentFlyingCardIds = new Set(cards.filter(c => c.isFlyingToPlayer).map(c => c.id));
+
+    for (const [cardId] of flyDataRef.current) {
+      if (!currentFlyingCardIds.has(cardId)) {
+        console.log('[FLY DATA] Cleaning up fly data for card that stopped flying', { cardId });
+        flyDataRef.current.delete(cardId);
+        cardPositionCache.current.delete(cardId);
+      }
+    }
+  }, [cards]);
 
   return (
     <>

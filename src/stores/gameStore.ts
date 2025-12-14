@@ -340,7 +340,8 @@ export const selectCurrentPlayer = (state: GameStore) => {
 export const selectIsGameOver = (state: GameStore) =>
 	state.gameState.gameStatus === "finished";
 export const selectCanFlip = (state: GameStore) => {
-	const selectedCards = state.gameState.cards.filter(c => c.isFlipped && !c.isMatched);
+	// Exclude flying cards - they're already matched, just animating
+	const selectedCards = state.gameState.cards.filter(c => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer);
 	return (
 		state.gameState.gameStatus === "playing" &&
 		selectedCards.length < 2 &&

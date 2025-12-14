@@ -39,9 +39,10 @@ export function getPlayerScore(cards: Card[], playerId: number): number {
 /**
  * Get currently selected cards (flipped but not yet matched)
  * This is the derived replacement for GameState.selectedCards
+ * Note: Excludes cards that are flying to player (already matched, just animating)
  */
 export function getSelectedCards(cards: Card[]): Card[] {
-	return cards.filter((c) => c.isFlipped && !c.isMatched);
+	return cards.filter((c) => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer);
 }
 
 /**
@@ -292,8 +293,8 @@ export function applyMatch(
 
 /**
  * Start match animation (Phase 1 of 2-phase match)
- * Sets cards to "flying" state and updates score immediately.
- * Call completeMatchAnimation() after the animation completes.
+ * Sets cards as matched immediately and starts flying animation.
+ * Call completeMatchAnimation() after the animation completes to clear flying state.
  */
 export function startMatchAnimation(
 	state: GameState,
@@ -302,13 +303,15 @@ export function startMatchAnimation(
 ): GameState {
 	const [firstId, secondId] = cardIds;
 
-	// Mark cards as flying to player and set matchedByPlayerId immediately
-	// This ensures score (derived from matchedByPlayerId) is always in sync
+	// Mark cards as matched AND flying immediately
+	// Setting isMatched: true right away prevents them from being counted as "selected"
+	// and allows the player to flip new cards during the animation
 	const newCards = state.cards.map((c) =>
 		c.id === firstId || c.id === secondId
 			? {
 					...c,
 					isFlipped: true,
+					isMatched: true,
 					isFlyingToPlayer: true,
 					flyingToPlayerId: playerId,
 					matchedByPlayerId: playerId,
@@ -326,27 +329,23 @@ export function startMatchAnimation(
 
 /**
  * Complete match animation (Phase 2 of 2-phase match)
- * Called after flying animation completes to mark cards as matched.
+ * Called after flying animation completes to clear flying state.
+ * Cards are already marked as matched from Phase 1.
  */
 export function completeMatchAnimation(
 	state: GameState,
 	cardIds: [string, string],
-	playerId: number,
+	_playerId: number,
 ): GameState {
 	const [firstId, secondId] = cardIds;
 
-	// Mark cards as matched and clear flying state
+	// Clear flying state - cards are already isMatched: true from Phase 1
 	const newCards = state.cards.map((c) =>
 		c.id === firstId || c.id === secondId
 			? {
-					id: c.id,
-					imageId: c.imageId,
-					imageUrl: c.imageUrl,
-					gradient: c.gradient,
-					isFlipped: c.isFlipped,
-					isMatched: true,
+					...c,
 					isFlyingToPlayer: false,
-					matchedByPlayerId: playerId,
+					flyingToPlayerId: undefined,
 				}
 			: c,
 	);

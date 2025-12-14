@@ -508,14 +508,24 @@ describe("Animation-Aware Match Functions", () => {
 			expect(result.cards[0].isFlipped).toBe(true);
 			expect(result.cards[1].isFlipped).toBe(true);
 		});
+
+		it("sets isMatched immediately", () => {
+			const cards = createMatchingCardPair();
+			const state = createTestState({ cards });
+			const result = startMatchAnimation(state, ["card-0", "card-1"], 1);
+			expect(result.cards[0].isMatched).toBe(true);
+			expect(result.cards[1].isMatched).toBe(true);
+		});
 	});
 
 	describe("completeMatchAnimation", () => {
-		it("sets isMatched on cards", () => {
+		it("preserves isMatched on cards (already set by startMatchAnimation)", () => {
 			const cards = createMatchingCardPair().map((c) => ({
 				...c,
+				isMatched: true,
 				isFlyingToPlayer: true,
 				flyingToPlayerId: 1,
+				matchedByPlayerId: 1,
 			}));
 			const state = createTestState({ cards });
 			const result = completeMatchAnimation(state, ["card-0", "card-1"], 1);
@@ -526,8 +536,10 @@ describe("Animation-Aware Match Functions", () => {
 		it("clears isFlyingToPlayer", () => {
 			const cards = createMatchingCardPair().map((c) => ({
 				...c,
+				isMatched: true,
 				isFlyingToPlayer: true,
 				flyingToPlayerId: 1,
+				matchedByPlayerId: 1,
 			}));
 			const state = createTestState({ cards });
 			const result = completeMatchAnimation(state, ["card-0", "card-1"], 1);
@@ -535,24 +547,32 @@ describe("Animation-Aware Match Functions", () => {
 			expect(result.cards[1].isFlyingToPlayer).toBe(false);
 		});
 
-		it("sets matchedByPlayerId", () => {
-			const cards = createMatchingCardPair();
+		it("preserves matchedByPlayerId (already set by startMatchAnimation)", () => {
+			const cards = createMatchingCardPair().map((c) => ({
+				...c,
+				isMatched: true,
+				isFlyingToPlayer: true,
+				flyingToPlayerId: 2,
+				matchedByPlayerId: 2,
+			}));
 			const state = createTestState({ cards });
 			const result = completeMatchAnimation(state, ["card-0", "card-1"], 2);
 			expect(result.cards[0].matchedByPlayerId).toBe(2);
 			expect(result.cards[1].matchedByPlayerId).toBe(2);
 		});
 
-		it("omits flyingToPlayerId to avoid persisting undefined", () => {
+		it("sets flyingToPlayerId to undefined after clearing", () => {
 			const cards = createMatchingCardPair().map((c) => ({
 				...c,
+				isMatched: true,
 				isFlyingToPlayer: true,
 				flyingToPlayerId: 1,
+				matchedByPlayerId: 1,
 			}));
 			const state = createTestState({ cards });
-			const result = completeMatchAnimation(state, ["card-0", "card-1"], 2);
-			expect("flyingToPlayerId" in result.cards[0]).toBe(false);
-			expect("flyingToPlayerId" in result.cards[1]).toBe(false);
+			const result = completeMatchAnimation(state, ["card-0", "card-1"], 1);
+			expect(result.cards[0].flyingToPlayerId).toBeUndefined();
+			expect(result.cards[1].flyingToPlayerId).toBeUndefined();
 		});
 	});
 

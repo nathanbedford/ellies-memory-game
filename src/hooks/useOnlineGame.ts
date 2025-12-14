@@ -289,7 +289,8 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			syncToFirestore(newState, `flipCard:${cardId}`);
 
 			// Derive selected cards from card state
-			const selectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched);
+			// IMPORTANT: Exclude flying cards - they're already matched, just animating
+			const selectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer);
 			const selectedCardIds = selectedCards.map(c => c.id);
 
 			logger.debug("Card flipped", {
@@ -436,37 +437,42 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 				return; // Exit early - the setTimeout will handle the rest
 			} else {
 				// Use GameEngine for no match: flip back and switch turns
-				const beforeFlippedCards = currentState.cards.filter(
-					(c) => c.isFlipped && !c.isMatched,
-				);
-				logger.debug(`No match - flipping cards back`, {
-					checkId,
-					cardIds,
-					currentPlayer: currentState.currentPlayer,
-					beforeFlippedCount: beforeFlippedCards.length,
-					beforeFlippedIds: beforeFlippedCards.map((c) => c.id),
+				// IMPORTANT: Use functional setState to get latest state, not stale currentState
+				// This prevents overwriting concurrent updates (e.g., completeMatchAnimation)
+				setGameState((prevState) => {
+					const beforeFlippedCards = prevState.cards.filter(
+						(c) => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer,
+					);
+					logger.debug(`No match - flipping cards back`, {
+						checkId,
+						cardIds,
+						currentPlayer: prevState.currentPlayer,
+						beforeFlippedCount: beforeFlippedCards.length,
+						beforeFlippedIds: beforeFlippedCards.map((c) => c.id),
+					});
+
+					const noMatchState = applyNoMatchWithReset(prevState, cardIds);
+
+					const afterFlippedCards = noMatchState.cards.filter(
+						(c) => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer,
+					);
+					logger.debug(`Switching turn`, {
+						checkId,
+						fromPlayer: prevState.currentPlayer,
+						toPlayer: noMatchState.currentPlayer,
+						afterFlippedCount: afterFlippedCards.length,
+						afterFlippedIds: afterFlippedCards.map((c) => c.id),
+					});
+
+					syncToFirestore(
+						noMatchState,
+						`noMatch:flipBack:${cardIds[0]}+${cardIds[1]}`,
+					);
+
+					logger.debug(`Match check complete - state synced`, { checkId });
+
+					return noMatchState;
 				});
-
-				const noMatchState = applyNoMatchWithReset(currentState, cardIds);
-
-				const afterFlippedCards = noMatchState.cards.filter(
-					(c) => c.isFlipped && !c.isMatched,
-				);
-				logger.debug(`Switching turn`, {
-					checkId,
-					fromPlayer: currentState.currentPlayer,
-					toPlayer: noMatchState.currentPlayer,
-					afterFlippedCount: afterFlippedCards.length,
-					afterFlippedIds: afterFlippedCards.map((c) => c.id),
-				});
-
-				setGameState(noMatchState);
-				syncToFirestore(
-					noMatchState,
-					`noMatch:flipBack:${cardIds[0]}+${cardIds[1]}`,
-				);
-
-				logger.debug(`Match check complete - state synced`, { checkId });
 
 				isCheckingMatchRef.current = false;
 			}
