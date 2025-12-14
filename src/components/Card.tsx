@@ -43,7 +43,7 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, em
   return (
     <div
       data-allow-touchmove
-      onPointerDown={card.isMatched ? undefined : (e) => {
+      onPointerDown={(e) => {
         e.preventDefault(); // Prevent text selection and other default behaviors
         onClick();
       }}
@@ -53,7 +53,7 @@ export const Card = ({ card, onClick, size = 100, useWhiteBackground = false, em
         height: `${size}px`,
         transformStyle: 'preserve-3d',
         transform: card.isFlipped || card.isMatched ? 'rotateY(180deg)' : 'rotateY(0deg)',
-        pointerEvents: card.isMatched ? 'none' : 'auto',
+        pointerEvents: 'auto',
         userSelect: 'none', // Prevent text selection for snappier feel
         touchAction: 'manipulation' // Optimize touch interactions on mobile
       }}

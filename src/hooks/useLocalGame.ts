@@ -6,21 +6,20 @@
  *
  * Key principles:
  * 1. Uses useGameController for core game logic
- * 2. Manages game settings (card size, flip duration, TTS, etc.)
- * 3. Creates and manages EffectManager for TTS and other effects
- * 4. Provides admin controls for testing/debugging
+ * 2. Reads settings from useSettingsStore (persisted via Zustand)
+ * 3. Uses useUIStore for transient UI state (modals, animations, layout)
+ * 4. Creates and manages EffectManager for TTS and other effects
+ * 5. Provides admin controls for testing/debugging
  */
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { Card, GameState } from "../types";
 import { useGameController } from "./useGameController";
 import { useTextToSpeech } from "./useTextToSpeech";
-import {
-	getPlayersFromSettings,
-	type PlayerSettings,
-} from "../services/game/GameEngine";
+import { getPlayersFromSettings } from "../services/game/GameEngine";
 import { EffectManager, createTTSEffect } from "../services/effects";
 import { calculateGridDimensions } from "../utils/gridLayout";
+import { useSettingsStore, useUIStore } from "../stores";
 
 export interface UseLocalGameReturn {
 	// State
@@ -95,15 +94,46 @@ export interface UseLocalGameReturn {
 
 export function useLocalGame(): UseLocalGameReturn {
 	// ============================================
-	// Player Settings State
+	// Settings from Zustand Store (persisted)
 	// ============================================
 
-	const [playerSettings, setPlayerSettings] = useState<PlayerSettings>(() => ({
-		player1Name: localStorage.getItem("player1Name") || "Player 1",
-		player1Color: localStorage.getItem("player1Color") || "#3b82f6",
-		player2Name: localStorage.getItem("player2Name") || "Player 2",
-		player2Color: localStorage.getItem("player2Color") || "#10b981",
-	}));
+	const { settings } = useSettingsStore();
+	const {
+		player1Name,
+		player1Color,
+		player2Name,
+		player2Color,
+		firstPlayer,
+		cardSize,
+		autoSizeEnabled,
+		useWhiteCardBackground,
+		flipDuration,
+		emojiSizePercentage,
+		ttsEnabled,
+	} = settings;
+
+	// Settings actions from store
+	const {
+		setPlayerName,
+		setPlayerColor,
+		setCardSize,
+		setAutoSizeEnabled,
+		setUseWhiteCardBackground,
+		setFlipDuration,
+		setEmojiSizePercentage,
+		setTtsEnabled,
+	} = useSettingsStore();
+
+	// Derive player settings for getPlayersFromSettings
+	const playerSettings = useMemo(
+		() => ({
+			player1Name,
+			player1Color,
+			player2Name,
+			player2Color,
+		}),
+		[player1Name, player1Color, player2Name, player2Color],
+	);
 
 	const players = useMemo(
 		() => getPlayersFromSettings(playerSettings),
@@ -111,51 +141,17 @@ export function useLocalGame(): UseLocalGameReturn {
 	);
 
 	// ============================================
-	// Settings State
+	// UI State from Zustand Store (transient)
 	// ============================================
 
-	const [cardSize, setCardSize] = useState(() => {
-		const saved = localStorage.getItem("cardSize");
-		return saved ? parseInt(saved, 10) : 100;
-	});
-
-	const [autoSizeEnabled, setAutoSizeEnabled] = useState(() => {
-		const saved = localStorage.getItem("autoSizeEnabled");
-		return saved === null ? true : saved === "true";
-	});
-
-	const [useWhiteCardBackground, setUseWhiteCardBackground] = useState(() => {
-		const saved = localStorage.getItem("useWhiteCardBackground");
-		return saved === "true";
-	});
-
-	const [flipDuration, setFlipDuration] = useState(() => {
-		const saved = localStorage.getItem("flipDuration");
-		return saved ? parseInt(saved, 10) : 1500;
-	});
-
-	const [emojiSizePercentage, setEmojiSizePercentage] = useState(() => {
-		const saved = localStorage.getItem("emojiSizePercentage");
-		return saved ? parseInt(saved, 10) : 72;
-	});
-
-	const [ttsEnabled, setTtsEnabled] = useState(() => {
-		const saved = localStorage.getItem("ttsEnabled");
-		return saved === null ? true : saved === "true";
-	});
-
-	const [layoutMetrics, setLayoutMetrics] = useState({
-		boardWidth: 0,
-		boardAvailableHeight: 0,
-		scoreboardHeight: 0,
-	});
-
-	// ============================================
-	// UI State
-	// ============================================
-
-	const [showStartModal, setShowStartModal] = useState(false);
-	const [allCardsFlipped, setAllCardsFlipped] = useState(false);
+	const {
+		showStartModal,
+		setShowStartModal,
+		allCardsFlipped,
+		setAllCardsFlipped,
+		layoutMetrics,
+		updateLayoutMetrics,
+	} = useUIStore();
 
 	// ============================================
 	// Effect Manager & TTS
@@ -174,13 +170,9 @@ export function useLocalGame(): UseLocalGameReturn {
 	// Game Controller
 	// ============================================
 
-	const savedFirstPlayer = parseInt(
-		localStorage.getItem("firstPlayer") || "1",
-	) as 1 | 2;
-
 	const initialGameState: GameState = {
 		cards: [],
-		currentPlayer: savedFirstPlayer,
+		currentPlayer: firstPlayer,
 		gameStatus: "setup",
 	};
 
@@ -200,102 +192,61 @@ export function useLocalGame(): UseLocalGameReturn {
 	});
 
 	// ============================================
-	// Settings Actions
+	// Settings Actions (delegate to store)
 	// ============================================
 
-	const updatePlayerName = useCallback((playerId: number, newName: string) => {
-		const trimmedName = newName.trim();
-		localStorage.setItem(`player${playerId}Name`, trimmedName);
-		setPlayerSettings((prev) =>
-			playerId === 1
-				? { ...prev, player1Name: trimmedName }
-				: { ...prev, player2Name: trimmedName },
-		);
-	}, []);
+	const updatePlayerName = useCallback(
+		(playerId: number, newName: string) => {
+			setPlayerName(playerId, newName.trim());
+		},
+		[setPlayerName],
+	);
 
-	const updatePlayerColor = useCallback((playerId: number, newColor: string) => {
-		localStorage.setItem(`player${playerId}Color`, newColor);
-		setPlayerSettings((prev) =>
-			playerId === 1
-				? { ...prev, player1Color: newColor }
-				: { ...prev, player2Color: newColor },
-		);
-	}, []);
+	const updatePlayerColor = useCallback(
+		(playerId: number, newColor: string) => {
+			setPlayerColor(playerId, newColor);
+		},
+		[setPlayerColor],
+	);
 
 	const increaseCardSize = useCallback(() => {
-		setCardSize((prev) => {
-			const newSize = Math.min(prev + 10, 300);
-			localStorage.setItem("cardSize", newSize.toString());
-			return newSize;
-		});
-	}, []);
+		setCardSize(Math.min(cardSize + 10, 300));
+	}, [cardSize, setCardSize]);
 
 	const decreaseCardSize = useCallback(() => {
-		setCardSize((prev) => {
-			const newSize = Math.max(prev - 10, 60);
-			localStorage.setItem("cardSize", newSize.toString());
-			return newSize;
-		});
-	}, []);
+		setCardSize(Math.max(cardSize - 10, 60));
+	}, [cardSize, setCardSize]);
 
 	const toggleWhiteCardBackground = useCallback(() => {
-		setUseWhiteCardBackground((prev) => {
-			const newValue = !prev;
-			localStorage.setItem("useWhiteCardBackground", newValue.toString());
-			return newValue;
-		});
-	}, []);
+		setUseWhiteCardBackground(!useWhiteCardBackground);
+	}, [useWhiteCardBackground, setUseWhiteCardBackground]);
 
 	const toggleAutoSize = useCallback(() => {
-		setAutoSizeEnabled((prev) => {
-			const newValue = !prev;
-			localStorage.setItem("autoSizeEnabled", newValue.toString());
-			return newValue;
-		});
-	}, []);
+		setAutoSizeEnabled(!autoSizeEnabled);
+	}, [autoSizeEnabled, setAutoSizeEnabled]);
 
 	const increaseFlipDuration = useCallback(() => {
-		setFlipDuration((prev) => {
-			const newDuration = Math.min(prev + 500, 10000);
-			localStorage.setItem("flipDuration", newDuration.toString());
-			return newDuration;
-		});
-	}, []);
+		setFlipDuration(Math.min(flipDuration + 500, 10000));
+	}, [flipDuration, setFlipDuration]);
 
 	const decreaseFlipDuration = useCallback(() => {
-		setFlipDuration((prev) => {
-			const newDuration = Math.max(prev - 500, 500);
-			localStorage.setItem("flipDuration", newDuration.toString());
-			return newDuration;
-		});
-	}, []);
+		setFlipDuration(Math.max(flipDuration - 500, 500));
+	}, [flipDuration, setFlipDuration]);
 
 	const increaseEmojiSize = useCallback(() => {
-		setEmojiSizePercentage((prev) => {
-			const newPercentage = Math.min(prev + 5, 150);
-			localStorage.setItem("emojiSizePercentage", newPercentage.toString());
-			return newPercentage;
-		});
-	}, []);
+		setEmojiSizePercentage(Math.min(emojiSizePercentage + 5, 150));
+	}, [emojiSizePercentage, setEmojiSizePercentage]);
 
 	const decreaseEmojiSize = useCallback(() => {
-		setEmojiSizePercentage((prev) => {
-			const newPercentage = Math.max(prev - 5, 20);
-			localStorage.setItem("emojiSizePercentage", newPercentage.toString());
-			return newPercentage;
-		});
-	}, []);
+		setEmojiSizePercentage(Math.max(emojiSizePercentage - 5, 20));
+	}, [emojiSizePercentage, setEmojiSizePercentage]);
 
 	const toggleTtsEnabled = useCallback(() => {
-		setTtsEnabled((prev) => {
-			const newValue = !prev;
-			localStorage.setItem("ttsEnabled", newValue.toString());
-			return newValue;
-		});
-	}, []);
+		setTtsEnabled(!ttsEnabled);
+	}, [ttsEnabled, setTtsEnabled]);
 
 	// ============================================
-	// Layout Actions
+	// Layout Actions (delegate to store)
 	// ============================================
 
 	const updateAutoSizeMetrics = useCallback(
@@ -304,30 +255,27 @@ export function useLocalGame(): UseLocalGameReturn {
 			boardAvailableHeight: number;
 			scoreboardHeight: number;
 		}) => {
-			setLayoutMetrics((prev) => {
-				const roundedPrev = {
-					boardWidth: Math.round(prev.boardWidth),
-					boardAvailableHeight: Math.round(prev.boardAvailableHeight),
-					scoreboardHeight: Math.round(prev.scoreboardHeight),
-				};
-				const roundedNext = {
-					boardWidth: Math.round(metrics.boardWidth),
-					boardAvailableHeight: Math.round(metrics.boardAvailableHeight),
-					scoreboardHeight: Math.round(metrics.scoreboardHeight),
-				};
+			// Only update if values actually changed (rounded comparison)
+			const roundedPrev = {
+				boardWidth: Math.round(layoutMetrics.boardWidth),
+				boardAvailableHeight: Math.round(layoutMetrics.boardAvailableHeight),
+				scoreboardHeight: Math.round(layoutMetrics.scoreboardHeight),
+			};
+			const roundedNext = {
+				boardWidth: Math.round(metrics.boardWidth),
+				boardAvailableHeight: Math.round(metrics.boardAvailableHeight),
+				scoreboardHeight: Math.round(metrics.scoreboardHeight),
+			};
 
-				if (
-					roundedPrev.boardWidth === roundedNext.boardWidth &&
-					roundedPrev.boardAvailableHeight === roundedNext.boardAvailableHeight &&
-					roundedPrev.scoreboardHeight === roundedNext.scoreboardHeight
-				) {
-					return prev;
-				}
-
-				return metrics;
-			});
+			if (
+				roundedPrev.boardWidth !== roundedNext.boardWidth ||
+				roundedPrev.boardAvailableHeight !== roundedNext.boardAvailableHeight ||
+				roundedPrev.scoreboardHeight !== roundedNext.scoreboardHeight
+			) {
+				updateLayoutMetrics(metrics);
+			}
 		},
-		[],
+		[layoutMetrics, updateLayoutMetrics],
 	);
 
 	const calculateOptimalCardSize = useCallback(
@@ -416,10 +364,9 @@ export function useLocalGame(): UseLocalGameReturn {
 			const optimalSize = calculateOptimalCardSize(cardCount, metricsOverride);
 			if (optimalSize !== cardSize) {
 				setCardSize(optimalSize);
-				localStorage.setItem("cardSize", optimalSize.toString());
 			}
 		},
-		[autoSizeEnabled, calculateOptimalCardSize, cardSize],
+		[autoSizeEnabled, calculateOptimalCardSize, cardSize, setCardSize],
 	);
 
 	// ============================================
@@ -427,31 +374,23 @@ export function useLocalGame(): UseLocalGameReturn {
 	// ============================================
 
 	const startGame = useCallback(
-		(player1Name: string, player2Name: string, firstPlayer: number) => {
-			const savedPlayer1Color =
-				localStorage.getItem("player1Color") || "#3b82f6";
-			const savedPlayer2Color =
-				localStorage.getItem("player2Color") || "#10b981";
-
-			setPlayerSettings({
-				player1Name,
-				player1Color: savedPlayer1Color,
-				player2Name,
-				player2Color: savedPlayer2Color,
-			});
+		(p1Name: string, p2Name: string, startingPlayer: number) => {
+			// Update player names via store (colors are already stored)
+			setPlayerName(1, p1Name);
+			setPlayerName(2, p2Name);
 
 			controller.setFullGameState({
 				cards: [],
-				currentPlayer: firstPlayer,
+				currentPlayer: startingPlayer,
 				gameStatus: "setup",
 			});
 		},
-		[controller],
+		[controller, setPlayerName],
 	);
 
 	const showStartGameModal = useCallback(() => {
 		setShowStartModal(true);
-	}, []);
+	}, [setShowStartModal]);
 
 	// ============================================
 	// Admin Controls
@@ -597,7 +536,7 @@ export function useLocalGame(): UseLocalGameReturn {
 				return { ...prev, cards: newCards };
 			})(),
 		);
-	}, [controller]);
+	}, [controller, setAllCardsFlipped]);
 
 	// ============================================
 	// Return

@@ -624,77 +624,42 @@ export function useGameController(
 				gameStatus: "playing" as const,
 			}));
 
-			// Persist first player preference to localStorage
-			localStorage.setItem("firstPlayer", firstPlayer.toString());
+			// Note: firstPlayer preference is persisted via useSettingsStore in useLocalGame
 		},
 		[effectManager, players],
 	);
 
 	// ============================================
 	// Player Management
-	// Note: Player names/colors are stored in settings, not game state
-	// These functions just persist to localStorage; actual state updates
-	// happen via the gameStore.setPlayerName/setPlayerColor actions
+	// Note: Player names/colors are now managed via useSettingsStore.
+	// These are no-ops kept for API compatibility - actual updates
+	// should be done via useLocalGame.updatePlayerName/Color which
+	// delegates to the settings store.
 	// ============================================
 
 	const updatePlayerName = useCallback(
-		(playerId: number, newName: string) => {
-			const trimmedName = newName.trim();
-			if (!trimmedName) return;
-
-			// Persist to localStorage (gameStore handles the actual state update)
-			localStorage.setItem(`player${playerId}Name`, trimmedName);
+		(_playerId: number, _newName: string) => {
+			// No-op: use useSettingsStore.setPlayerName instead
 		},
 		[],
 	);
 
 	const updatePlayerColor = useCallback(
-		(playerId: number, newColor: string) => {
-			// Persist to localStorage (gameStore handles the actual state update)
-			localStorage.setItem(`player${playerId}Color`, newColor);
+		(_playerId: number, _newColor: string) => {
+			// No-op: use useSettingsStore.setPlayerColor instead
 		},
 		[],
 	);
 
 	// ============================================
 	// Settings Management
+	// Note: Settings are now persisted via useSettingsStore in useLocalGame.
+	// This function updates local state for the controller but does NOT
+	// persist to localStorage - that's handled by the store.
 	// ============================================
 
 	const updateSettings = useCallback((newSettings: Partial<GameSettings>) => {
-		setSettings((prev) => {
-			const updated = { ...prev, ...newSettings };
-
-			// Persist relevant settings to localStorage
-			if ("flipDuration" in newSettings) {
-				localStorage.setItem("flipDuration", String(updated.flipDuration));
-			}
-			if ("cardSize" in newSettings) {
-				localStorage.setItem("cardSize", String(updated.cardSize));
-			}
-			if ("autoSizeEnabled" in newSettings) {
-				localStorage.setItem(
-					"autoSizeEnabled",
-					String(updated.autoSizeEnabled),
-				);
-			}
-			if ("useWhiteCardBackground" in newSettings) {
-				localStorage.setItem(
-					"useWhiteCardBackground",
-					String(updated.useWhiteCardBackground),
-				);
-			}
-			if ("emojiSizePercentage" in newSettings) {
-				localStorage.setItem(
-					"emojiSizePercentage",
-					String(updated.emojiSizePercentage),
-				);
-			}
-			if ("ttsEnabled" in newSettings) {
-				localStorage.setItem("ttsEnabled", String(updated.ttsEnabled));
-			}
-
-			return updated;
-		});
+		setSettings((prev) => ({ ...prev, ...newSettings }));
 	}, []);
 
 	const updateLayoutMetrics = useCallback((metrics: LayoutMetrics) => {

@@ -266,7 +266,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           startX: rect.left,
           startY: rect.top,
           endX: targetX - cardSize / 2,
-          endY: headerY - cardSize / 2,
+          endY: headerY - cardSize * 0.8,  // 30% higher than before
           finalY: finalY,
           rotationAngle: rotationAngle,
           playerId: playerId
