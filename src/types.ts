@@ -118,14 +118,11 @@ export interface Room {
 		cardBack: string;
 		pairCount?: number; // Number of pairs (4-20), defaults to 20 if not set
 	} | null;
-	players: Record<
-		string,
-		{
-			slot: 1 | 2;
-			name: string;
-			color: string;
-		}
-	>;
+	// playerSlots: just stores slot assignment (1 or 2) per odahId
+	// Name/color come from RTDB presence only (single source of truth)
+	playerSlots?: Record<string, 1 | 2>;
+	// Legacy: old rooms may have full player objects - handle in joinRoom for backwards compat
+	players?: Record<string, { slot: 1 | 2; name: string; color: string }>;
 	createdAt: number;
 	lastActivity: number;
 }

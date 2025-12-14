@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useMemoryGame } from './hooks/useMemoryGame';
+import { useLocalGame } from './hooks/useLocalGame';
 import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme, BACKGROUND_OPTIONS } from './hooks/useBackgroundSelector';
 import { useCardBackSelector, CardBackType, CARD_BACK_OPTIONS } from './hooks/useCardBackSelector';
@@ -32,7 +32,7 @@ import { LogViewerModal } from './components/LogViewerModal';
 import { ModeSelector, OnlineLobby, OpponentDisconnectOverlay } from './components/online';
 import { useOpponentDisconnect } from './hooks/useOpponentDisconnect';
 import { PairCountModal } from './components/PairCountModal';
-import { useGameStore } from './stores/gameStore';
+import { useSettingsStore } from './stores/settingsStore';
 import screenfull from 'screenfull';
 
 type SetupStep = 'modeSelect' | 'theme' | 'cardPack' | 'background' | 'cardBack' | 'pairCount' | 'startGame' | null;
@@ -56,14 +56,15 @@ const TEST_COMBO_SEQUENCE = ['1', '2', '2', '5', '1', '2', '2', '5'];
 
 function App() {
   const { selectedPack, setSelectedPack, getCurrentPackImages, getPackImagesForPairCount, cardPacks } = useCardPacks();
-  
-  // Get pair count settings from game store
-  const localPairCount = useGameStore((state) => state.settings.localPairCount);
-  const onlinePairCount = useGameStore((state) => state.settings.onlinePairCount);
-  const setLocalPairCount = useGameStore((state) => state.setLocalPairCount);
-  const setOnlinePairCount = useGameStore((state) => state.setOnlinePairCount);
-  // Local game hook - always used for settings, and for game logic in local mode
-  const localGame = useMemoryGame();
+
+  // Get pair count settings from settings store
+  const localPairCount = useSettingsStore((state) => state.settings.localPairCount);
+  const onlinePairCount = useSettingsStore((state) => state.settings.onlinePairCount);
+  const setLocalPairCount = useSettingsStore((state) => state.setLocalPairCount);
+  const setOnlinePairCount = useSettingsStore((state) => state.setOnlinePairCount);
+
+  // Local game hook - uses useGameController internally for unified game logic
+  const localGame = useLocalGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -257,14 +258,19 @@ function App() {
   const toggleAllCardsAdmin = isOnlineMode ? onlineGame.toggleAllCardsFlipped : localGame.toggleAllCardsFlipped;
   const endGameEarly = isOnlineMode ? onlineGame.endGameEarly : localGame.endGameEarly;
 
-  // Settings and other functions always come from localGame
+  // Settings and game functions come from useLocalGame (unified hook)
   const {
-    cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration,
-    emojiSizePercentage, ttsEnabled, initializeGame, startGameWithFirstPlayer,
-    updatePlayerName, updatePlayerColor, increaseCardSize, decreaseCardSize,
+    // Settings
+    cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled,
+    // Settings actions
+    increaseCardSize, decreaseCardSize,
     toggleWhiteCardBackground, toggleAutoSize, increaseFlipDuration, decreaseFlipDuration,
-    increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled, resetGame, isAnimatingCards,
+    increaseEmojiSize, decreaseEmojiSize, toggleTtsEnabled,
+    updatePlayerName, updatePlayerColor,
+    // Layout
     updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
+    // Game actions
+    initializeGame, startGameWithFirstPlayer, resetGame, isAnimatingCards,
   } = localGame;
 
   // Cursor sync for online mode - only active during gameplay
@@ -619,7 +625,7 @@ function App() {
   }, [autoSizeEnabled, computeLayoutMetrics, updateAutoSizeMetrics]);
 
   // Auto-size when cards appear (works for both local and online modes)
-  // This is needed because useMemoryGame's internal effect only sees its own gameState,
+  // This is needed because useLocalGame's internal effect only sees its own gameState,
   // but in online mode the cards are in onlineGame.gameState
   useEffect(() => {
     if (!autoSizeEnabled || gameState.cards.length === 0) {

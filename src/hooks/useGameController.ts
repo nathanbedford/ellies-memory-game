@@ -1,7 +1,7 @@
 /**
  * useGameController - Unified hook for both local and online game modes
  *
- * This hook consolidates all game logic from useMemoryGame and useOnlineGame,
+ * This hook provides core game logic that can be used by useLocalGame and useOnlineGame,
  * using GameEngine pure functions as the single source of truth for game rules.
  *
  * Key principles:
@@ -79,14 +79,19 @@ export interface GameControllerReturn {
 	layoutMetrics: LayoutMetrics;
 	isAnimating: boolean;
 	isAuthoritative: boolean;
+	isAnimatingCards: boolean;
 
 	// Actions
 	flipCard: (cardId: string) => void;
 	endTurn: () => void;
 	resetGame: () => void;
 	setFullGameState: (state: GameState) => void;
-	initializeGame: (cards: Card[]) => void;
+	initializeGame: (
+		images: { id: string; url: string; gradient?: string }[],
+		startPlaying?: boolean,
+	) => void;
 	startGame: () => void;
+	startGameWithFirstPlayer: (firstPlayer: number) => void;
 
 	// Player management
 	updatePlayerName: (playerId: number, newName: string) => void;
@@ -95,6 +100,10 @@ export interface GameControllerReturn {
 	// Settings management
 	updateSettings: (settings: Partial<GameSettings>) => void;
 	updateLayoutMetrics: (metrics: LayoutMetrics) => void;
+
+	// Admin/Debug controls
+	toggleAllCardsFlipped: () => void;
+	endGameEarly: () => void;
 
 	// Utilities
 	calculateOptimalCardSize: (cardCount: number) => number;
@@ -105,6 +114,21 @@ export interface GameControllerReturn {
 // ============================================
 
 const STUCK_THRESHOLD_MS = 15000; // 15 seconds without resolution is stuck
+
+// ============================================
+// Helpers
+// ============================================
+
+/**
+ * Convert imageId to human-readable card name for TTS
+ * e.g. "african-elephant" -> "African Elephant"
+ */
+const formatCardNameForSpeech = (imageId: string): string => {
+	return imageId
+		.split('-')
+		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ');
+};
 
 // ============================================
 // Hook Implementation
@@ -136,6 +160,7 @@ export function useGameController(
 		scoreboardHeight: 0,
 	});
 	const [isAnimating, setIsAnimating] = useState(false);
+	const [isAnimatingCards, setIsAnimatingCards] = useState(false);
 
 	// ============================================
 	// Refs
@@ -150,6 +175,10 @@ export function useGameController(
 	const lastSyncedVersionRef = useRef(0);
 	const localVersionRef = useRef(
 		(initialGameState as OnlineGameState).syncVersion || 0,
+	);
+	// Track game round to detect resets
+	const lastGameRoundRef = useRef(
+		(initialGameState as OnlineGameState).gameRound || 0,
 	);
 
 	// Stuck detection refs
@@ -179,11 +208,15 @@ export function useGameController(
 				const newVersion = localVersionRef.current + 1;
 				localVersionRef.current = newVersion;
 
+				// Preserve gameRound if state already has it (from previous sync)
+				const currentGameRound =
+					(state as OnlineGameState).gameRound ?? lastGameRoundRef.current;
+
 				const onlineState: OnlineGameState = {
 					...state,
 					syncVersion: newVersion,
 					lastUpdatedBy: localPlayerSlot,
-					gameRound: (state as OnlineGameState).gameRound || 0,
+					gameRound: currentGameRound,
 				};
 
 				await syncAdapter.setState(onlineState);
@@ -191,6 +224,7 @@ export function useGameController(
 				console.log(`[SYNC] ${context || "unknown"}`, {
 					version: newVersion,
 					currentPlayer: state.currentPlayer,
+					gameRound: currentGameRound,
 				});
 			} catch (error) {
 				console.error(`[SYNC ERROR] ${context || "unknown"}`, error);
@@ -206,13 +240,27 @@ export function useGameController(
 	useEffect(() => {
 		if (!isOnlineMode || !syncAdapter || !roomCode) return;
 
+		// Don't subscribe until we have a valid localPlayerSlot
+		// This prevents the race condition where guest initially gets slot 1 as fallback
+		// and then filters out host's first card flip thinking it's their own update
+		if (!localPlayerSlot || localPlayerSlot < 1 || localPlayerSlot > 2) {
+			console.log("[SUBSCRIPTION] Invalid localPlayerSlot, skipping", { localPlayerSlot });
+			return;
+		}
+
 		const unsubscribe = syncAdapter.subscribeToState((remoteState) => {
 			const onlineState = remoteState as OnlineGameState;
 			const remoteVersion = onlineState.syncVersion || 0;
+			const remoteGameRound = onlineState.gameRound || 0;
 			const lastUpdatedBy = onlineState.lastUpdatedBy;
 
-			// Skip if this update came from us
-			if (lastUpdatedBy === localPlayerSlot) {
+			// Check if this is a new game round (reset detected)
+			// Use > instead of !== to reject stale updates from older rounds
+			const isNewRound = remoteGameRound > lastGameRoundRef.current;
+
+			// Skip if this update came from us (unless it's a new round)
+			if (lastUpdatedBy === localPlayerSlot && !isNewRound) {
+				// Still track version and round
 				lastSyncedVersionRef.current = Math.max(
 					lastSyncedVersionRef.current,
 					remoteVersion,
@@ -221,15 +269,28 @@ export function useGameController(
 					localVersionRef.current,
 					remoteVersion,
 				);
+				lastGameRoundRef.current = remoteGameRound;
 				return;
 			}
 
-			// Only apply if remote is newer
-			if (remoteVersion > lastSyncedVersionRef.current) {
-				lastSyncedVersionRef.current = remoteVersion;
-				localVersionRef.current = remoteVersion;
+			// Apply if remote is newer OR if it's a new round (reset)
+			if (remoteVersion > lastSyncedVersionRef.current || isNewRound) {
+				if (isNewRound) {
+					console.log("[SUBSCRIPTION] New round detected - resetting version tracking", {
+						oldRound: lastGameRoundRef.current,
+						newRound: remoteGameRound,
+						remoteVersion,
+					});
+					// Reset version tracking for new round
+					lastSyncedVersionRef.current = remoteVersion;
+					localVersionRef.current = remoteVersion;
+					lastGameRoundRef.current = remoteGameRound;
+				} else {
+					lastSyncedVersionRef.current = remoteVersion;
+					localVersionRef.current = remoteVersion;
+				}
 
-				// Cancel any pending match check (opponent's turn now)
+				// Cancel any pending match check (opponent's turn now or game reset)
 				if (matchCheckTimeoutRef.current) {
 					clearTimeout(matchCheckTimeoutRef.current);
 					matchCheckTimeoutRef.current = null;
@@ -355,8 +416,9 @@ export function useGameController(
 					syncToFirestore(finalState, `match:complete`);
 				}
 
-				// Notify effect manager
-				effectManager?.notifyMatchFound(currentPlayerName, currentPlayerId);
+				// Notify effect manager (TTS will announce match with card name)
+				const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
+				effectManager?.notifyMatchFound(currentPlayerName, currentPlayerId, matchedCardName);
 
 				// Check for game over - derive winner/isTie from cards
 				if (finalState.gameStatus === "finished") {
@@ -458,22 +520,80 @@ export function useGameController(
 			setGameState(newState);
 
 			if (isOnlineMode) {
-				const version = (newState as OnlineGameState).syncVersion || 0;
+				const onlineState = newState as OnlineGameState;
+				const version = onlineState.syncVersion || 0;
+				const gameRound = onlineState.gameRound || 0;
 				lastSyncedVersionRef.current = version;
 				localVersionRef.current = version;
+				lastGameRoundRef.current = gameRound;
 			}
 		},
 		[isOnlineMode],
 	);
 
-	const initializeGame = useCallback((cards: Card[]) => {
-		setIsAnimating(true);
-		setGameState((prev) => ({
-			...prev,
-			cards,
-			gameStatus: "setup",
-		}));
-	}, []);
+	const initializeGame = useCallback(
+		(
+			images: { id: string; url: string; gradient?: string }[],
+			startPlaying: boolean = false,
+		) => {
+			// Cancel any pending match check
+			if (matchCheckTimeoutRef.current) {
+				clearTimeout(matchCheckTimeoutRef.current);
+				matchCheckTimeoutRef.current = null;
+			}
+			isCheckingMatchRef.current = false;
+
+			// Create pairs of cards from images
+			const cards: Card[] = [];
+			images.forEach((image, index) => {
+				cards.push({
+					id: `card-${index * 2}`,
+					imageId: image.id,
+					imageUrl: image.url,
+					gradient: image.gradient,
+					isFlipped: false,
+					isMatched: false,
+				});
+				cards.push({
+					id: `card-${index * 2 + 1}`,
+					imageId: image.id,
+					imageUrl: image.url,
+					gradient: image.gradient,
+					isFlipped: false,
+					isMatched: false,
+				});
+			});
+
+			// Shuffle cards
+			const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
+
+			if (startPlaying) {
+				// Start animation sequence
+				setIsAnimatingCards(true);
+				setIsAnimating(true);
+				setGameState((prev) => ({
+					...prev,
+					cards: shuffledCards,
+					gameStatus: "playing",
+				}));
+
+				// After animation completes, mark animation as done
+				// 900ms per card animation + 30ms delay between cards
+				const totalAnimationTime = shuffledCards.length * 30 + 900;
+				setTimeout(() => {
+					setIsAnimatingCards(false);
+					setIsAnimating(false);
+				}, totalAnimationTime);
+			} else {
+				setGameState((prev) => ({
+					...prev,
+					cards: shuffledCards,
+					gameStatus: "setup",
+				}));
+			}
+		},
+		[],
+	);
 
 	const startGame = useCallback(() => {
 		setGameState((prev) => ({
@@ -489,6 +609,26 @@ export function useGameController(
 			`Player ${firstPlayerId}`;
 		effectManager?.notifyGameStart(firstPlayerName, firstPlayerId);
 	}, [gameState.currentPlayer, players, effectManager]);
+
+	const startGameWithFirstPlayer = useCallback(
+		(firstPlayer: number) => {
+			const firstPlayerName =
+				getPlayerById(players, firstPlayer)?.name || `Player ${firstPlayer}`;
+
+			// Notify effects (TTS will announce first player's turn)
+			effectManager?.notifyGameStart(firstPlayerName, firstPlayer);
+
+			setGameState((prev) => ({
+				...prev,
+				currentPlayer: firstPlayer,
+				gameStatus: "playing" as const,
+			}));
+
+			// Persist first player preference to localStorage
+			localStorage.setItem("firstPlayer", firstPlayer.toString());
+		},
+		[effectManager, players],
+	);
 
 	// ============================================
 	// Player Management
@@ -574,6 +714,119 @@ export function useGameController(
 	}, []);
 
 	// ============================================
+	// Admin/Debug Controls
+	// ============================================
+
+	const toggleAllCardsFlipped = useCallback(() => {
+		if (gameState.cards.length === 0) return;
+
+		const unmatchedCards = gameState.cards.filter((c) => !c.isMatched);
+		if (unmatchedCards.length === 0) return;
+
+		const allFlipped = unmatchedCards.every((c) => c.isFlipped);
+		const newFlippedState = !allFlipped;
+
+		const newCards = gameState.cards.map((card) => {
+			if (card.isMatched) {
+				return card;
+			}
+			return { ...card, isFlipped: newFlippedState };
+		});
+
+		const newState: GameState = {
+			...gameState,
+			cards: newCards,
+		};
+
+		setGameState(newState);
+		if (isOnlineMode) {
+			syncToFirestore(
+				newState,
+				newFlippedState ? "admin:revealAll" : "admin:hideAll",
+			);
+		}
+	}, [gameState, isOnlineMode, syncToFirestore]);
+
+	const endGameEarly = useCallback(() => {
+		if (gameState.gameStatus !== "playing" || gameState.cards.length === 0) {
+			return;
+		}
+
+		// Set up test state: Player 1 gets 10 matches, Player 2 gets 9 matches
+		// This leaves 1 pair (2 cards) unmatched for easy testing
+
+		// Get all unmatched cards
+		const unmatchedCards = gameState.cards.filter((c) => !c.isMatched);
+
+		// Group unmatched cards by imageId to get pairs
+		const cardPairs: { [imageId: string]: Card[] } = {};
+		unmatchedCards.forEach((card) => {
+			if (!cardPairs[card.imageId]) {
+				cardPairs[card.imageId] = [];
+			}
+			cardPairs[card.imageId].push(card);
+		});
+
+		// Get complete pairs only (should be exactly 2 cards each)
+		const pairs = Object.values(cardPairs).filter((pair) => pair.length === 2);
+
+		// Find the last pair to leave unmatched
+		const lastPair = pairs[pairs.length - 1];
+		const lastPairImageId = lastPair?.[0]?.imageId;
+
+		// Create a map of card ID to assigned player ID
+		const cardToPlayerMap = new Map<string, number>();
+
+		// Distribute pairs: 10 to Player 1, 9 to Player 2
+		// Skip the last pair (leave it unmatched)
+		const pairsToAssign = pairs.slice(0, -1);
+		pairsToAssign.forEach((pair, index) => {
+			// First 10 pairs go to Player 1, next 9 pairs go to Player 2
+			const assignedPlayer = index < 10 ? 1 : 2;
+			pair.forEach((card) => {
+				cardToPlayerMap.set(card.id, assignedPlayer);
+			});
+		});
+
+		// Update cards
+		const newCards = gameState.cards.map((card) => {
+			// Keep already matched cards as is
+			if (card.isMatched) {
+				return card;
+			}
+
+			// Keep the last pair unflipped and unmatched
+			if (card.imageId === lastPairImageId) {
+				return { ...card, isFlipped: false, isMatched: false };
+			}
+
+			// Check if this card should be matched
+			const matchedByPlayerId = cardToPlayerMap.get(card.id);
+			if (matchedByPlayerId !== undefined) {
+				return {
+					...card,
+					isFlipped: true,
+					isMatched: true,
+					matchedByPlayerId,
+				};
+			}
+
+			return card;
+		});
+
+		// Keep game in "playing" status so user can complete the final match
+		const newState: GameState = {
+			...gameState,
+			cards: newCards,
+		};
+
+		setGameState(newState);
+		if (isOnlineMode) {
+			syncToFirestore(newState, "admin:endGameEarly");
+		}
+	}, [gameState, isOnlineMode, syncToFirestore]);
+
+	// ============================================
 	// Utilities
 	// ============================================
 
@@ -625,6 +878,7 @@ export function useGameController(
 		layoutMetrics,
 		isAnimating,
 		isAuthoritative,
+		isAnimatingCards,
 
 		// Actions
 		flipCard,
@@ -633,6 +887,7 @@ export function useGameController(
 		setFullGameState,
 		initializeGame,
 		startGame,
+		startGameWithFirstPlayer,
 
 		// Player management
 		updatePlayerName,
@@ -641,6 +896,10 @@ export function useGameController(
 		// Settings management
 		updateSettings,
 		updateLayoutMetrics,
+
+		// Admin/Debug controls
+		toggleAllCardsFlipped,
+		endGameEarly,
 
 		// Utilities
 		calculateOptimalCardSize,

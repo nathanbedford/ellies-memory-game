@@ -106,6 +106,8 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		}
 
 		// Create room document (game state stored separately in /games/{roomCode})
+		// Note: Name/color are stored in RTDB presence only (single source of truth)
+		// playerSlots just tracks which odahId has which slot (1 or 2)
 		const room: Room = {
 			roomCode,
 			hostId: options.hostId,
@@ -115,12 +117,8 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 				background: options.background,
 				cardBack: options.cardBack,
 			},
-			players: {
-				[this.odahId]: {
-					slot: 1,
-					name: options.hostName,
-					color: options.hostColor,
-				},
+			playerSlots: {
+				[this.odahId]: 1, // Host is always slot 1
 			},
 			createdAt: Date.now(),
 			lastActivity: Date.now(),
@@ -162,8 +160,16 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 
 		const room = roomSnap.data() as Room;
 
+		// Support both new playerSlots format and legacy players format
+		// New format: playerSlots = { [odahId]: 1 | 2 }
+		// Legacy format: players = { [odahId]: { slot, name, color } }
+		const playerSlots: Record<string, 1 | 2> = room.playerSlots ||
+			(room.players
+				? Object.fromEntries(Object.entries(room.players).map(([k, v]) => [k, v.slot]))
+				: {});
+
 		// Check if player is already in the room (rejoining)
-		const isExistingPlayer = options.odahId in room.players;
+		const isExistingPlayer = options.odahId in playerSlots;
 
 		if (!isExistingPlayer) {
 			// New player trying to join
@@ -171,22 +177,19 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 				throw new Error("Game already in progress");
 			}
 
-			const playerCount = Object.keys(room.players).length;
+			const playerCount = Object.keys(playerSlots).length;
 			if (playerCount >= 2) {
 				throw new Error("Room is full");
 			}
 		}
 
-		// Determine player slot
-		const playerSlot: 1 | 2 = isExistingPlayer ? room.players[options.odahId].slot : 2;
+		// Determine player slot (host is always 1, guest is always 2)
+		const playerSlot: 1 | 2 = isExistingPlayer ? playerSlots[options.odahId] : 2;
 
-		// Add/update player in room
+		// Add/update player slot in room (just the slot number, not name/color)
+		// Name/color come from RTDB presence only
 		await updateDoc(roomRef, {
-			[`players.${options.odahId}`]: {
-				slot: playerSlot,
-				name: options.name,
-				color: options.color,
-			},
+			[`playerSlots.${options.odahId}`]: playerSlot,
 			lastActivity: serverTimestamp(),
 		});
 
@@ -220,9 +223,9 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 				lastActivity: serverTimestamp(),
 			});
 		} else {
-			// Guest leaving removes them from the room
+			// Guest leaving removes them from the room (slot assignment only)
 			await updateDoc(roomRef, {
-				[`players.${this.odahId}`]: null,
+				[`playerSlots.${this.odahId}`]: null,
 				lastActivity: serverTimestamp(),
 			});
 		}
@@ -441,14 +444,8 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 	async updatePlayerName(name: string): Promise<void> {
 		if (!this.roomCode || !this.odahId) return;
 
-		const roomRef = doc(db, "rooms", this.roomCode);
-
-		await updateDoc(roomRef, {
-			[`players.${this.odahId}.name`]: name,
-			lastActivity: serverTimestamp(),
-		});
-
-		// Update presence
+		// Name is stored in RTDB presence only (single source of truth)
+		// No Firestore update needed - playerSlots only stores slot assignment
 		if (this.presenceService) {
 			await this.presenceService.updateName(name);
 		}
@@ -457,14 +454,8 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 	async updatePlayerColor(color: string): Promise<void> {
 		if (!this.roomCode || !this.odahId) return;
 
-		const roomRef = doc(db, "rooms", this.roomCode);
-
-		await updateDoc(roomRef, {
-			[`players.${this.odahId}.color`]: color,
-			lastActivity: serverTimestamp(),
-		});
-
-		// Update presence
+		// Color is stored in RTDB presence only (single source of truth)
+		// No Firestore update needed - playerSlots only stores slot assignment
 		if (this.presenceService) {
 			await this.presenceService.updateColor(color);
 		}

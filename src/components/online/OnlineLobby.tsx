@@ -6,8 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { UserPlus, LogIn } from 'lucide-react';
-import { useOnlineStore } from '../../stores';
-import { useGameStore } from '../../stores';
+import { useOnlineStore, useSettingsStore } from '../../stores';
 import { ConnectionStatus } from './ConnectionStatus';
 import { RoomCodeDisplay } from './RoomCodeDisplay';
 import { JoinRoomForm } from './JoinRoomForm';
@@ -54,7 +53,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     setPlayerNameInput(playerName);
   }, [playerName]);
 
-  const { settings } = useGameStore();
+  const { settings } = useSettingsStore();
 
   // Helper to get images for a card pack
   const getPackImages = useCallback((packId: CardPack) => {
