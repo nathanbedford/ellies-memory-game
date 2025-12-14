@@ -114,6 +114,8 @@ function App() {
     localPlayerSlot: localPlayerSlot || 0,
     flipDuration: localGame.flipDuration,
     initialGameState: localGame.gameState, // Used as fallback until Firestore snapshot arrives
+    players: getPlayersFromPresence(presenceData),
+    effectManager: localGame.effectManager,
   });
 
   const getPackImagesById = useCallback((packId: CardPack) => {

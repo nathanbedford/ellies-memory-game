@@ -38,8 +38,16 @@ export function createTTSEffect(
   };
 
   return {
-    onMatchFound(playerName: string) {
-      speakWithDelay(() => ttsHook.speakMatchFound(playerName));
+    onMatchFound(playerName: string, _playerId: number, cardName?: string) {
+      speakWithDelay(() => {
+        if (cardName) {
+          // Use custom message with card name for richer feedback
+          ttsHook.speak(`${playerName} found a ${cardName}! It's still their turn.`);
+        } else {
+          // Fall back to generic message
+          ttsHook.speakMatchFound(playerName);
+        }
+      });
     },
 
     onTurnChange(playerName: string) {

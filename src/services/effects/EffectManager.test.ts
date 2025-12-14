@@ -47,8 +47,17 @@ describe("EffectManager", () => {
 
 			effectManager.notifyMatchFound("Alice", 1);
 
-			expect(effect1.onMatchFound).toHaveBeenCalledWith("Alice", 1);
-			expect(effect2.onMatchFound).toHaveBeenCalledWith("Alice", 1);
+			expect(effect1.onMatchFound).toHaveBeenCalledWith("Alice", 1, undefined);
+			expect(effect2.onMatchFound).toHaveBeenCalledWith("Alice", 1, undefined);
+		});
+
+		it("passes cardName to onMatchFound when provided", () => {
+			const effect: GameEffect = { onMatchFound: vi.fn() };
+			effectManager.register(effect);
+
+			effectManager.notifyMatchFound("Alice", 1, "Dog");
+
+			expect(effect.onMatchFound).toHaveBeenCalledWith("Alice", 1, "Dog");
 		});
 
 		it("does not throw if effect has no onMatchFound", () => {

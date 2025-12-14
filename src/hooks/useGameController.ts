@@ -17,8 +17,7 @@ import {
 	canFlipCard,
 	flipCard as engineFlipCard,
 	checkMatch,
-	startMatchAnimation,
-	completeMatchAnimation,
+	applyMatch,
 	applyNoMatchWithReset,
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
@@ -105,7 +104,6 @@ export interface GameControllerReturn {
 // Constants
 // ============================================
 
-const MATCH_ANIMATION_DURATION = 3000; // ms - must match CSS animation
 const STUCK_THRESHOLD_MS = 15000; // 15 seconds without resolution is stuck
 
 // ============================================
@@ -348,44 +346,23 @@ export function useGameController(
 				`Player ${currentPlayerId}`;
 
 			if (isMatch) {
-				// PHASE 1: Start flying animation
-				const flyingState = startMatchAnimation(
-					currentState,
-					cardIds,
-					currentPlayerId,
-				);
+				// Apply match directly - animation is handled locally by GameBoard
+				const matchedState = applyMatch(currentState, matchResult);
+				const finalState = checkAndFinishGame(matchedState);
 
-				setGameState(flyingState);
+				setGameState(finalState);
 				if (isOnlineMode) {
-					syncToFirestore(flyingState, `match:flying`);
+					syncToFirestore(finalState, `match:complete`);
 				}
 
 				// Notify effect manager
 				effectManager?.notifyMatchFound(currentPlayerName, currentPlayerId);
 
-				// PHASE 2: Complete match after animation
-				setTimeout(() => {
-					setGameState((prevState) => {
-						const matchedState = completeMatchAnimation(
-							prevState,
-							cardIds,
-							currentPlayerId,
-						);
-						const finalState = checkAndFinishGame(matchedState);
-
-						if (isOnlineMode) {
-							syncToFirestore(finalState, `match:complete`);
-						}
-
-						// Check for game over - derive winner/isTie from cards
-						if (finalState.gameStatus === "finished") {
-							const { winner, isTie } = calculateWinner(finalState.cards, players);
-							effectManager?.notifyGameOver(winner, isTie);
-						}
-
-						return finalState;
-					});
-				}, MATCH_ANIMATION_DURATION);
+				// Check for game over - derive winner/isTie from cards
+				if (finalState.gameStatus === "finished") {
+					const { winner, isTie } = calculateWinner(finalState.cards, players);
+					effectManager?.notifyGameOver(winner, isTie);
+				}
 
 				isCheckingMatchRef.current = false;
 			} else {

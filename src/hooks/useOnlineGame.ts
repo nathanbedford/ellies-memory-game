@@ -11,7 +11,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { getFirestoreSyncAdapter } from "../services/sync/FirestoreSyncAdapter";
 import { logger } from "../services/logging/LogService";
-import type { GameState, OnlineGameState } from "../types";
+import type { GameState, OnlineGameState, Player } from "../types";
 import {
 	getPlayerScore,
 	canFlipCard,
@@ -21,17 +21,33 @@ import {
 	applyNoMatchWithReset,
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
+	getPlayerById,
+	calculateWinner,
 } from "../services/game/GameEngine";
+import type { EffectManager } from "../services/effects";
+
+/**
+ * Convert imageId to human-readable card name for TTS
+ * e.g. "african-elephant" -> "African Elephant"
+ */
+const formatCardNameForSpeech = (imageId: string): string => {
+	return imageId
+		.split('-')
+		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(' ');
+};
 
 interface UseOnlineGameOptions {
 	roomCode: string;
 	localPlayerSlot: number;
 	flipDuration: number;
 	initialGameState: GameState;
+	players: Player[];
+	effectManager?: EffectManager;
 }
 
 export function useOnlineGame(options: UseOnlineGameOptions) {
-	const { roomCode, localPlayerSlot, flipDuration, initialGameState } = options;
+	const { roomCode, localPlayerSlot, flipDuration, initialGameState, players, effectManager } = options;
 
 	// Game state - starts with initial state from room
 	const [gameState, setGameState] = useState<GameState>(initialGameState);
@@ -397,48 +413,63 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 					`match:${cardIds[0]}+${cardIds[1]}`,
 				);
 
+				// Notify effects (TTS will announce match with card name)
+				const currentPlayerId = currentState.currentPlayer;
+				const matchedPlayerName = getPlayerById(players, currentPlayerId)?.name || `Player ${currentPlayerId}`;
+				const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
+				effectManager?.notifyMatchFound(matchedPlayerName, currentPlayerId, matchedCardName);
+
+				// Check if game ended and notify
+				if (finalState.gameStatus === "finished") {
+					const { winner, isTie } = calculateWinner(finalState.cards, players);
+					effectManager?.notifyGameOver(winner, isTie);
+				}
+
 				isCheckingMatchRef.current = false;
 			} else {
 				// No match: flip back and switch turns
-				setGameState((prevState) => {
-					const beforeFlippedCards = prevState.cards.filter(
-						(c) => c.isFlipped && !c.isMatched,
-					);
-					logger.debug(`No match - flipping cards back`, {
-						checkId,
-						cardIds,
-						currentPlayer: prevState.currentPlayer,
-						beforeFlippedCount: beforeFlippedCards.length,
-						beforeFlippedIds: beforeFlippedCards.map((c) => c.id),
-					});
-
-					const noMatchState = applyNoMatchWithReset(prevState, cardIds);
-
-					const afterFlippedCards = noMatchState.cards.filter(
-						(c) => c.isFlipped && !c.isMatched,
-					);
-					logger.debug(`Switching turn`, {
-						checkId,
-						fromPlayer: prevState.currentPlayer,
-						toPlayer: noMatchState.currentPlayer,
-						afterFlippedCount: afterFlippedCards.length,
-						afterFlippedIds: afterFlippedCards.map((c) => c.id),
-					});
-
-					syncToFirestore(
-						noMatchState,
-						`noMatch:flipBack:${cardIds[0]}+${cardIds[1]}`,
-					);
-
-					logger.debug(`Match check complete - state synced`, { checkId });
-
-					return noMatchState;
+				const beforeFlippedCards = currentState.cards.filter(
+					(c) => c.isFlipped && !c.isMatched,
+				);
+				logger.debug(`No match - flipping cards back`, {
+					checkId,
+					cardIds,
+					currentPlayer: currentState.currentPlayer,
+					beforeFlippedCount: beforeFlippedCards.length,
+					beforeFlippedIds: beforeFlippedCards.map((c) => c.id),
 				});
+
+				const noMatchState = applyNoMatchWithReset(currentState, cardIds);
+
+				const afterFlippedCards = noMatchState.cards.filter(
+					(c) => c.isFlipped && !c.isMatched,
+				);
+				logger.debug(`Switching turn`, {
+					checkId,
+					fromPlayer: currentState.currentPlayer,
+					toPlayer: noMatchState.currentPlayer,
+					afterFlippedCount: afterFlippedCards.length,
+					afterFlippedIds: afterFlippedCards.map((c) => c.id),
+				});
+
+				setGameState(noMatchState);
+				syncToFirestore(
+					noMatchState,
+					`noMatch:flipBack:${cardIds[0]}+${cardIds[1]}`,
+				);
+
+				logger.debug(`Match check complete - state synced`, { checkId });
+
+				// Notify effects of turn change
+				const nextPlayer = noMatchState.currentPlayer;
+				const nextPlayerName = getPlayerById(players, nextPlayer)?.name || `Player ${nextPlayer}`;
+				effectManager?.notifyNoMatch();
+				effectManager?.notifyTurnChange(nextPlayerName, nextPlayer);
 
 				isCheckingMatchRef.current = false;
 			}
 		},
-		[localPlayerSlot, syncToFirestore],
+		[localPlayerSlot, syncToFirestore, players, effectManager],
 	);
 
 	// Update ref whenever checkForMatch changes

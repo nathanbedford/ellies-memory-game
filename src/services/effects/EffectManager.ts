@@ -6,7 +6,7 @@ import type { Player } from '../../types';
  */
 export interface GameEffect {
   /** Called when a match is found */
-  onMatchFound?(playerName: string, playerId: number): void;
+  onMatchFound?(playerName: string, playerId: number, cardName?: string): void;
 
   /** Called when cards don't match */
   onNoMatch?(): void;
@@ -60,10 +60,10 @@ export class EffectManager {
   /**
    * Notify all registered effects that a match was found
    */
-  notifyMatchFound(playerName: string, playerId: number): void {
+  notifyMatchFound(playerName: string, playerId: number, cardName?: string): void {
     this.effects.forEach(effect => {
       try {
-        effect.onMatchFound?.(playerName, playerId);
+        effect.onMatchFound?.(playerName, playerId, cardName);
       } catch (error) {
         console.error('Error in onMatchFound effect:', error);
       }

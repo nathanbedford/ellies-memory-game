@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { Card, GameState } from "../types";
 import { useTextToSpeech } from "./useTextToSpeech";
 import {
@@ -11,9 +11,11 @@ import {
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
 	getPlayersFromSettings,
+	calculateWinner,
 	type PlayerSettings,
 } from "../services/game/GameEngine";
 import { calculateGridDimensions } from "../utils/gridLayout";
+import { EffectManager, createTTSEffect } from "../services/effects";
 
 // Helper function to format imageId into a readable name for TTS
 const formatCardNameForSpeech = (imageId: string): string => {
@@ -74,6 +76,7 @@ export const useMemoryGame = () => {
 		null,
 	);
 	const isCheckingMatchRef = useRef(false);
+	const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [flipDuration, setFlipDuration] = useState(() => {
 		// Load flip duration from localStorage, default to 1500ms (1.5 seconds)
 		const saved = localStorage.getItem("flipDuration");
@@ -94,13 +97,18 @@ export const useMemoryGame = () => {
 	const [allCardsFlipped, setAllCardsFlipped] = useState(false);
 
 	// Initialize text-to-speech
-	const {
-		speakPlayerTurn,
-		speak,
-		isAvailable,
-		cancel: cancelTTS,
-	} = useTextToSpeech();
-	const ttsDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const tts = useTextToSpeech();
+	const { cancel: cancelTTS } = tts;
+
+	// Create EffectManager singleton
+	const effectManager = useMemo(() => new EffectManager(), []);
+
+	// Register TTS effect when enabled
+	useEffect(() => {
+		const ttsEffect = createTTSEffect(tts, () => ttsEnabled);
+		const unregister = effectManager.register(ttsEffect);
+		return unregister;
+	}, [effectManager, tts, ttsEnabled]);
 
 	const updateAutoSizeMetrics = useCallback(
 		(metrics: {
@@ -369,12 +377,8 @@ export const useMemoryGame = () => {
 				players.find((p) => p.id === firstPlayer)?.name ||
 				`Player ${firstPlayer}`;
 
-			// Announce first player's turn after a short delay
-			if (ttsEnabled && isAvailable()) {
-				setTimeout(() => {
-					speakPlayerTurn(firstPlayerName);
-				}, 400);
-			}
+			// Notify effects (TTS will announce first player's turn)
+			effectManager.notifyGameStart(firstPlayerName, firstPlayer);
 
 			setGameState((prev) => ({
 				...prev,
@@ -385,7 +389,7 @@ export const useMemoryGame = () => {
 			localStorage.setItem("firstPlayer", firstPlayer.toString());
 			isInitialLoadRef.current = false;
 		},
-		[speakPlayerTurn, isAvailable, ttsEnabled, players],
+		[effectManager, players],
 	);
 
 	const showStartGameModal = useCallback(() => {
@@ -570,15 +574,13 @@ export const useMemoryGame = () => {
 						}),
 					);
 
-					// Announce match found
-					if (ttsEnabled && isAvailable()) {
-						if (ttsDelayTimeoutRef.current) {
-							clearTimeout(ttsDelayTimeoutRef.current);
-						}
-						ttsDelayTimeoutRef.current = setTimeout(() => {
-							speak(`${matchedPlayerName} found a ${matchedCardName}! It's still their turn.`);
-							ttsDelayTimeoutRef.current = null;
-						}, 400);
+					// Notify effects (TTS will announce match with card name)
+					effectManager.notifyMatchFound(matchedPlayerName, currentPlayerId, matchedCardName);
+
+					// Check if game ended and notify
+					if (finalState.gameStatus === "finished") {
+						const { winner, isTie } = calculateWinner(finalState.cards, players);
+						effectManager.notifyGameOver(winner, isTie);
 					}
 
 					// Reset checking flag
@@ -610,19 +612,11 @@ export const useMemoryGame = () => {
 						}),
 					);
 
-					// Announce next player's turn
-					if (ttsEnabled && isAvailable()) {
-						if (ttsDelayTimeoutRef.current) {
-							clearTimeout(ttsDelayTimeoutRef.current);
-						}
-						ttsDelayTimeoutRef.current = setTimeout(() => {
-							const nextPlayerName =
-								getPlayerById(players, nextPlayer)?.name ||
-								`Player ${nextPlayer}`;
-							speakPlayerTurn(nextPlayerName);
-							ttsDelayTimeoutRef.current = null;
-						}, 400);
-					}
+					// Notify effects (TTS will announce turn change)
+					const nextPlayerName =
+						getPlayerById(players, nextPlayer)?.name ||
+						`Player ${nextPlayer}`;
+					effectManager.notifyTurnChange(nextPlayerName, nextPlayer);
 
 					// Reset the checking flag
 					requestAnimationFrame(() => {
@@ -635,7 +629,7 @@ export const useMemoryGame = () => {
 				}
 			});
 		},
-		[speakPlayerTurn, speak, isAvailable, ttsEnabled, players],
+		[effectManager, players],
 	);
 
 	const endTurn = useCallback(() => {
@@ -1034,5 +1028,6 @@ export const useMemoryGame = () => {
 		allCardsFlipped,
 		updateAutoSizeMetrics,
 		calculateOptimalCardSizeForCount,
+		effectManager, // Exposed so it can be shared with useOnlineGame
 	};
 };
