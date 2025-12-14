@@ -132,11 +132,13 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			lastActivity: serverTimestamp(),
 		});
 
-		// Start presence tracking
+		// Start presence tracking (host is always slot 1)
 		this.presenceService = new PresenceService(
 			roomCode,
 			this.odahId,
 			options.hostName,
+			options.hostColor,
+			1,
 		);
 		await this.presenceService.start();
 
@@ -175,10 +177,13 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			}
 		}
 
+		// Determine player slot
+		const playerSlot: 1 | 2 = isExistingPlayer ? room.players[options.odahId].slot : 2;
+
 		// Add/update player in room
 		await updateDoc(roomRef, {
 			[`players.${options.odahId}`]: {
-				slot: isExistingPlayer ? room.players[options.odahId].slot : 2,
+				slot: playerSlot,
 				name: options.name,
 				color: options.color,
 			},
@@ -190,6 +195,8 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			roomCode.toUpperCase(),
 			options.odahId,
 			options.name,
+			options.color,
+			playerSlot,
 		);
 		await this.presenceService.start();
 
@@ -458,6 +465,11 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			[`players.${this.odahId}.color`]: color,
 			lastActivity: serverTimestamp(),
 		});
+
+		// Update presence
+		if (this.presenceService) {
+			await this.presenceService.updateColor(color);
+		}
 	}
 }
 

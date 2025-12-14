@@ -16,7 +16,7 @@ import { getFirestoreSyncAdapter } from '../../services/sync/FirestoreSyncAdapte
 import { initializeCards, createInitialState, startGameWithCards } from '../../services/game/GameEngine';
 import { CARD_DECKS } from '../../data/cardDecks';
 import { DEFAULT_PAIR_COUNT } from '../../utils/gridLayout';
-import type { CardPack } from '../../types';
+import type { CardPack, OnlineGameState } from '../../types';
 
 type LobbyView = 'choice' | 'create' | 'join' | 'waiting';
 
@@ -47,6 +47,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     playerName,
     setPlayerNamePreference,
     getLastOnlinePreferences,
+    presenceData,
   } = useOnlineStore();
 
   useEffect(() => {
@@ -79,10 +80,10 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
       const shuffled = [...allImages].sort(() => 0.5 - Math.random());
       const images = shuffled.slice(0, pairCount);
 
-      // Create initial game state
-      const players = Object.entries(room.players);
-      const hostPlayer = players.find(([, p]) => p.slot === 1);
-      const guestPlayer = players.find(([, p]) => p.slot === 2);
+      // Create initial game state from presence data
+      const players = Object.values(presenceData);
+      const hostPlayer = players.find(p => p.slot === 1);
+      const guestPlayer = players.find(p => p.slot === 2);
 
       if (!hostPlayer || !guestPlayer) {
         console.error('Missing players');
@@ -92,27 +93,36 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
       // Initialize cards
       const cards = initializeCards(images);
 
-      // Create game state with player info from room
+      // Create game state with player info from presence data
       const initialState = createInitialState(
-        hostPlayer[1].name,
-        guestPlayer[1].name,
-        hostPlayer[1].color,
-        guestPlayer[1].color,
+        hostPlayer.name,
+        guestPlayer.name,
+        hostPlayer.color,
+        guestPlayer.color,
         1 // Host goes first
       );
 
       const gameState = startGameWithCards(initialState, cards);
 
+      // Create complete online state with sync metadata
+      // This ensures the host's useOnlineGame hook initializes with correct gameRound
+      const onlineState: OnlineGameState = {
+        ...gameState,
+        syncVersion: 1,
+        gameRound: 1,  // First round
+        lastUpdatedBy: 1,  // Host is always slot 1
+      };
+
       // Start game via adapter (syncs to Firestore)
       const adapter = getFirestoreSyncAdapter();
-      await adapter.startGame(roomCode, gameState);
+      await adapter.startGame(roomCode, onlineState);
 
-      // Trigger callback with the game state
-      onGameStart(gameState);
+      // Pass the complete online state so host's refs are initialized correctly
+      onGameStart(onlineState);
     } catch (error) {
       console.error('Failed to start game:', error);
     }
-  }, [isHost, room, roomCode, settings.cardPack, getPackImages, onGameStart]);
+  }, [isHost, room, roomCode, settings.cardPack, getPackImages, onGameStart, presenceData]);
 
   // Connect on mount
   useEffect(() => {

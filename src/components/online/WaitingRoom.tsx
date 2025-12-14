@@ -38,9 +38,9 @@ export const WaitingRoom = ({
   onStartGame,
 }: WaitingRoomProps) => {
   const [openModal, setOpenModal] = useState<OpenModal>('none');
-  const { updateRoomConfig, getLastOnlinePreferences } = useOnlineStore();
+  const { updateRoomConfig, getLastOnlinePreferences, presenceData } = useOnlineStore();
 
-  const players = Object.entries(room.players);
+  const players = Object.entries(presenceData);
   const hasOpponent = players.length === 2;
   const canStart = isHost && hasOpponent && opponentConnected;
 

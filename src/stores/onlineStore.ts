@@ -481,6 +481,8 @@ export const useOnlineStore = create<OnlineStore>()(
 						converted[id] = {
 							odahId: data.odahId,
 							name: data.name,
+							color: data.color,
+							slot: data.slot,
 							online: data.online,
 							lastSeen:
 								typeof data.lastSeen === "number" ? data.lastSeen : Date.now(),
@@ -562,40 +564,41 @@ export const selectIsInRoom = (state: OnlineStore) => state.roomCode !== null;
 export const selectCanStartGame = (state: OnlineStore) =>
 	state.isHost &&
 	state.room !== null &&
-	Object.keys(state.room.players).length === 2 &&
+	Object.keys(state.presenceData).length === 2 &&
 	state.opponentConnected;
 
 export const selectOpponent = (state: OnlineStore) => {
-	if (!state.room || !state.odahId) return null;
+	if (!state.odahId) return null;
 
-	const opponentEntry = Object.entries(state.room.players).find(
+	// Find opponent in presence data
+	const opponentEntry = Object.entries(state.presenceData).find(
 		([id]) => id !== state.odahId,
 	);
 
 	if (!opponentEntry) return null;
 
-	const [id, player] = opponentEntry;
-	const presence = state.presenceData[id];
+	const [id, presence] = opponentEntry;
 
 	return {
 		odahId: id,
-		name: player.name,
-		color: player.color,
-		slot: player.slot,
-		online: presence?.online ?? false,
+		name: presence.name,
+		color: presence.color,
+		slot: presence.slot,
+		online: presence.online,
 	};
 };
 
 export const selectSelf = (state: OnlineStore) => {
-	if (!state.room || !state.odahId) return null;
+	if (!state.odahId) return null;
 
-	const player = state.room.players[state.odahId];
-	if (!player) return null;
+	// Get self from presence data
+	const presence = state.presenceData[state.odahId];
+	if (!presence) return null;
 
 	return {
 		odahId: state.odahId,
-		name: player.name,
-		color: player.color,
-		slot: player.slot,
+		name: presence.name,
+		color: presence.color,
+		slot: presence.slot,
 	};
 };

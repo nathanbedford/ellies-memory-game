@@ -23,6 +23,8 @@ import { rtdb } from '../../lib/firebase';
 export interface PresenceDataInternal {
   odahId: string;
   name: string;
+  color: string;
+  slot: 1 | 2;
   online: boolean;
   lastSeen: object | number; // serverTimestamp() returns object, stored as number
 }
@@ -31,14 +33,18 @@ export class PresenceService {
   private roomCode: string;
   private odahId: string;
   private playerName: string;
+  private playerColor: string;
+  private playerSlot: 1 | 2;
   private presenceRef: DatabaseReference | null = null;
   private connectedRef: DatabaseReference | null = null;
   private unsubscribeConnected: (() => void) | null = null;
 
-  constructor(roomCode: string, odahId: string, playerName: string) {
+  constructor(roomCode: string, odahId: string, playerName: string, playerColor: string, playerSlot: 1 | 2) {
     this.roomCode = roomCode;
     this.odahId = odahId;
     this.playerName = playerName;
+    this.playerColor = playerColor;
+    this.playerSlot = playerSlot;
   }
 
   /**
@@ -63,6 +69,8 @@ export class PresenceService {
           onDisconnect(this.presenceRef!).set({
             odahId: this.odahId,
             name: this.playerName,
+            color: this.playerColor,
+            slot: this.playerSlot,
             online: false,
             lastSeen: serverTimestamp(),
           } as PresenceDataInternal);
@@ -71,6 +79,8 @@ export class PresenceService {
           set(this.presenceRef!, {
             odahId: this.odahId,
             name: this.playerName,
+            color: this.playerColor,
+            slot: this.playerSlot,
             online: true,
             lastSeen: serverTimestamp(),
           } as PresenceDataInternal)
@@ -101,6 +111,8 @@ export class PresenceService {
       await set(this.presenceRef, {
         odahId: this.odahId,
         name: this.playerName,
+        color: this.playerColor,
+        slot: this.playerSlot,
         online: false,
         lastSeen: serverTimestamp(),
       } as PresenceDataInternal);
@@ -119,6 +131,25 @@ export class PresenceService {
       await set(this.presenceRef, {
         odahId: this.odahId,
         name: newName,
+        color: this.playerColor,
+        slot: this.playerSlot,
+        online: true,
+        lastSeen: serverTimestamp(),
+      } as PresenceDataInternal);
+    }
+  }
+
+  /**
+   * Update player color in presence
+   */
+  async updateColor(newColor: string): Promise<void> {
+    this.playerColor = newColor;
+    if (this.presenceRef) {
+      await set(this.presenceRef, {
+        odahId: this.odahId,
+        name: this.playerName,
+        color: newColor,
+        slot: this.playerSlot,
         online: true,
         lastSeen: serverTimestamp(),
       } as PresenceDataInternal);

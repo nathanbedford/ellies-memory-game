@@ -137,6 +137,14 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			return;
 		}
 
+		// Don't subscribe until we have a valid localPlayerSlot
+		// This prevents the race condition where guest initially gets slot 1 as fallback
+		// and then filters out host's first card flip thinking it's their own update
+		if (!localPlayerSlot || localPlayerSlot < 1 || localPlayerSlot > 2) {
+			logger.debug("Invalid localPlayerSlot, skipping subscription", { localPlayerSlot });
+			return;
+		}
+
 		const adapter = getFirestoreSyncAdapter();
 		const adapterRoomCode = adapter.getRoomCode();
 

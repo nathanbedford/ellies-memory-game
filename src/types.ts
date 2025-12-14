@@ -134,6 +134,8 @@ export interface Room {
 export interface PresenceData {
 	odahId: string;
 	name: string;
+	color: string;
+	slot: 1 | 2;
 	online: boolean;
 	lastSeen: number;
 }

@@ -101,15 +101,17 @@ function App() {
   const [showPWAInstall, setShowPWAInstall] = useState(false);
 
   // Online multiplayer state
-  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, setPlayerNamePreference } = useOnlineStore();
-  // Get local player slot directly to avoid creating new objects that cause re-renders
-  const localPlayerSlot = room && odahId ? (room.players[odahId]?.slot ?? null) : null;
+  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, setPlayerNamePreference, presenceData } = useOnlineStore();
+  // Get local player slot from presence data
+  const localPlayerSlot = odahId && presenceData[odahId] ? presenceData[odahId].slot : null;
 
   // Online game hook - only meaningful when in online mode with valid room
   // Game state is loaded from separate /games/{roomCode} document via Firestore subscription
+  // Pass 0 when localPlayerSlot is not yet known from presence data - the hook will delay
+  // subscription until a valid slot (1 or 2) is received, preventing race conditions
   const onlineGame = useOnlineGame({
     roomCode: roomCode || '',
-    localPlayerSlot: localPlayerSlot || 1,
+    localPlayerSlot: localPlayerSlot || 0,
     flipDuration: localGame.flipDuration,
     initialGameState: localGame.gameState, // Used as fallback until Firestore snapshot arrives
   });
@@ -132,7 +134,7 @@ function App() {
 
       try {
         const adapter = getFirestoreSyncAdapter();
-        const players = Object.values(room.players);
+        const players = Object.values(presenceData);
         const hostPlayer = players.find(p => p.slot === 1);
         const guestPlayer = players.find(p => p.slot === 2);
 
@@ -167,9 +169,14 @@ function App() {
           ...nextState,
           syncVersion: 1, // Reset sync version for new game
           gameRound: newGameRound,
+          lastUpdatedBy: 1, // Host is always slot 1
         };
 
         await adapter.setState(onlineState);
+
+        // Update local game state and refs so host's subsequent actions use correct gameRound
+        // This is critical - without this, the host's card flips would send gameRound: 0
+        onlineGame.setFullGameState(onlineState);
 
         const configUpdates: { cardPack?: CardPack; background?: string; cardBack?: string; pairCount?: number } = {};
         if (room.config?.cardPack !== options.pack) configUpdates.cardPack = options.pack;
@@ -183,7 +190,7 @@ function App() {
         console.error('Failed to start online round', error);
       }
     },
-    [roomCode, room, isHost, getPackImagesById, updateRoomConfig]
+    [roomCode, room, isHost, getPackImagesById, updateRoomConfig, presenceData, onlineGame]
   );
 
   // Select which game interface to use based on mode
@@ -197,21 +204,21 @@ function App() {
 
   // Get opponent's odahId for cursor sync
   const opponentOdahId = useMemo(() => {
-    if (!room || !odahId) return null;
-    const opponentEntry = Object.entries(room.players).find(([id]) => id !== odahId);
+    if (!odahId) return null;
+    const opponentEntry = Object.entries(presenceData).find(([id]) => id !== odahId);
     return opponentEntry ? opponentEntry[0] : null;
-  }, [room, odahId]);
+  }, [presenceData, odahId]);
 
   // Get opponent's player info for cursor display
   const opponentInfo = useMemo(() => {
-    if (!room || !opponentOdahId) return null;
-    const opponentPlayer = room.players[opponentOdahId];
-    if (!opponentPlayer) return null;
+    if (!opponentOdahId) return null;
+    const opponentPresence = presenceData[opponentOdahId];
+    if (!opponentPresence) return null;
     return {
-      name: opponentPlayer.name,
-      color: opponentPlayer.color,
+      name: opponentPresence.name,
+      color: opponentPresence.color,
     };
-  }, [room, opponentOdahId]);
+  }, [presenceData, opponentOdahId]);
 
   // Subscribe to presence during online gameplay
   // OnlineLobby handles presence in the waiting room, but unmounts when game starts

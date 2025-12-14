@@ -32,19 +32,19 @@ export function useOpponentDisconnect(
 	const opponentDisconnectedAt = useOnlineStore(
 		(s) => s.opponentDisconnectedAt,
 	);
-	const room = useOnlineStore((s) => s.room);
+	const presenceData = useOnlineStore((s) => s.presenceData);
 	const odahId = useOnlineStore((s) => s.odahId);
 
 	// Countdown state
 	const [secondsRemaining, setSecondsRemaining] = useState(timeoutSeconds);
 
-	// Get opponent name from room
+	// Get opponent name from presence data
 	const opponentName = useMemo(() => {
-		if (!room || !odahId) return "Opponent";
+		if (!odahId) return "Opponent";
 
-		const opponent = Object.entries(room.players).find(([id]) => id !== odahId);
+		const opponent = Object.entries(presenceData).find(([id]) => id !== odahId);
 		return opponent?.[1]?.name ?? "Opponent";
-	}, [room, odahId]);
+	}, [presenceData, odahId]);
 
 	// Countdown timer effect
 	useEffect(() => {
