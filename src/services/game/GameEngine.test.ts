@@ -3,6 +3,8 @@ import {
 	sortPlayersByID,
 	getPlayerById,
 	getPlayerScore,
+	getSelectedCards,
+	getSelectedCardIds,
 	generateRoomCode,
 	createCardPairs,
 	shuffleCards,
@@ -24,10 +26,9 @@ import {
 	createInitialState,
 	resetGameState,
 	startGameWithCards,
-	updatePlayerName,
-	updatePlayerColor,
 	cleanStateForPersistence,
 	validateState,
+	getPlayersFromSettings,
 	type CardImage,
 } from "./GameEngine";
 import type { Card, Player, GameState } from "../../types";
@@ -59,17 +60,18 @@ function createTestPlayer(overrides: Partial<Player> = {}): Player {
 function createTestState(overrides: Partial<GameState> = {}): GameState {
 	return {
 		cards: [],
-		players: [
-			createTestPlayer({ id: 1, name: "Player 1" }),
-			createTestPlayer({ id: 2, name: "Player 2", color: "#10b981" }),
-		],
 		currentPlayer: 1,
-		selectedCards: [],
 		gameStatus: "playing",
-		winner: null,
-		isTie: false,
 		...overrides,
 	};
+}
+
+// Default test players derived from settings (for tests that need player data)
+function getTestPlayers(): Player[] {
+	return [
+		createTestPlayer({ id: 1, name: "Player 1" }),
+		createTestPlayer({ id: 2, name: "Player 2", color: "#10b981" }),
+	];
 }
 
 function createMatchingCardPair(): Card[] {
@@ -252,8 +254,11 @@ describe("Card Operations", () => {
 
 		it("returns false if 2 cards already selected", () => {
 			const state = createTestState({
-				cards: [createTestCard()],
-				selectedCards: ["card-a", "card-b"],
+				cards: [
+					createTestCard({ id: "card-a", isFlipped: true }),
+					createTestCard({ id: "card-b", isFlipped: true }),
+					createTestCard({ id: "card-1" }),
+				],
 			});
 			expect(canFlipCard(state, "card-1")).toBe(false);
 		});
@@ -287,10 +292,9 @@ describe("Card Operations", () => {
 		it("returns true when one card already selected", () => {
 			const state = createTestState({
 				cards: [
-					createTestCard({ id: "card-1" }),
+					createTestCard({ id: "card-1", isFlipped: true }),
 					createTestCard({ id: "card-2" }),
 				],
-				selectedCards: ["card-1"],
 			});
 			expect(canFlipCard(state, "card-2")).toBe(true);
 		});
@@ -305,13 +309,12 @@ describe("Card Operations", () => {
 			expect(newState.cards[0].isFlipped).toBe(true);
 		});
 
-		it("adds card to selectedCards", () => {
+		it("adds card to selected (derived from flipped cards)", () => {
 			const state = createTestState({
 				cards: [createTestCard()],
-				selectedCards: [],
 			});
 			const newState = flipCard(state, "card-1");
-			expect(newState.selectedCards).toContain("card-1");
+			expect(getSelectedCardIds(newState.cards)).toContain("card-1");
 		});
 
 		it("returns unchanged state if invalid flip", () => {
@@ -339,26 +342,27 @@ describe("Card Operations", () => {
 describe("Match Detection", () => {
 	describe("checkMatch", () => {
 		it("returns null if less than 2 cards selected", () => {
+			const cards = createMatchingCardPair();
+			cards[0].isFlipped = true; // Only one card flipped
 			const state = createTestState({
-				cards: createMatchingCardPair(),
-				selectedCards: ["card-0"],
+				cards,
 			});
 			expect(checkMatch(state)).toBeNull();
 		});
 
 		it("returns null if selected cards not found", () => {
 			const state = createTestState({
-				cards: [],
-				selectedCards: ["card-0", "card-1"],
+				cards: [], // No cards to match
 			});
 			expect(checkMatch(state)).toBeNull();
 		});
 
 		it("returns isMatch: true for matching imageIds", () => {
 			const cards = createMatchingCardPair();
+			cards[0].isFlipped = true;
+			cards[1].isFlipped = true;
 			const state = createTestState({
 				cards,
-				selectedCards: ["card-0", "card-1"],
 			});
 			const result = checkMatch(state);
 			expect(result?.isMatch).toBe(true);
@@ -366,9 +370,10 @@ describe("Match Detection", () => {
 
 		it("returns isMatch: false for different imageIds", () => {
 			const cards = createNonMatchingCards();
+			cards[0].isFlipped = true;
+			cards[1].isFlipped = true;
 			const state = createTestState({
 				cards,
-				selectedCards: ["card-0", "card-1"],
 			});
 			const result = checkMatch(state);
 			expect(result?.isMatch).toBe(false);
@@ -376,9 +381,10 @@ describe("Match Detection", () => {
 
 		it("returns the matched cards", () => {
 			const cards = createMatchingCardPair();
+			cards[0].isFlipped = true;
+			cards[1].isFlipped = true;
 			const state = createTestState({
 				cards,
-				selectedCards: ["card-0", "card-1"],
 			});
 			const result = checkMatch(state);
 			expect(result?.firstCard.id).toBe("card-0");
@@ -420,18 +426,20 @@ describe("Match Detection", () => {
 			expect(getPlayerScore(result.cards, 1)).toBe(1);
 		});
 
-		it("clears selectedCards", () => {
+		it("clears selected cards (cards are matched, no longer just flipped)", () => {
 			const cards = createMatchingCardPair();
+			cards[0].isFlipped = true;
+			cards[1].isFlipped = true;
 			const state = createTestState({
 				cards,
-				selectedCards: ["card-0", "card-1"],
 			});
 			const result = applyMatch(state, {
 				isMatch: true,
 				firstCard: cards[0],
 				secondCard: cards[1],
 			});
-			expect(result.selectedCards).toEqual([]);
+			// After match, cards are matched not just flipped, so selected cards is empty
+			expect(getSelectedCardIds(result.cards)).toEqual([]);
 		});
 
 		it("sets matchedByPlayerId on matched cards", () => {
@@ -477,14 +485,20 @@ describe("Animation-Aware Match Functions", () => {
 			expect(getPlayerScore(result.cards, 1)).toBe(1);
 		});
 
-		it("clears selectedCards", () => {
+		it("sets matchedByPlayerId on cards (cards stay flipped until animation completes)", () => {
 			const cards = createMatchingCardPair();
+			cards[0].isFlipped = true;
+			cards[1].isFlipped = true;
 			const state = createTestState({
 				cards,
-				selectedCards: ["card-0", "card-1"],
 			});
 			const result = startMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(result.selectedCards).toEqual([]);
+			// Cards have matchedByPlayerId set immediately for score calculation
+			expect(result.cards[0].matchedByPlayerId).toBe(1);
+			expect(result.cards[1].matchedByPlayerId).toBe(1);
+			// Cards stay flipped until completeMatchAnimation is called
+			expect(result.cards[0].isFlipped).toBe(true);
+			expect(result.cards[1].isFlipped).toBe(true);
 		});
 
 		it("keeps cards flipped", () => {
@@ -561,14 +575,16 @@ describe("Animation-Aware Match Functions", () => {
 			expect(result.currentPlayer).toBe(2);
 		});
 
-		it("clears selectedCards", () => {
+		it("clears selected cards (cards are flipped back)", () => {
 			const cards = createNonMatchingCards();
+			cards[0].isFlipped = true;
+			cards[1].isFlipped = true;
 			const state = createTestState({
 				cards,
-				selectedCards: ["card-0", "card-1"],
 			});
 			const result = applyNoMatchWithReset(state, ["card-0", "card-1"]);
-			expect(result.selectedCards).toEqual([]);
+			// After reset, cards are flipped back so no selected cards
+			expect(getSelectedCardIds(result.cards)).toEqual([]);
 		});
 
 		it("clears animation state", () => {
@@ -625,10 +641,14 @@ describe("Turn Management", () => {
 			expect(result.currentPlayer).toBe(1);
 		});
 
-		it("clears selectedCards", () => {
-			const state = createTestState({ selectedCards: ["card-1"] });
+		it("does not modify card state (just switches player)", () => {
+			const state = createTestState({
+				cards: [createTestCard({ id: "card-1", isFlipped: true })],
+			});
 			const result = switchPlayer(state);
-			expect(result.selectedCards).toEqual([]);
+			// switchPlayer only changes currentPlayer, doesn't affect cards
+			// Use endTurn to flip cards back and switch player together
+			expect(result.cards[0].isFlipped).toBe(true);
 		});
 	});
 
@@ -652,10 +672,16 @@ describe("Turn Management", () => {
 			expect(result.currentPlayer).toBe(2);
 		});
 
-		it("clears selectedCards", () => {
-			const state = createTestState({ selectedCards: ["card-1", "card-2"] });
+		it("clears selected cards (by flipping cards back)", () => {
+			const state = createTestState({
+				cards: [
+					createTestCard({ id: "card-1", isFlipped: true }),
+					createTestCard({ id: "card-2", isFlipped: true }),
+				],
+			});
 			const result = endTurn(state);
-			expect(result.selectedCards).toEqual([]);
+			// endTurn flips cards back, so no selected cards
+			expect(getSelectedCardIds(result.cards)).toEqual([]);
 		});
 
 		it("handles stuck flying cards", () => {
@@ -706,12 +732,14 @@ describe("Game Status", () => {
 
 	describe("calculateWinner", () => {
 		it("returns null winner with empty players", () => {
-			const state = createTestState({ players: [] });
-			const result = calculateWinner(state);
+			const cards: Card[] = [];
+			const players: Player[] = [];
+			const result = calculateWinner(cards, players);
 			expect(result.winner).toBeNull();
 		});
 
 		it("returns player with highest score as winner", () => {
+			const players = getTestPlayers();
 			// Create cards with matchedByPlayerId to set scores
 			const cards = [
 				...Array.from({ length: 6 }, (_, i) =>
@@ -731,13 +759,13 @@ describe("Game Status", () => {
 					}),
 				),
 			];
-			const state = createTestState({ cards });
-			const result = calculateWinner(state);
+			const result = calculateWinner(cards, players);
 			expect(result.winner?.id).toBe(2);
 			expect(result.isTie).toBe(false);
 		});
 
 		it("detects tie correctly", () => {
+			const players = getTestPlayers();
 			// Create cards with matchedByPlayerId to set equal scores
 			const cards = [
 				...Array.from({ length: 6 }, (_, i) =>
@@ -757,8 +785,7 @@ describe("Game Status", () => {
 					}),
 				),
 			];
-			const state = createTestState({ cards });
-			const result = calculateWinner(state);
+			const result = calculateWinner(cards, players);
 			expect(result.winner).toBeNull();
 			expect(result.isTie).toBe(true);
 		});
@@ -771,7 +798,8 @@ describe("Game Status", () => {
 			expect(result.gameStatus).toBe("finished");
 		});
 
-		it("sets winner", () => {
+		it("preserves cards and allows winner to be derived", () => {
+			const players = getTestPlayers();
 			// Create cards with matchedByPlayerId to set scores
 			const cards = [
 				...Array.from({ length: 10 }, (_, i) =>
@@ -793,13 +821,20 @@ describe("Game Status", () => {
 			];
 			const state = createTestState({ cards });
 			const result = finishGame(state);
-			expect(result.winner?.id).toBe(1);
+			expect(result.gameStatus).toBe("finished");
+			// Winner is now derived from cards and players, not stored in state
+			const { winner } = calculateWinner(result.cards, players);
+			expect(winner?.id).toBe(1);
 		});
 
-		it("clears selectedCards", () => {
-			const state = createTestState({ selectedCards: ["card-1"] });
+		it("does not modify card state (just sets gameStatus)", () => {
+			const state = createTestState({
+				cards: [createTestCard({ id: "card-1", isFlipped: true })],
+			});
 			const result = finishGame(state);
-			expect(result.selectedCards).toEqual([]);
+			// finishGame only sets gameStatus - doesn't modify cards
+			expect(result.cards[0].isFlipped).toBe(true);
+			expect(result.gameStatus).toBe("finished");
 		});
 	});
 
@@ -834,45 +869,65 @@ describe("Game Reset", () => {
 			expect(state.gameStatus).toBe("setup");
 		});
 
-		it("creates two players with names", () => {
-			const state = createInitialState("Alice", "Bob");
-			expect(state.players).toHaveLength(2);
-			expect(state.players[0].name).toBe("Alice");
-			expect(state.players[1].name).toBe("Bob");
+		it("sets first player to 1 by default", () => {
+			const state = createInitialState();
+			expect(state.currentPlayer).toBe(1);
 		});
 
 		it("sets first player correctly", () => {
-			const state = createInitialState("A", "B", "#fff", "#000", 2);
+			const state = createInitialState(2);
 			expect(state.currentPlayer).toBe(2);
 		});
 
-		it("initializes with zero scores", () => {
+		it("initializes with empty cards", () => {
 			const state = createInitialState();
-			state.players.forEach((p) => {
-				expect(getPlayerScore(state.cards, p.id)).toBe(0);
+			expect(state.cards).toEqual([]);
+		});
+	});
+
+	describe("getPlayersFromSettings", () => {
+		it("creates two players from settings", () => {
+			const players = getPlayersFromSettings({
+				player1Name: "Alice",
+				player1Color: "#ff0000",
+				player2Name: "Bob",
+				player2Color: "#00ff00",
 			});
+			expect(players).toHaveLength(2);
+			expect(players[0].name).toBe("Alice");
+			expect(players[0].color).toBe("#ff0000");
+			expect(players[1].name).toBe("Bob");
+			expect(players[1].color).toBe("#00ff00");
+		});
+
+		it("assigns correct player IDs", () => {
+			const players = getPlayersFromSettings({
+				player1Name: "P1",
+				player1Color: "#fff",
+				player2Name: "P2",
+				player2Color: "#000",
+			});
+			expect(players[0].id).toBe(1);
+			expect(players[1].id).toBe(2);
 		});
 	});
 
 	describe("resetGameState", () => {
-		it("keeps player names", () => {
-			const state = createTestState({
-				players: [
-					createTestPlayer({ id: 1, name: "Alice" }),
-					createTestPlayer({ id: 2, name: "Bob" }),
-				],
-			});
+		it("preserves currentPlayer", () => {
+			const state = createTestState({ currentPlayer: 2 });
 			const result = resetGameState(state);
-			expect(result.players[0].name).toBe("Alice");
-			expect(result.players[1].name).toBe("Bob");
+			expect(result.currentPlayer).toBe(2);
 		});
 
-		it("resets scores to zero", () => {
+		it("clears cards (scores are derived from cards)", () => {
 			const state = createTestState({
-				players: [createTestPlayer({ id: 1 }), createTestPlayer({ id: 2 })],
+				cards: [createTestCard({ matchedByPlayerId: 1 })],
 			});
 			const result = resetGameState(state);
-			result.players.forEach((p) => {
+			expect(result.cards).toEqual([]);
+			// Scores derived from empty cards would be 0
+			const players = getTestPlayers();
+			players.forEach((p) => {
 				expect(getPlayerScore(result.cards, p.id)).toBe(0);
 			});
 		});
@@ -908,43 +963,8 @@ describe("Game Reset", () => {
 	});
 });
 
-// ============================================
-// Player Management Tests
-// ============================================
-
-describe("Player Management", () => {
-	describe("updatePlayerName", () => {
-		it("updates the correct player name", () => {
-			const state = createTestState();
-			const result = updatePlayerName(state, 1, "NewName");
-			const player1 = result.players.find((p) => p.id === 1);
-			expect(player1?.name).toBe("NewName");
-		});
-
-		it("trims whitespace from name", () => {
-			const state = createTestState();
-			const result = updatePlayerName(state, 1, "  Trimmed  ");
-			const player1 = result.players.find((p) => p.id === 1);
-			expect(player1?.name).toBe("Trimmed");
-		});
-
-		it("does not modify other players", () => {
-			const state = createTestState();
-			const result = updatePlayerName(state, 1, "NewName");
-			const player2 = result.players.find((p) => p.id === 2);
-			expect(player2?.name).toBe("Player 2");
-		});
-	});
-
-	describe("updatePlayerColor", () => {
-		it("updates the correct player color", () => {
-			const state = createTestState();
-			const result = updatePlayerColor(state, 1, "#ff0000");
-			const player1 = result.players.find((p) => p.id === 1);
-			expect(player1?.color).toBe("#ff0000");
-		});
-	});
-});
+// Note: updatePlayerName and updatePlayerColor tests removed
+// Player names and colors are now managed in settings/presence, not GameState
 
 // ============================================
 // State Serialization Tests
@@ -965,10 +985,14 @@ describe("State Serialization", () => {
 			expect(result.cards[0].flyingToPlayerId).toBeUndefined();
 		});
 
-		it("clears selectedCards", () => {
-			const state = createTestState({ selectedCards: ["card-1"] });
+		it("preserves isFlipped state (only removes animation properties)", () => {
+			const state = createTestState({
+				cards: [createTestCard({ id: "card-1", isFlipped: true })],
+			});
 			const result = cleanStateForPersistence(state);
-			expect(result.selectedCards).toEqual([]);
+			// cleanStateForPersistence only removes animation state (isFlyingToPlayer, flyingToPlayerId)
+			// It preserves isFlipped for persistence
+			expect(result.cards[0].isFlipped).toBe(true);
 		});
 
 		it("preserves game-relevant card properties", () => {
@@ -1008,7 +1032,6 @@ describe("State Serialization", () => {
 				cards: [],
 				players: [],
 				currentPlayer: 1,
-				selectedCards: [],
 				gameStatus: "invalid",
 			};
 			expect(validateState(state)).toBe(false);

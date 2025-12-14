@@ -17,11 +17,11 @@ import {
 	applyMatch,
 	applyNoMatch,
 	checkAndFinishGame,
-	updatePlayerName,
-	updatePlayerColor,
 	endTurn,
 	initializeCards,
+	getPlayersFromSettings,
 	type CardImage,
+	type PlayerSettings,
 } from "../services/game/GameEngine";
 import { DEFAULT_PAIR_COUNT } from "../utils/gridLayout";
 
@@ -145,13 +145,7 @@ export const useGameStore = create<GameStore>()(
 		persist(
 			(set, get) => ({
 				// Initial state
-				gameState: createInitialState(
-					DEFAULT_SETTINGS.player1Name,
-					DEFAULT_SETTINGS.player2Name,
-					DEFAULT_SETTINGS.player1Color,
-					DEFAULT_SETTINGS.player2Color,
-					DEFAULT_SETTINGS.firstPlayer,
-				),
+				gameState: createInitialState(DEFAULT_SETTINGS.firstPlayer),
 				settings: DEFAULT_SETTINGS,
 				showStartModal: false,
 				isAnimatingCards: false,
@@ -222,25 +216,21 @@ export const useGameStore = create<GameStore>()(
 					set({ gameState: state });
 				},
 
-				// Player actions
+				// Player actions (player names/colors are stored in settings, not gameState)
 				setPlayerName: (playerId: number, name: string) => {
-					const { gameState, settings } = get();
-					const newState = updatePlayerName(gameState, playerId, name);
+					const { settings } = get();
 					const settingsUpdate =
 						playerId === 1 ? { player1Name: name } : { player2Name: name };
 					set({
-						gameState: newState,
 						settings: { ...settings, ...settingsUpdate },
 					});
 				},
 
 				setPlayerColor: (playerId: number, color: string) => {
-					const { gameState, settings } = get();
-					const newState = updatePlayerColor(gameState, playerId, color);
+					const { settings } = get();
 					const settingsUpdate =
 						playerId === 1 ? { player1Color: color } : { player2Color: color };
 					set({
-						gameState: newState,
 						settings: { ...settings, ...settingsUpdate },
 					});
 				},
@@ -340,11 +330,20 @@ export const useGameStore = create<GameStore>()(
 
 export const selectGameState = (state: GameStore) => state.gameState;
 export const selectSettings = (state: GameStore) => state.settings;
-export const selectCurrentPlayer = (state: GameStore) =>
-	state.gameState.players.find((p) => p.id === state.gameState.currentPlayer);
+// Derive players from settings
+export const selectPlayers = (state: GameStore) =>
+	getPlayersFromSettings(state.settings as PlayerSettings);
+export const selectCurrentPlayer = (state: GameStore) => {
+	const players = getPlayersFromSettings(state.settings as PlayerSettings);
+	return players.find((p) => p.id === state.gameState.currentPlayer);
+};
 export const selectIsGameOver = (state: GameStore) =>
 	state.gameState.gameStatus === "finished";
-export const selectCanFlip = (state: GameStore) =>
-	state.gameState.gameStatus === "playing" &&
-	state.gameState.selectedCards.length < 2 &&
-	!state.isAnimatingCards;
+export const selectCanFlip = (state: GameStore) => {
+	const selectedCards = state.gameState.cards.filter(c => c.isFlipped && !c.isMatched);
+	return (
+		state.gameState.gameStatus === "playing" &&
+		selectedCards.length < 2 &&
+		!state.isAnimatingCards
+	);
+};

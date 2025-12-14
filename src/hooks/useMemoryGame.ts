@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { Card, Player, GameState } from "../types";
+import type { Card, GameState } from "../types";
 import { useTextToSpeech } from "./useTextToSpeech";
 import {
-	sortPlayersByID,
 	getPlayerById,
 	canFlipCard,
 	flipCard as engineFlipCard,
@@ -12,8 +11,8 @@ import {
 	applyNoMatchWithReset,
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
-	updatePlayerName as engineUpdatePlayerName,
-	updatePlayerColor as engineUpdatePlayerColor,
+	getPlayersFromSettings,
+	type PlayerSettings,
 } from "../services/game/GameEngine";
 import { calculateGridDimensions } from "../utils/gridLayout";
 
@@ -26,29 +25,26 @@ const formatCardNameForSpeech = (imageId: string): string => {
 };
 
 export const useMemoryGame = () => {
+	// Load player settings from localStorage
+	const [playerSettings, setPlayerSettings] = useState<PlayerSettings>(() => ({
+		player1Name: localStorage.getItem("player1Name") || "Player 1",
+		player1Color: localStorage.getItem("player1Color") || "#3b82f6",
+		player2Name: localStorage.getItem("player2Name") || "Player 2",
+		player2Color: localStorage.getItem("player2Color") || "#10b981",
+	}));
+
+	// Derive players from settings
+	const players = getPlayersFromSettings(playerSettings);
+
 	const [gameState, setGameState] = useState<GameState>(() => {
-		// Load player names and colors from localStorage (preferences, not game state)
-		const savedPlayer1Name = localStorage.getItem("player1Name") || "Player 1";
-		const savedPlayer2Name = localStorage.getItem("player2Name") || "Player 2";
-		const savedPlayer1Color = localStorage.getItem("player1Color") || "#3b82f6";
-		const savedPlayer2Color = localStorage.getItem("player2Color") || "#10b981";
 		const savedFirstPlayer = parseInt(
 			localStorage.getItem("firstPlayer") || "1",
 		) as 1 | 2;
 
-		const initialPlayers: Player[] = [
-			{ id: 1, name: savedPlayer1Name, color: savedPlayer1Color },
-			{ id: 2, name: savedPlayer2Name, color: savedPlayer2Color },
-		];
-
 		return {
 			cards: [],
-			players: initialPlayers,
 			currentPlayer: savedFirstPlayer,
-			selectedCards: [],
 			gameStatus: "setup",
-			winner: null,
-			isTie: false,
 		};
 	});
 
@@ -324,10 +320,7 @@ export const useMemoryGame = () => {
 				setGameState((prev) => ({
 					...prev,
 					cards: shuffledCards,
-					selectedCards: [],
 					gameStatus: "playing",
-					winner: null,
-					isTie: false,
 				}));
 
 				// After animation completes, mark animation as done
@@ -340,10 +333,7 @@ export const useMemoryGame = () => {
 				setGameState((prev) => ({
 					...prev,
 					cards: shuffledCards,
-					selectedCards: [],
 					gameStatus: "setup",
-					winner: null,
-					isTie: false,
 				}));
 			}
 		},
@@ -357,18 +347,17 @@ export const useMemoryGame = () => {
 				localStorage.getItem("player1Color") || "#3b82f6";
 			const savedPlayer2Color =
 				localStorage.getItem("player2Color") || "#10b981";
-			const players = sortPlayersByID([
-				{ id: 1, name: player1Name, color: savedPlayer1Color },
-				{ id: 2, name: player2Name, color: savedPlayer2Color },
-			]);
+			// Update player settings
+			setPlayerSettings({
+				player1Name,
+				player1Color: savedPlayer1Color,
+				player2Name,
+				player2Color: savedPlayer2Color,
+			});
 			setGameState({
 				cards: [],
-				players,
 				currentPlayer: firstPlayer,
-				selectedCards: [],
 				gameStatus: "setup",
-				winner: null,
-				isTie: false,
 			});
 			// Don't show modal yet - wait for cards to be initialized
 		},
@@ -377,29 +366,27 @@ export const useMemoryGame = () => {
 
 	const startGameWithFirstPlayer = useCallback(
 		(firstPlayer: number) => {
-			setGameState((prev) => {
-				const firstPlayerName =
-					prev.players.find((p) => p.id === firstPlayer)?.name ||
-					`Player ${firstPlayer}`;
+			const firstPlayerName =
+				players.find((p) => p.id === firstPlayer)?.name ||
+				`Player ${firstPlayer}`;
 
-				// Announce first player's turn after a short delay
-				if (ttsEnabled && isAvailable()) {
-					setTimeout(() => {
-						speakPlayerTurn(firstPlayerName);
-					}, 400);
-				}
+			// Announce first player's turn after a short delay
+			if (ttsEnabled && isAvailable()) {
+				setTimeout(() => {
+					speakPlayerTurn(firstPlayerName);
+				}, 400);
+			}
 
-				return {
-					...prev,
-					currentPlayer: firstPlayer,
-					gameStatus: "playing" as const,
-				};
-			});
+			setGameState((prev) => ({
+				...prev,
+				currentPlayer: firstPlayer,
+				gameStatus: "playing" as const,
+			}));
 			setShowStartModal(false);
 			localStorage.setItem("firstPlayer", firstPlayer.toString());
 			isInitialLoadRef.current = false;
 		},
-		[speakPlayerTurn, isAvailable, ttsEnabled],
+		[speakPlayerTurn, isAvailable, ttsEnabled, players],
 	);
 
 	const showStartGameModal = useCallback(() => {
@@ -443,15 +430,23 @@ export const useMemoryGame = () => {
 		const trimmedName = newName.trim();
 		// Save to localStorage (preference, not game state)
 		localStorage.setItem(`player${playerId}Name`, trimmedName);
-		// Use GameEngine to update player name
-		setGameState((prev) => engineUpdatePlayerName(prev, playerId, trimmedName));
+		// Update player settings (players derived from settings)
+		setPlayerSettings((prev) =>
+			playerId === 1
+				? { ...prev, player1Name: trimmedName }
+				: { ...prev, player2Name: trimmedName }
+		);
 	}, []);
 
 	const updatePlayerColor = useCallback((playerId: 1 | 2, newColor: string) => {
 		// Save to localStorage (preference, not game state)
 		localStorage.setItem(`player${playerId}Color`, newColor);
-		// Use GameEngine to update player color
-		setGameState((prev) => engineUpdatePlayerColor(prev, playerId, newColor));
+		// Update player settings (players derived from settings)
+		setPlayerSettings((prev) =>
+			playerId === 1
+				? { ...prev, player1Color: newColor }
+				: { ...prev, player2Color: newColor }
+		);
 	}, []);
 
 	const resetGame = useCallback(() => {
@@ -473,32 +468,12 @@ export const useMemoryGame = () => {
 		sessionStorage.removeItem("gameState");
 
 		// Reset clears cards and goes back to setup mode
-		// The actual reset flow will be handled by App.tsx
-		setGameState((prev) => {
-			const player1 = getPlayerById(prev.players, 1);
-			const player2 = getPlayerById(prev.players, 2);
-			const players = sortPlayersByID([
-				{
-					id: 1,
-					name: player1?.name || "Player 1",
-					color: player1?.color || "#3b82f6",
-				},
-				{
-					id: 2,
-					name: player2?.name || "Player 2",
-					color: player2?.color || "#10b981",
-				},
-			]);
-			return {
-				...prev,
-				cards: [],
-				players,
-				selectedCards: [],
-				gameStatus: "setup",
-				winner: null,
-				isTie: false,
-			};
-		});
+		// Player settings are preserved
+		setGameState((prev) => ({
+			...prev,
+			cards: [],
+			gameStatus: "setup",
+		}));
 	}, [cancelTTS]);
 
 	const checkForMatch = useCallback(
@@ -523,17 +498,21 @@ export const useMemoryGame = () => {
 			setGameState((prev) => {
 				const [firstId, secondId] = selectedIds;
 
+				// Derive selected cards from card state
+				const currentSelectedCards = prev.cards.filter(c => c.isFlipped && !c.isMatched);
+				const currentSelectedIds = currentSelectedCards.map(c => c.id);
+
 				// Verify the cards are still selected (prevent race conditions)
 				if (
-					prev.selectedCards.length !== 2 ||
-					!prev.selectedCards.includes(firstId) ||
-					!prev.selectedCards.includes(secondId)
+					currentSelectedCards.length !== 2 ||
+					!currentSelectedIds.includes(firstId) ||
+					!currentSelectedIds.includes(secondId)
 				) {
 					console.log(
 						"[MATCH CHECK] Cards no longer selected, ignoring",
 						JSON.stringify({
 							selectedIds,
-							currentSelectedCards: prev.selectedCards,
+							currentSelectedCards: currentSelectedIds,
 						}),
 					);
 					isCheckingMatchRef.current = false;
@@ -564,7 +543,7 @@ export const useMemoryGame = () => {
 				if (isMatch) {
 					const currentPlayerId = prev.currentPlayer;
 					const matchedPlayerName =
-						getPlayerById(prev.players, currentPlayerId)?.name ||
+						getPlayerById(players, currentPlayerId)?.name ||
 						`Player ${currentPlayerId}`;
 					const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
 
@@ -667,7 +646,7 @@ export const useMemoryGame = () => {
 						}
 						ttsDelayTimeoutRef.current = setTimeout(() => {
 							const nextPlayerName =
-								getPlayerById(noMatchState.players, nextPlayer)?.name ||
+								getPlayerById(players, nextPlayer)?.name ||
 								`Player ${nextPlayer}`;
 							speakPlayerTurn(nextPlayerName);
 							ttsDelayTimeoutRef.current = null;
@@ -685,7 +664,7 @@ export const useMemoryGame = () => {
 				}
 			});
 		},
-		[speakPlayerTurn, speak, isAvailable, ttsEnabled],
+		[speakPlayerTurn, speak, isAvailable, ttsEnabled, players],
 	);
 
 	const endTurn = useCallback(() => {
@@ -785,13 +764,17 @@ export const useMemoryGame = () => {
 			}
 
 			setGameState((prev) => {
+				// Derive selected cards from card state
+				const prevSelectedCards = prev.cards.filter(c => c.isFlipped && !c.isMatched);
+				const prevSelectedIds = prevSelectedCards.map(c => c.id);
+
 				console.log(
 					"[FLIP CARD] Card clicked",
 					JSON.stringify({
 						cardId,
 						gameStatus: prev.gameStatus,
-						selectedCardsCount: prev.selectedCards.length,
-						selectedCards: prev.selectedCards,
+						selectedCardsCount: prevSelectedCards.length,
+						selectedCards: prevSelectedIds,
 						timestamp: new Date().toISOString(),
 					}),
 				);
@@ -807,16 +790,20 @@ export const useMemoryGame = () => {
 				// Use GameEngine to flip the card
 				const newState = engineFlipCard(prev, cardId);
 
+				// Derive new selected cards from new state
+				const newSelectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched);
+				const newSelectedIds = newSelectedCards.map(c => c.id);
+
 				console.log(
 					"[FLIP CARD] Card flipped, new selected cards",
 					JSON.stringify({
-						newSelectedCards: newState.selectedCards,
-						willCheckMatch: newState.selectedCards.length === 2,
+						newSelectedCards: newSelectedIds,
+						willCheckMatch: newSelectedCards.length === 2,
 					}),
 				);
 
 				// Check for match when two cards are selected
-				if (newState.selectedCards.length === 2) {
+				if (newSelectedCards.length === 2) {
 					// Cancel any existing match check timeout
 					if (matchCheckTimeoutRef.current) {
 						console.log("[FLIP CARD] Cancelling existing match check timeout");
@@ -827,7 +814,7 @@ export const useMemoryGame = () => {
 					console.log(
 						"[FLIP CARD] Scheduling match check",
 						JSON.stringify({
-							selectedCards: newState.selectedCards,
+							selectedCards: newSelectedIds,
 							duration: flipDuration,
 						}),
 					);
@@ -836,7 +823,7 @@ export const useMemoryGame = () => {
 							"[FLIP CARD] Match check timeout fired, calling checkForMatch",
 						);
 						matchCheckTimeoutRef.current = null;
-						checkForMatch(newState.selectedCards);
+						checkForMatch(newSelectedIds);
 					}, flipDuration);
 				}
 
@@ -921,7 +908,6 @@ export const useMemoryGame = () => {
 			return {
 				...prev,
 				cards: newCards,
-				selectedCards: [],
 				// gameStatus stays "playing" - don't finish the game yet
 			};
 		});
@@ -952,7 +938,6 @@ export const useMemoryGame = () => {
 			return {
 				...prev,
 				cards: newCards,
-				selectedCards: [], // Clear selected cards when toggling
 			};
 		});
 	}, []);
@@ -1032,7 +1017,6 @@ export const useMemoryGame = () => {
 			return {
 				...prev,
 				cards: newCards,
-				selectedCards: [],
 			};
 		});
 	}, []);
@@ -1044,6 +1028,7 @@ export const useMemoryGame = () => {
 
 	return {
 		gameState,
+		players, // Derived from settings
 		setFullGameState,
 		showStartModal,
 		setShowStartModal,

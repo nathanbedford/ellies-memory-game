@@ -21,12 +21,12 @@ export type GameStatus = "setup" | "playing" | "finished";
 
 export interface GameState {
 	cards: Card[];
-	players: Player[];
 	currentPlayer: number;
-	selectedCards: string[];
+	// players[] removed - derive via getPlayersFromSettings() or getPlayersFromPresence()
+	// selectedCards removed - derive via getSelectedCardIds(cards)
 	gameStatus: GameStatus;
-	winner: Player | null;
-	isTie: boolean;
+	// winner removed - derive via calculateWinner(cards, players)
+	// isTie removed - derive via calculateWinner(cards, players)
 }
 
 export type CardPack =

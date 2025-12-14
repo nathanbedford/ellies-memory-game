@@ -22,7 +22,6 @@ import {
 	applyNoMatchWithReset,
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
-	updatePlayerName as engineUpdatePlayerName,
 } from "../services/game/GameEngine";
 
 interface UseOnlineGameOptions {
@@ -89,7 +88,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 					syncId,
 					adapterRoomCode,
 					currentPlayer: state.currentPlayer,
-					selectedCards: state.selectedCards,
 					flippedUnmatchedCount: flippedUnmatched.length,
 					flippedUnmatchedIds: flippedUnmatched.map((c) => c.id),
 				});
@@ -115,7 +113,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 					syncId,
 					version: newVersion,
 					currentPlayer: state.currentPlayer,
-					selectedCards: state.selectedCards.length,
+					flippedUnmatchedCount: flippedUnmatched.length,
 					matchedCards: state.cards.filter((c) => c.isMatched).length,
 				});
 			} catch (error) {
@@ -123,7 +121,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 					syncId,
 					error: error instanceof Error ? error.message : String(error),
 					currentPlayer: state.currentPlayer,
-					selectedCards: state.selectedCards,
 				});
 			}
 		},
@@ -224,7 +221,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 						localVersion: lastSyncedVersionRef.current,
 						lastUpdatedBy,
 						currentPlayer: onlineState.currentPlayer,
-						selectedCards: onlineState.selectedCards,
 						flippedUnmatchedCount: flippedUnmatched.length,
 						flippedUnmatchedIds: flippedUnmatched.map(
 							(c: { id: string }) => c.id,
@@ -244,13 +240,9 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 				}
 				isCheckingMatchRef.current = false;
 
-				// Normalize state to handle Firestore undefined vs null
-				const normalizedState = {
-					...remoteState,
-					winner: remoteState.winner ?? null,
-					isTie: remoteState.isTie ?? false,
-				};
-				setGameState(normalizedState);
+				// Apply the remote state directly
+				// Note: winner and isTie are now derived, not stored in state
+				setGameState(remoteState);
 			} else {
 				logger.trace("Ignoring stale remote state", {
 					remoteVersion,
@@ -296,14 +288,18 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			// Sync to Firestore immediately
 			syncToFirestore(newState, `flipCard:${cardId}`);
 
+			// Derive selected cards from card state
+			const selectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched);
+			const selectedCardIds = selectedCards.map(c => c.id);
+
 			logger.debug("Card flipped", {
 				cardId,
-				selectedCards: newState.selectedCards,
-				isSecondCard: newState.selectedCards.length === 2,
+				selectedCards: selectedCardIds,
+				isSecondCard: selectedCards.length === 2,
 			});
 
 			// Schedule match check if 2 cards selected
-			if (newState.selectedCards.length === 2) {
+			if (selectedCards.length === 2) {
 				// Cancel any existing timeout
 				if (matchCheckTimeoutRef.current) {
 					logger.trace("Cancelling existing match check timeout");
@@ -311,17 +307,17 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 				}
 
 				logger.debug("Scheduling match check", {
-					selectedCards: newState.selectedCards,
+					selectedCards: selectedCardIds,
 					flipDuration,
 				});
 
 				matchCheckTimeoutRef.current = setTimeout(() => {
 					logger.trace("Match check timeout fired", {
-						selectedCards: newState.selectedCards,
+						selectedCards: selectedCardIds,
 					});
 					matchCheckTimeoutRef.current = null;
 					if (checkForMatchRef.current) {
-						checkForMatchRef.current(newState.selectedCards, newState);
+						checkForMatchRef.current(selectedCardIds, newState);
 					}
 				}, flipDuration);
 			}
@@ -341,7 +337,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			logger.debug(`Match check starting`, {
 				checkId,
 				selectedIds,
-				currentStateSelectedCards: currentState.selectedCards,
 				currentPlayer: currentState.currentPlayer,
 				isAuthoritative: localPlayerSlot === currentState.currentPlayer,
 				flippedCardIds: flippedCards.map((c) => c.id),
@@ -365,7 +360,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			if (!matchResult) {
 				logger.error(`Match check aborted - cards not found`, {
 					checkId,
-					selectedCards: currentState.selectedCards,
+					flippedCardIds: flippedCards.map((c) => c.id),
 					selectedIds,
 				});
 				isCheckingMatchRef.current = false;
@@ -512,7 +507,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 
 		logger.info("Manual end turn triggered", {
 			currentPlayer: gameState.currentPlayer,
-			selectedCards: gameState.selectedCards,
 			flippedUnmatchedCount: flippedUnmatched.length,
 			hadPendingMatchCheck: !!matchCheckTimeoutRef.current,
 		});
@@ -536,25 +530,8 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		syncToFirestore(newState, "endTurn:manual");
 	}, [gameState, syncToFirestore]);
 
-	// Update player name - syncs to Firestore
-	const updatePlayerName = useCallback(
-		(playerId: 1 | 2, newName: string) => {
-			const trimmedName = newName.trim();
-			if (!trimmedName) return;
-
-			// Use GameEngine to update player name
-			const newState = engineUpdatePlayerName(gameState, playerId, trimmedName);
-
-			logger.debug("Updating player name", {
-				playerId,
-				newName: trimmedName,
-			});
-
-			setGameState(newState);
-			syncToFirestore(newState, `updatePlayerName:${playerId}`);
-		},
-		[gameState, syncToFirestore],
-	);
+	// Note: Player names are managed via presence data (RTDB) in online mode,
+	// not via game state. See OnlineLobby for presence-based player info.
 
 	const toggleAllCardsFlipped = useCallback(() => {
 		if (gameState.cards.length === 0) return;
@@ -579,7 +556,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		const newState: GameState = {
 			...gameState,
 			cards: newCards,
-			selectedCards: [],
 		};
 
 		setGameState(newState);
@@ -663,7 +639,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		const newState: GameState = {
 			...gameState,
 			cards: newCards,
-			selectedCards: [],
 			// gameStatus stays "playing" - don't finish the game yet
 		};
 
@@ -688,7 +663,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			logger.trace("Monitoring potential stuck cards", {
 				flippedCards: flippedUnmatched.map((c) => c.id),
 				currentPlayer: gameState.currentPlayer,
-				selectedCards: gameState.selectedCards,
 				resolutionInFlight,
 			});
 		} else if (!shouldMonitor && cardsFlippedAtRef.current !== null) {
@@ -713,7 +687,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 						flippedCards: gameState.cards
 							.filter((c) => c.isFlipped && !c.isMatched)
 							.map((c) => c.id),
-						selectedCards: gameState.selectedCards,
 						currentPlayer: gameState.currentPlayer,
 						isCheckingMatch: isCheckingMatchRef.current,
 						hasPendingMatchCheck: !!matchCheckTimeoutRef.current,
@@ -737,7 +710,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 	}, [
 		gameState.cards,
 		gameState.currentPlayer,
-		gameState.selectedCards,
 		localPlayerSlot,
 		endTurn,
 	]);
@@ -761,7 +733,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		endTurn,
 		resetGame,
 		isAuthoritative,
-		updatePlayerName,
 		toggleAllCardsFlipped,
 		endGameEarly,
 	};

@@ -22,10 +22,10 @@ import {
 	applyNoMatchWithReset,
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
-	updatePlayerName as engineUpdatePlayerName,
-	updatePlayerColor as engineUpdatePlayerColor,
 	getPlayerById,
+	calculateWinner,
 } from "../services/game/GameEngine";
+import type { Player } from "../types";
 import { EffectManager } from "../services/effects/EffectManager";
 import type { ISyncAdapter } from "../services/sync/ISyncAdapter";
 
@@ -57,6 +57,9 @@ export interface UseGameControllerOptions {
 
 	/** Initial settings */
 	initialSettings: GameSettings;
+
+	/** Players array (derived from settings for local, presence for online) */
+	players: Player[];
 
 	/** Effect manager for side effects (TTS, sounds) */
 	effectManager?: EffectManager;
@@ -116,6 +119,7 @@ export function useGameController(
 		mode,
 		initialGameState,
 		initialSettings,
+		players,
 		effectManager,
 		syncAdapter,
 		localPlayerSlot,
@@ -261,13 +265,13 @@ export function useGameController(
 			syncToFirestore(newState, "endTurn");
 		}
 
-		// Notify turn change
+		// Notify turn change (players passed in from settings/presence)
 		const nextPlayerId = newState.currentPlayer;
 		const nextPlayerName =
-			getPlayerById(newState.players, nextPlayerId)?.name ||
+			getPlayerById(players, nextPlayerId)?.name ||
 			`Player ${nextPlayerId}`;
 		effectManager?.notifyTurnChange(nextPlayerName, nextPlayerId);
-	}, [gameState, isOnlineMode, syncToFirestore, effectManager]);
+	}, [gameState, isOnlineMode, syncToFirestore, effectManager, players]);
 
 	// ============================================
 	// Stuck Game Detection
@@ -340,7 +344,7 @@ export function useGameController(
 			const cardIds: [string, string] = [firstCard.id, secondCard.id];
 			const currentPlayerId = currentState.currentPlayer;
 			const currentPlayerName =
-				getPlayerById(currentState.players, currentPlayerId)?.name ||
+				getPlayerById(players, currentPlayerId)?.name ||
 				`Player ${currentPlayerId}`;
 
 			if (isMatch) {
@@ -373,12 +377,10 @@ export function useGameController(
 							syncToFirestore(finalState, `match:complete`);
 						}
 
-						// Check for game over
+						// Check for game over - derive winner/isTie from cards
 						if (finalState.gameStatus === "finished") {
-							effectManager?.notifyGameOver(
-								finalState.winner,
-								finalState.isTie,
-							);
+							const { winner, isTie } = calculateWinner(finalState.cards, players);
+							effectManager?.notifyGameOver(winner, isTie);
 						}
 
 						return finalState;
@@ -398,14 +400,14 @@ export function useGameController(
 				// Notify effect manager of turn change
 				const nextPlayerId = noMatchState.currentPlayer;
 				const nextPlayerName =
-					getPlayerById(noMatchState.players, nextPlayerId)?.name ||
+					getPlayerById(players, nextPlayerId)?.name ||
 					`Player ${nextPlayerId}`;
 				effectManager?.notifyTurnChange(nextPlayerName, nextPlayerId);
 
 				isCheckingMatchRef.current = false;
 			}
 		},
-		[isOnlineMode, localPlayerSlot, syncToFirestore, effectManager],
+		[isOnlineMode, localPlayerSlot, syncToFirestore, effectManager, players],
 	);
 
 	// ============================================
@@ -440,15 +442,17 @@ export function useGameController(
 				syncToFirestore(newState, `flip:${cardId}`);
 			}
 
-			// Schedule match check if 2 cards selected
-			if (newState.selectedCards.length === 2) {
+			// Schedule match check if 2 cards selected (derived from card state)
+			const selectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched);
+			if (selectedCards.length === 2) {
 				if (matchCheckTimeoutRef.current) {
 					clearTimeout(matchCheckTimeoutRef.current);
 				}
 
+				const selectedCardIds = selectedCards.map(c => c.id);
 				matchCheckTimeoutRef.current = setTimeout(() => {
 					matchCheckTimeoutRef.current = null;
-					checkForMatch(newState.selectedCards, newState);
+					checkForMatch(selectedCardIds, newState);
 				}, settings.flipDuration);
 			}
 		},
@@ -491,7 +495,6 @@ export function useGameController(
 			...prev,
 			cards,
 			gameStatus: "setup",
-			selectedCards: [],
 		}));
 	}, []);
 
@@ -502,16 +505,19 @@ export function useGameController(
 		}));
 		setIsAnimating(false);
 
-		// Notify game start
+		// Notify game start (players passed in from settings/presence)
 		const firstPlayerId = gameState.currentPlayer;
 		const firstPlayerName =
-			getPlayerById(gameState.players, firstPlayerId)?.name ||
+			getPlayerById(players, firstPlayerId)?.name ||
 			`Player ${firstPlayerId}`;
 		effectManager?.notifyGameStart(firstPlayerName, firstPlayerId);
-	}, [gameState.currentPlayer, gameState.players, effectManager]);
+	}, [gameState.currentPlayer, players, effectManager]);
 
 	// ============================================
 	// Player Management
+	// Note: Player names/colors are stored in settings, not game state
+	// These functions just persist to localStorage; actual state updates
+	// happen via the gameStore.setPlayerName/setPlayerColor actions
 	// ============================================
 
 	const updatePlayerName = useCallback(
@@ -519,32 +525,18 @@ export function useGameController(
 			const trimmedName = newName.trim();
 			if (!trimmedName) return;
 
-			const newState = engineUpdatePlayerName(gameState, playerId, trimmedName);
-			setGameState(newState);
-
-			if (isOnlineMode) {
-				syncToFirestore(newState, `updateName:${playerId}`);
-			}
-
-			// Persist to localStorage
+			// Persist to localStorage (gameStore handles the actual state update)
 			localStorage.setItem(`player${playerId}Name`, trimmedName);
 		},
-		[gameState, isOnlineMode, syncToFirestore],
+		[],
 	);
 
 	const updatePlayerColor = useCallback(
 		(playerId: number, newColor: string) => {
-			const newState = engineUpdatePlayerColor(gameState, playerId, newColor);
-			setGameState(newState);
-
-			if (isOnlineMode) {
-				syncToFirestore(newState, `updateColor:${playerId}`);
-			}
-
-			// Persist to localStorage
+			// Persist to localStorage (gameStore handles the actual state update)
 			localStorage.setItem(`player${playerId}Color`, newColor);
 		},
-		[gameState, isOnlineMode, syncToFirestore],
+		[],
 	);
 
 	// ============================================

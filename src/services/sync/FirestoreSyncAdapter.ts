@@ -382,8 +382,7 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		const onlineState: OnlineGameState = {
 			...state,
 			cards: cleanedCards,
-			winner: state.winner ?? null, // Ensure null, not undefined (for Firestore)
-			isTie: state.isTie ?? false, // Ensure boolean value
+			// winner and isTie are now derived from cards and players, not stored
 			syncVersion: existingState.syncVersion || 0,
 			gameRound: existingState.gameRound ?? 0, // Preserve gameRound if present
 		};

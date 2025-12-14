@@ -93,14 +93,8 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
       // Initialize cards
       const cards = initializeCards(images);
 
-      // Create game state with player info from presence data
-      const initialState = createInitialState(
-        hostPlayer.name,
-        guestPlayer.name,
-        hostPlayer.color,
-        guestPlayer.color,
-        1 // Host goes first
-      );
+      // Create game state - player info is stored in presence data, not game state
+      const initialState = createInitialState(1); // Host goes first
 
       const gameState = startGameWithCards(initialState, cards);
 

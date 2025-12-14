@@ -37,6 +37,21 @@ export function getPlayerScore(cards: Card[], playerId: number): number {
 }
 
 /**
+ * Get currently selected cards (flipped but not yet matched)
+ * This is the derived replacement for GameState.selectedCards
+ */
+export function getSelectedCards(cards: Card[]): Card[] {
+	return cards.filter((c) => c.isFlipped && !c.isMatched);
+}
+
+/**
+ * Get IDs of currently selected cards
+ */
+export function getSelectedCardIds(cards: Card[]): string[] {
+	return getSelectedCards(cards).map((c) => c.id);
+}
+
+/**
  * Generate a 4-character room code (uppercase letters, excluding ambiguous chars)
  */
 export function generateRoomCode(): string {
@@ -45,6 +60,56 @@ export function generateRoomCode(): string {
 		{ length: 4 },
 		() => chars[Math.floor(Math.random() * chars.length)],
 	).join("");
+}
+
+// ============================================
+// Player Info Helpers (derived from settings or presence)
+// ============================================
+
+/**
+ * Settings structure for extracting player info (local mode)
+ */
+export interface PlayerSettings {
+	player1Name: string;
+	player1Color: string;
+	player2Name: string;
+	player2Color: string;
+}
+
+/**
+ * Presence data structure for extracting player info (online mode)
+ */
+export interface PresencePlayer {
+	name: string;
+	color: string;
+	slot: 1 | 2;
+}
+
+/**
+ * Get players array from settings (for local mode)
+ */
+export function getPlayersFromSettings(settings: PlayerSettings): Player[] {
+	return [
+		{ id: 1, name: settings.player1Name, color: settings.player1Color },
+		{ id: 2, name: settings.player2Name, color: settings.player2Color },
+	];
+}
+
+/**
+ * Get players array from presence data (for online mode)
+ */
+export function getPlayersFromPresence(
+	presenceData: Record<string, PresencePlayer>,
+): Player[] {
+	const players: Player[] = [];
+	for (const presence of Object.values(presenceData)) {
+		players.push({
+			id: presence.slot,
+			name: presence.name,
+			color: presence.color,
+		});
+	}
+	return sortPlayersByID(players);
 }
 
 // ============================================
@@ -118,8 +183,9 @@ export function canFlipCard(state: GameState, cardId: string): boolean {
 		return false;
 	}
 
-	// Already have 2 cards selected
-	if (state.selectedCards.length >= 2) {
+	// Already have 2 cards selected (derived from cards)
+	const selectedCards = getSelectedCards(state.cards);
+	if (selectedCards.length >= 2) {
 		return false;
 	}
 
@@ -138,6 +204,7 @@ export function canFlipCard(state: GameState, cardId: string): boolean {
 
 /**
  * Flip a card (pure function - returns new state)
+ * Note: selectedCards is now derived from cards, so we just set isFlipped: true
  */
 export function flipCard(state: GameState, cardId: string): GameState {
 	if (!canFlipCard(state, cardId)) {
@@ -148,12 +215,9 @@ export function flipCard(state: GameState, cardId: string): GameState {
 		c.id === cardId ? { ...c, isFlipped: true } : c,
 	);
 
-	const newSelectedCards = [...state.selectedCards, cardId];
-
 	return {
 		...state,
 		cards: newCards,
-		selectedCards: newSelectedCards,
 	};
 }
 
@@ -169,19 +233,15 @@ export interface MatchResult {
 
 /**
  * Check if two selected cards are a match
+ * Uses derived selectedCards from card state
  */
 export function checkMatch(state: GameState): MatchResult | null {
-	if (state.selectedCards.length !== 2) {
+	const selectedCards = getSelectedCards(state.cards);
+	if (selectedCards.length !== 2) {
 		return null;
 	}
 
-	const [firstId, secondId] = state.selectedCards;
-	const firstCard = state.cards.find((c) => c.id === firstId);
-	const secondCard = state.cards.find((c) => c.id === secondId);
-
-	if (!firstCard || !secondCard) {
-		return null;
-	}
+	const [firstCard, secondCard] = selectedCards;
 
 	return {
 		isMatch: firstCard.imageId === secondCard.imageId,
@@ -223,7 +283,6 @@ export function applyMatch(
 	return {
 		...state,
 		cards: newCards,
-		selectedCards: [],
 	};
 }
 
@@ -262,7 +321,6 @@ export function startMatchAnimation(
 	return {
 		...state,
 		cards: newCards,
-		selectedCards: [],
 	};
 }
 
@@ -332,7 +390,6 @@ export function applyNoMatchWithReset(
 		...state,
 		cards: newCards,
 		currentPlayer: nextPlayer,
-		selectedCards: [],
 	};
 }
 
@@ -363,7 +420,6 @@ export function applyNoMatch(
 		...state,
 		cards: newCards,
 		currentPlayer: nextPlayer,
-		selectedCards: [],
 	};
 }
 
@@ -385,7 +441,6 @@ export function switchPlayer(state: GameState): GameState {
 	return {
 		...state,
 		currentPlayer: getNextPlayer(state.currentPlayer),
-		selectedCards: [],
 	};
 }
 
@@ -412,7 +467,6 @@ export function endTurn(state: GameState): GameState {
 		...state,
 		cards: newCards,
 		currentPlayer: getNextPlayer(state.currentPlayer),
-		selectedCards: [],
 	};
 }
 
@@ -431,27 +485,31 @@ export function isGameOver(state: GameState): boolean {
 }
 
 /**
- * Calculate the winner
+ * Calculate the winner from cards and players
+ * Players are passed in because they're no longer stored in GameState
  */
-export function calculateWinner(state: GameState): {
+export function calculateWinner(
+	cards: Card[],
+	players: Player[],
+): {
 	winner: Player | null;
 	isTie: boolean;
 } {
-	if (state.players.length === 0) {
+	if (players.length === 0) {
 		return { winner: null, isTie: false };
 	}
 
 	// Find player with highest score (derived from cards)
-	const winner = state.players.reduce((prev, current) => {
-		const prevScore = getPlayerScore(state.cards, prev.id);
-		const currentScore = getPlayerScore(state.cards, current.id);
+	const winner = players.reduce((prev, current) => {
+		const prevScore = getPlayerScore(cards, prev.id);
+		const currentScore = getPlayerScore(cards, current.id);
 		return currentScore > prevScore ? current : prev;
 	});
 
 	// Check if it's a tie
-	const winnerScore = getPlayerScore(state.cards, winner.id);
-	const isTie = state.players.every(
-		(p) => getPlayerScore(state.cards, p.id) === winnerScore,
+	const winnerScore = getPlayerScore(cards, winner.id);
+	const isTie = players.every(
+		(p) => getPlayerScore(cards, p.id) === winnerScore,
 	);
 
 	return {
@@ -461,17 +519,13 @@ export function calculateWinner(state: GameState): {
 }
 
 /**
- * Finish the game and determine winner
+ * Finish the game (set status to finished)
+ * Winner/isTie are now derived via calculateWinner(cards, players)
  */
 export function finishGame(state: GameState): GameState {
-	const { winner, isTie } = calculateWinner(state);
-
 	return {
 		...state,
 		gameStatus: "finished",
-		winner,
-		isTie,
-		selectedCards: [],
 	};
 }
 
@@ -491,54 +545,25 @@ export function checkAndFinishGame(state: GameState): GameState {
 
 /**
  * Create initial game state
+ * Players are no longer stored in GameState - use getPlayersFromSettings() or getPlayersFromPresence()
  */
-export function createInitialState(
-	player1Name: string = "Player 1",
-	player2Name: string = "Player 2",
-	player1Color: string = "#3b82f6",
-	player2Color: string = "#10b981",
-	firstPlayer: 1 | 2 = 1,
-): GameState {
+export function createInitialState(firstPlayer: 1 | 2 = 1): GameState {
 	return {
 		cards: [],
-		players: sortPlayersByID([
-			{ id: 1, name: player1Name, color: player1Color },
-			{ id: 2, name: player2Name, color: player2Color },
-		]),
 		currentPlayer: firstPlayer,
-		selectedCards: [],
 		gameStatus: "setup",
-		winner: null,
-		isTie: false,
 	};
 }
 
 /**
- * Reset game state (keep player names/colors, reset scores and cards)
+ * Reset game state (clear cards, reset status)
+ * Player names/colors are stored in settings, not in game state
  */
 export function resetGameState(state: GameState): GameState {
-	const player1 = getPlayerById(state.players, 1);
-	const player2 = getPlayerById(state.players, 2);
-
 	return {
 		cards: [],
-		players: sortPlayersByID([
-			{
-				id: 1,
-				name: player1?.name || "Player 1",
-				color: player1?.color || "#3b82f6",
-			},
-			{
-				id: 2,
-				name: player2?.name || "Player 2",
-				color: player2?.color || "#10b981",
-			},
-		]),
 		currentPlayer: state.currentPlayer, // Keep the current player setting
-		selectedCards: [],
 		gameStatus: "setup",
-		winner: null,
-		isTie: false,
 	};
 }
 
@@ -549,54 +574,7 @@ export function startGameWithCards(state: GameState, cards: Card[]): GameState {
 	return {
 		...state,
 		cards,
-		selectedCards: [],
 		gameStatus: "playing",
-		winner: null,
-		isTie: false,
-	};
-}
-
-// ============================================
-// Player Management
-// ============================================
-
-/**
- * Update player name
- */
-export function updatePlayerName(
-	state: GameState,
-	playerId: number,
-	newName: string,
-): GameState {
-	const newPlayers = sortPlayersByID(
-		state.players.map((p) =>
-			p.id === playerId ? { ...p, name: newName.trim() } : p,
-		),
-	);
-
-	return {
-		...state,
-		players: newPlayers,
-	};
-}
-
-/**
- * Update player color
- */
-export function updatePlayerColor(
-	state: GameState,
-	playerId: number,
-	newColor: string,
-): GameState {
-	const newPlayers = sortPlayersByID(
-		state.players.map((p) =>
-			p.id === playerId ? { ...p, color: newColor } : p,
-		),
-	);
-
-	return {
-		...state,
-		players: newPlayers,
 	};
 }
 
@@ -606,6 +584,7 @@ export function updatePlayerColor(
 
 /**
  * Clean state for persistence (remove transient animation properties)
+ * Players are stored in settings/presence, not in game state
  */
 export function cleanStateForPersistence(state: GameState): GameState {
 	return {
@@ -620,13 +599,12 @@ export function cleanStateForPersistence(state: GameState): GameState {
 			matchedByPlayerId: card.matchedByPlayerId,
 			// Exclude: isFlyingToPlayer, flyingToPlayerId (transient animation state)
 		})),
-		players: sortPlayersByID(state.players),
-		selectedCards: [], // Don't persist mid-selection state
 	};
 }
 
 /**
  * Validate incoming state from network
+ * Players are stored in settings/presence, not validated here
  */
 export function validateState(state: unknown): state is GameState {
 	if (!state || typeof state !== "object") return false;
@@ -634,9 +612,7 @@ export function validateState(state: unknown): state is GameState {
 	const s = state as GameState;
 
 	if (!Array.isArray(s.cards)) return false;
-	if (!Array.isArray(s.players)) return false;
 	if (typeof s.currentPlayer !== "number") return false;
-	if (!Array.isArray(s.selectedCards)) return false;
 	if (!["setup", "playing", "finished"].includes(s.gameStatus)) return false;
 
 	return true;
