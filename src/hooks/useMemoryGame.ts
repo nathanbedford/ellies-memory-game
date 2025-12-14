@@ -6,8 +6,7 @@ import {
 	canFlipCard,
 	flipCard as engineFlipCard,
 	checkMatch,
-	startMatchAnimation,
-	completeMatchAnimation,
+	applyMatch,
 	applyNoMatchWithReset,
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
@@ -548,7 +547,7 @@ export const useMemoryGame = () => {
 					const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
 
 					console.log(
-						"[MATCH CHECK] ✓ MATCH FOUND! Marking cards as flying to player",
+						"[MATCH CHECK] ✓ MATCH FOUND! Applying match directly",
 						JSON.stringify({
 							cardIds,
 							playerId: currentPlayerId,
@@ -557,14 +556,21 @@ export const useMemoryGame = () => {
 						}),
 					);
 
-					// Use GameEngine for Phase 1: flying animation
-					const flyingState = startMatchAnimation(
-						prev,
-						cardIds,
-						currentPlayerId,
+					// Apply match directly - animation is handled locally by GameBoard
+					const matchedState = applyMatch(prev, matchResult);
+
+					// Check if game is finished
+					const finalState = checkAndFinishGame(matchedState);
+
+					console.log(
+						"[MATCH CHECK] Cards marked as matched",
+						JSON.stringify({
+							matchedCount: finalState.cards.filter((c) => c.isMatched).length,
+							gameStatus: finalState.gameStatus,
+						}),
 					);
 
-					// Announce match found immediately (don't wait for animation)
+					// Announce match found
 					if (ttsEnabled && isAvailable()) {
 						if (ttsDelayTimeoutRef.current) {
 							clearTimeout(ttsDelayTimeoutRef.current);
@@ -575,41 +581,6 @@ export const useMemoryGame = () => {
 						}, 400);
 					}
 
-					// After animation completes, mark as matched using GameEngine
-					setTimeout(() => {
-						console.log(
-							"[MATCH CHECK] Animation timeout fired, marking cards as matched",
-							JSON.stringify({
-								cardIds,
-								matchedByPlayerId: currentPlayerId,
-								timestamp: new Date().toISOString(),
-							}),
-						);
-
-						setGameState((prevState) => {
-							// Use GameEngine for Phase 2: complete match
-							const matchedState = completeMatchAnimation(
-								prevState,
-								cardIds,
-								currentPlayerId,
-							);
-
-							// Use GameEngine to check if game is finished
-							const finalState = checkAndFinishGame(matchedState);
-
-							console.log(
-								"[MATCH CHECK] Cards marked as matched",
-								JSON.stringify({
-									matchedCount: finalState.cards.filter((c) => c.isMatched)
-										.length,
-									gameStatus: finalState.gameStatus,
-								}),
-							);
-
-							return finalState;
-						});
-					}, 3000); // Match animation duration (matches CSS animation length)
-
 					// Reset checking flag
 					requestAnimationFrame(() => {
 						requestAnimationFrame(() => {
@@ -617,7 +588,7 @@ export const useMemoryGame = () => {
 						});
 					});
 
-					return flyingState;
+					return finalState;
 				} else {
 					// Use GameEngine for no match: flip back and switch player
 					console.log(
@@ -919,7 +890,7 @@ export const useMemoryGame = () => {
 
 			// Check if all unmatched cards are currently flipped
 			const unmatchedCards = prev.cards.filter(
-				(c) => !c.isMatched && !c.isFlyingToPlayer,
+				(c) => !c.isMatched,
 			);
 			const allFlipped =
 				unmatchedCards.length > 0 && unmatchedCards.every((c) => c.isFlipped);
@@ -928,8 +899,8 @@ export const useMemoryGame = () => {
 			setAllCardsFlipped(newFlippedState);
 
 			const newCards = prev.cards.map((card) => {
-				// Don't flip matched cards or cards that are currently flying
-				if (card.isMatched || card.isFlyingToPlayer) {
+				// Don't flip matched cards
+				if (card.isMatched) {
 					return card;
 				}
 				return { ...card, isFlipped: newFlippedState };

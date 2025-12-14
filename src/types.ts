@@ -5,8 +5,8 @@ export interface Card {
 	gradient?: string;
 	isFlipped: boolean;
 	isMatched: boolean;
-	isFlyingToPlayer?: boolean;
-	flyingToPlayerId?: number;
+	// isFlyingToPlayer removed - animation is a local UI concern, not synced state
+	// flyingToPlayerId removed - animation is a local UI concern, not synced state
 	matchedByPlayerId?: number; // Track which player matched this card
 }
 

@@ -17,8 +17,7 @@ import {
 	canFlipCard,
 	flipCard as engineFlipCard,
 	checkMatch,
-	startMatchAnimation,
-	completeMatchAnimation,
+	applyMatch,
 	applyNoMatchWithReset,
 	checkAndFinishGame,
 	endTurn as engineEndTurn,
@@ -289,8 +288,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			syncToFirestore(newState, `flipCard:${cardId}`);
 
 			// Derive selected cards from card state
-			// IMPORTANT: Exclude flying cards - they're already matched, just animating
-			const selectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer);
+			const selectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched);
 			const selectedCardIds = selectedCards.map(c => c.id);
 
 			logger.debug("Card flipped", {
@@ -379,69 +377,32 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 			});
 
 			if (isMatch) {
-				const currentPlayerId = currentState.currentPlayer;
+				// Apply match directly - animation is handled locally by GameBoard
+				const matchedState = applyMatch(currentState, matchResult);
 
-				// Use GameEngine for Phase 1: flying animation
-				const flyingState = startMatchAnimation(
-					currentState,
-					cardIds,
-					currentPlayerId,
-				);
+				// Check if game is finished
+				const finalState = checkAndFinishGame(matchedState);
 
-				logger.info(`Match found - starting flying animation`, {
+				logger.info(`Match found - applying match directly`, {
 					checkId,
 					cardIds,
-					playerId: currentPlayerId,
-					newScore: getPlayerScore(flyingState.cards, currentPlayerId),
+					playerId: currentState.currentPlayer,
+					newScore: getPlayerScore(finalState.cards, currentState.currentPlayer),
+					gameStatus: finalState.gameStatus,
 				});
 
-				setGameState(flyingState);
+				setGameState(finalState);
 				syncToFirestore(
-					flyingState,
-					`match:flying:${cardIds[0]}+${cardIds[1]}`,
+					finalState,
+					`match:${cardIds[0]}+${cardIds[1]}`,
 				);
 
-				// PHASE 2: After animation completes, mark cards as matched using GameEngine
-				setTimeout(() => {
-					logger.debug(`Match phase 2 - animation complete, marking matched`, {
-						checkId,
-						cardIds,
-					});
-
-					setGameState((prevState) => {
-						// Use GameEngine for Phase 2: complete match
-						const matchedState = completeMatchAnimation(
-							prevState,
-							cardIds,
-							currentPlayerId,
-						);
-
-						// Use GameEngine to check if game is finished
-						const finalState = checkAndFinishGame(matchedState);
-
-						logger.debug(`Match phase 2 - syncing matched state`, {
-							checkId,
-							gameStatus: finalState.gameStatus,
-							matchedCount: finalState.cards.filter((c) => c.isMatched).length,
-						});
-						syncToFirestore(
-							finalState,
-							`match:complete:${cardIds[0]}+${cardIds[1]}`,
-						);
-
-						return finalState;
-					});
-				}, 3000); // Match animation duration (matches CSS)
-
 				isCheckingMatchRef.current = false;
-				return; // Exit early - the setTimeout will handle the rest
 			} else {
-				// Use GameEngine for no match: flip back and switch turns
-				// IMPORTANT: Use functional setState to get latest state, not stale currentState
-				// This prevents overwriting concurrent updates (e.g., completeMatchAnimation)
+				// No match: flip back and switch turns
 				setGameState((prevState) => {
 					const beforeFlippedCards = prevState.cards.filter(
-						(c) => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer,
+						(c) => c.isFlipped && !c.isMatched,
 					);
 					logger.debug(`No match - flipping cards back`, {
 						checkId,
@@ -454,7 +415,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 					const noMatchState = applyNoMatchWithReset(prevState, cardIds);
 
 					const afterFlippedCards = noMatchState.cards.filter(
-						(c) => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer,
+						(c) => c.isFlipped && !c.isMatched,
 					);
 					logger.debug(`Switching turn`, {
 						checkId,
@@ -543,7 +504,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		if (gameState.cards.length === 0) return;
 
 		const unmatchedCards = gameState.cards.filter(
-			(c) => !c.isMatched && !c.isFlyingToPlayer,
+			(c) => !c.isMatched,
 		);
 		if (unmatchedCards.length === 0) {
 			return;
@@ -553,7 +514,7 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		const newFlippedState = !allFlipped;
 
 		const newCards = gameState.cards.map((card) => {
-			if (card.isMatched || card.isFlyingToPlayer) {
+			if (card.isMatched) {
 				return card;
 			}
 			return { ...card, isFlipped: newFlippedState };

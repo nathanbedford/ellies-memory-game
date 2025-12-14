@@ -13,8 +13,6 @@ import {
 	flipCard,
 	checkMatch,
 	applyMatch,
-	startMatchAnimation,
-	completeMatchAnimation,
 	applyNoMatchWithReset,
 	getNextPlayer,
 	switchPlayer,
@@ -457,125 +455,10 @@ describe("Match Detection", () => {
 });
 
 // ============================================
-// Animation-Aware Match Functions Tests
+// No-Match Reset Tests
 // ============================================
 
-describe("Animation-Aware Match Functions", () => {
-	describe("startMatchAnimation", () => {
-		it("sets isFlyingToPlayer on matched cards", () => {
-			const cards = createMatchingCardPair();
-			const state = createTestState({ cards });
-			const result = startMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(result.cards[0].isFlyingToPlayer).toBe(true);
-			expect(result.cards[1].isFlyingToPlayer).toBe(true);
-		});
-
-		it("sets flyingToPlayerId on matched cards", () => {
-			const cards = createMatchingCardPair();
-			const state = createTestState({ cards });
-			const result = startMatchAnimation(state, ["card-0", "card-1"], 2);
-			expect(result.cards[0].flyingToPlayerId).toBe(2);
-			expect(result.cards[1].flyingToPlayerId).toBe(2);
-		});
-
-		it("increments player score", () => {
-			const cards = createMatchingCardPair();
-			const state = createTestState({ cards });
-			const result = startMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(getPlayerScore(result.cards, 1)).toBe(1);
-		});
-
-		it("sets matchedByPlayerId on cards (cards stay flipped until animation completes)", () => {
-			const cards = createMatchingCardPair();
-			cards[0].isFlipped = true;
-			cards[1].isFlipped = true;
-			const state = createTestState({
-				cards,
-			});
-			const result = startMatchAnimation(state, ["card-0", "card-1"], 1);
-			// Cards have matchedByPlayerId set immediately for score calculation
-			expect(result.cards[0].matchedByPlayerId).toBe(1);
-			expect(result.cards[1].matchedByPlayerId).toBe(1);
-			// Cards stay flipped until completeMatchAnimation is called
-			expect(result.cards[0].isFlipped).toBe(true);
-			expect(result.cards[1].isFlipped).toBe(true);
-		});
-
-		it("keeps cards flipped", () => {
-			const cards = createMatchingCardPair();
-			const state = createTestState({ cards });
-			const result = startMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(result.cards[0].isFlipped).toBe(true);
-			expect(result.cards[1].isFlipped).toBe(true);
-		});
-
-		it("sets isMatched immediately", () => {
-			const cards = createMatchingCardPair();
-			const state = createTestState({ cards });
-			const result = startMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(result.cards[0].isMatched).toBe(true);
-			expect(result.cards[1].isMatched).toBe(true);
-		});
-	});
-
-	describe("completeMatchAnimation", () => {
-		it("preserves isMatched on cards (already set by startMatchAnimation)", () => {
-			const cards = createMatchingCardPair().map((c) => ({
-				...c,
-				isMatched: true,
-				isFlyingToPlayer: true,
-				flyingToPlayerId: 1,
-				matchedByPlayerId: 1,
-			}));
-			const state = createTestState({ cards });
-			const result = completeMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(result.cards[0].isMatched).toBe(true);
-			expect(result.cards[1].isMatched).toBe(true);
-		});
-
-		it("clears isFlyingToPlayer", () => {
-			const cards = createMatchingCardPair().map((c) => ({
-				...c,
-				isMatched: true,
-				isFlyingToPlayer: true,
-				flyingToPlayerId: 1,
-				matchedByPlayerId: 1,
-			}));
-			const state = createTestState({ cards });
-			const result = completeMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(result.cards[0].isFlyingToPlayer).toBe(false);
-			expect(result.cards[1].isFlyingToPlayer).toBe(false);
-		});
-
-		it("preserves matchedByPlayerId (already set by startMatchAnimation)", () => {
-			const cards = createMatchingCardPair().map((c) => ({
-				...c,
-				isMatched: true,
-				isFlyingToPlayer: true,
-				flyingToPlayerId: 2,
-				matchedByPlayerId: 2,
-			}));
-			const state = createTestState({ cards });
-			const result = completeMatchAnimation(state, ["card-0", "card-1"], 2);
-			expect(result.cards[0].matchedByPlayerId).toBe(2);
-			expect(result.cards[1].matchedByPlayerId).toBe(2);
-		});
-
-		it("sets flyingToPlayerId to undefined after clearing", () => {
-			const cards = createMatchingCardPair().map((c) => ({
-				...c,
-				isMatched: true,
-				isFlyingToPlayer: true,
-				flyingToPlayerId: 1,
-				matchedByPlayerId: 1,
-			}));
-			const state = createTestState({ cards });
-			const result = completeMatchAnimation(state, ["card-0", "card-1"], 1);
-			expect(result.cards[0].flyingToPlayerId).toBeUndefined();
-			expect(result.cards[1].flyingToPlayerId).toBeUndefined();
-		});
-	});
-
+describe("No-Match Reset", () => {
 	describe("applyNoMatchWithReset", () => {
 		it("flips cards back", () => {
 			const cards = createNonMatchingCards().map((c) => ({
@@ -605,30 +488,6 @@ describe("Animation-Aware Match Functions", () => {
 			const result = applyNoMatchWithReset(state, ["card-0", "card-1"]);
 			// After reset, cards are flipped back so no selected cards
 			expect(getSelectedCardIds(result.cards)).toEqual([]);
-		});
-
-		it("clears animation state", () => {
-			const cards = createNonMatchingCards().map((c) => ({
-				...c,
-				isFlyingToPlayer: true,
-				flyingToPlayerId: 1,
-			}));
-			const state = createTestState({ cards });
-			const result = applyNoMatchWithReset(state, ["card-0", "card-1"]);
-			expect(result.cards[0].isFlyingToPlayer).toBe(false);
-			expect(result.cards[0].flyingToPlayerId).toBeUndefined();
-		});
-
-		it("removes flyingToPlayerId property entirely after reset", () => {
-			const cards = createNonMatchingCards().map((c) => ({
-				...c,
-				isFlyingToPlayer: true,
-				flyingToPlayerId: 1,
-			}));
-			const state = createTestState({ cards });
-			const result = applyNoMatchWithReset(state, ["card-0", "card-1"]);
-			expect("flyingToPlayerId" in result.cards[0]).toBe(false);
-			expect("flyingToPlayerId" in result.cards[1]).toBe(false);
 		});
 	});
 });
@@ -702,20 +561,6 @@ describe("Turn Management", () => {
 			const result = endTurn(state);
 			// endTurn flips cards back, so no selected cards
 			expect(getSelectedCardIds(result.cards)).toEqual([]);
-		});
-
-		it("handles stuck flying cards", () => {
-			const cards = [
-				createTestCard({
-					id: "card-0",
-					isFlyingToPlayer: true,
-					isFlipped: true,
-				}),
-			];
-			const state = createTestState({ cards });
-			const result = endTurn(state);
-			expect(result.cards[0].isFlyingToPlayer).toBe(false);
-			expect(result.cards[0].isFlipped).toBe(false);
 		});
 	});
 });
@@ -992,26 +837,11 @@ describe("Game Reset", () => {
 
 describe("State Serialization", () => {
 	describe("cleanStateForPersistence", () => {
-		it("removes animation properties from cards", () => {
-			const cards = [
-				createTestCard({
-					isFlyingToPlayer: true,
-					flyingToPlayerId: 1,
-				}),
-			];
-			const state = createTestState({ cards });
-			const result = cleanStateForPersistence(state);
-			expect(result.cards[0].isFlyingToPlayer).toBeUndefined();
-			expect(result.cards[0].flyingToPlayerId).toBeUndefined();
-		});
-
-		it("preserves isFlipped state (only removes animation properties)", () => {
+		it("preserves isFlipped state", () => {
 			const state = createTestState({
 				cards: [createTestCard({ id: "card-1", isFlipped: true })],
 			});
 			const result = cleanStateForPersistence(state);
-			// cleanStateForPersistence only removes animation state (isFlyingToPlayer, flyingToPlayerId)
-			// It preserves isFlipped for persistence
 			expect(result.cards[0].isFlipped).toBe(true);
 		});
 

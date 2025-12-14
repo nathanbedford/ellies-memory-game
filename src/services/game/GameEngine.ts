@@ -39,10 +39,9 @@ export function getPlayerScore(cards: Card[], playerId: number): number {
 /**
  * Get currently selected cards (flipped but not yet matched)
  * This is the derived replacement for GameState.selectedCards
- * Note: Excludes cards that are flying to player (already matched, just animating)
  */
 export function getSelectedCards(cards: Card[]): Card[] {
-	return cards.filter((c) => c.isFlipped && !c.isMatched && !c.isFlyingToPlayer);
+	return cards.filter((c) => c.isFlipped && !c.isMatched);
 }
 
 /**
@@ -287,78 +286,12 @@ export function applyMatch(
 	};
 }
 
-// ============================================
-// Animation-Aware Match Functions
-// ============================================
-
-/**
- * Start match animation (Phase 1 of 2-phase match)
- * Sets cards as matched immediately and starts flying animation.
- * Call completeMatchAnimation() after the animation completes to clear flying state.
- */
-export function startMatchAnimation(
-	state: GameState,
-	cardIds: [string, string],
-	playerId: number,
-): GameState {
-	const [firstId, secondId] = cardIds;
-
-	// Mark cards as matched AND flying immediately
-	// Setting isMatched: true right away prevents them from being counted as "selected"
-	// and allows the player to flip new cards during the animation
-	const newCards = state.cards.map((c) =>
-		c.id === firstId || c.id === secondId
-			? {
-					...c,
-					isFlipped: true,
-					isMatched: true,
-					isFlyingToPlayer: true,
-					flyingToPlayerId: playerId,
-					matchedByPlayerId: playerId,
-				}
-			: c,
-	);
-
-	// Score is now derived from cards - no need to update player.score
-
-	return {
-		...state,
-		cards: newCards,
-	};
-}
-
-/**
- * Complete match animation (Phase 2 of 2-phase match)
- * Called after flying animation completes to clear flying state.
- * Cards are already marked as matched from Phase 1.
- */
-export function completeMatchAnimation(
-	state: GameState,
-	cardIds: [string, string],
-	_playerId: number,
-): GameState {
-	const [firstId, secondId] = cardIds;
-
-	// Clear flying state - cards are already isMatched: true from Phase 1
-	const newCards = state.cards.map((c) =>
-		c.id === firstId || c.id === secondId
-			? {
-					...c,
-					isFlyingToPlayer: false,
-					flyingToPlayerId: undefined,
-				}
-			: c,
-	);
-
-	return {
-		...state,
-		cards: newCards,
-	};
-}
+// startMatchAnimation and completeMatchAnimation removed
+// Animation is now handled locally in GameBoard.tsx
+// Use applyMatch() directly for match handling
 
 /**
  * Apply no-match result with card reset (flips cards back, switches player)
- * This is the animated version that properly resets card states.
  */
 export function applyNoMatchWithReset(
 	state: GameState,
@@ -366,19 +299,10 @@ export function applyNoMatchWithReset(
 ): GameState {
 	const [firstId, secondId] = cardIds;
 
-	// Flip cards back and clear any animation state
+	// Flip cards back
 	const newCards = state.cards.map((c) =>
 		c.id === firstId || c.id === secondId
-			? {
-					id: c.id,
-					imageId: c.imageId,
-					imageUrl: c.imageUrl,
-					gradient: c.gradient,
-					isFlipped: false,
-					isMatched: c.isMatched,
-					isFlyingToPlayer: false,
-					matchedByPlayerId: c.matchedByPlayerId,
-				}
+			? { ...c, isFlipped: false }
 			: c,
 	);
 
@@ -447,14 +371,10 @@ export function switchPlayer(state: GameState): GameState {
  * End turn manually (flip all non-matched cards back, switch player)
  */
 export function endTurn(state: GameState): GameState {
-	// Flip all non-matched, non-flying cards back
+	// Flip all non-matched cards back
 	const newCards = state.cards.map((c) => {
 		if (c.isMatched) {
 			return c;
-		}
-		if (c.isFlyingToPlayer) {
-			// Handle stuck flying cards - mark as matched if they have a pair
-			return { ...c, isFlyingToPlayer: false, isFlipped: false };
 		}
 		if (c.isFlipped) {
 			return { ...c, isFlipped: false };
@@ -619,7 +539,7 @@ export function validateState(state: unknown): state is GameState {
 
 /**
  * Reconcile matched cards - fixes race condition where matchedByPlayerId is set
- * but isMatched is false (e.g., during flying animation or sync delays).
+ * but isMatched is false (e.g., during sync delays).
  * This ensures consistency between ScoreBoard (which uses matchedByPlayerId)
  * and PlayerMatchesModal (which requires both isMatched && matchedByPlayerId).
  */
@@ -637,7 +557,6 @@ export function reconcileMatchedCards(state: GameState): GameState {
 			? {
 					...c,
 					isMatched: true,
-					isFlyingToPlayer: false,
 				}
 			: c,
 	);

@@ -1810,7 +1810,7 @@ function App() {
             allCardsFlipped={
               gameState.cards.length > 0 &&
               gameState.cards
-                .filter(c => !c.isMatched && !c.isFlyingToPlayer)
+                .filter(c => !c.isMatched)
                 .every(c => c.isFlipped)
             }
             onViewLogs={() => setShowLogViewer(true)}

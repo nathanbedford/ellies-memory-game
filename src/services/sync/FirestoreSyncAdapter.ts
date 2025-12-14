@@ -363,6 +363,7 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		const existingState = state as OnlineGameState;
 
 		// Clean undefined values from cards (Firestore doesn't accept undefined)
+		// Note: isFlyingToPlayer and flyingToPlayerId are no longer synced - animation is local UI state
 		const cleanedCards = state.cards.map((card) => {
 			const cleaned: any = {
 				id: card.id,
@@ -373,8 +374,6 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			};
 			// Only include optional fields if they have values
 			if (card.gradient !== undefined) cleaned.gradient = card.gradient;
-			if (card.isFlyingToPlayer !== undefined) cleaned.isFlyingToPlayer = card.isFlyingToPlayer;
-			if (card.flyingToPlayerId !== undefined) cleaned.flyingToPlayerId = card.flyingToPlayerId;
 			if (card.matchedByPlayerId !== undefined) cleaned.matchedByPlayerId = card.matchedByPlayerId;
 			return cleaned;
 		});

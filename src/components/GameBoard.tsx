@@ -53,12 +53,24 @@ interface CachedCardPosition {
   height: number;
 }
 
+// Type for local flying card state
+interface FlyingCardState {
+  playerId: number | undefined;
+  flyData: FlyData;
+  card: CardType;
+}
+
 export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack, columns: columnsProp, onCursorMove, onCursorLeave, remoteCursor }: GameBoardProps) => {
   const [lightboxCardId, setLightboxCardId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  // Store fly data that persists across renders - key is card ID
-  const flyDataRef = useRef<Map<string, FlyData>>(new Map());
+
+  // LOCAL animation state - flying cards are tracked locally, not synced
+  const [flyingCards, setFlyingCards] = useState<Map<string, FlyingCardState>>(new Map());
+
+  // Track previous matched state to detect match transitions
+  const prevMatchedRef = useRef<Set<string>>(new Set());
+
   // Cache card positions when they get flipped - used to calculate fly data
   const cardPositionCache = useRef<Map<string, CachedCardPosition>>(new Map());
 
@@ -90,18 +102,17 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
   // Monitor card state changes for debugging
   useEffect(() => {
     const flippedCards = cards.filter(c => c.isFlipped && !c.isMatched);
-    const flyingCards = cards.filter(c => c.isFlyingToPlayer);
     const matchedCards = cards.filter(c => c.isMatched);
 
     console.log('[CARD STATE] Cards state changed', JSON.stringify({
       totalCards: cards.length,
       flippedCardsCount: flippedCards.length,
       flippedCards: flippedCards.map(c => ({ id: c.id, isFlipped: c.isFlipped, isMatched: c.isMatched })),
-      flyingCardsCount: flyingCards.length,
+      flyingCardsCount: flyingCards.size,
       matchedCardsCount: matchedCards.length,
       timestamp: new Date().toISOString()
     }));
-  }, [cards]);
+  }, [cards, flyingCards.size]);
 
   // Generate random starting positions and rotations for each card
   const animationData = useMemo<CardAnimationData[]>(() => {
@@ -161,7 +172,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
     });
   }, [isAnimating, cardSize, cards, columns, gap]);
 
-  // Cache card positions when they get flipped (before they might become flying)
+  // Cache card positions when they get flipped (before they might become matched)
   // This ensures we have position data available when calculating fly animations
   useLayoutEffect(() => {
     // Find cards that are flipped but not matched (selected cards)
@@ -183,149 +194,142 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         }
       }
     }
-
-    // Clean up cache for cards that are no longer relevant (not flipped and not flying)
-    for (const [cardId] of cardPositionCache.current) {
-      const card = cards.find(c => c.id === cardId);
-      if (card && !card.isFlipped && !card.isFlyingToPlayer) {
-        cardPositionCache.current.delete(cardId);
-      }
-    }
   }, [cards]);
 
-  // Calculate fly-to-player animation data
-  // Uses cached positions from when cards were flipped
-  const flyToPlayerData = useMemo(() => {
-    return cards.map((card) => {
-      if (!card.isFlyingToPlayer) return null;
+  // Detect match transitions and trigger local flying animation
+  useEffect(() => {
+    const currentMatched = new Set(cards.filter(c => c.isMatched).map(c => c.id));
+    const prevMatched = prevMatchedRef.current;
 
-      // Check if we already have calculated fly data for this card
-      const existingFlyData = flyDataRef.current.get(card.id);
-      if (existingFlyData) {
-        return existingFlyData;
+    // Find newly matched cards (cards that just transitioned to isMatched: true)
+    const newlyMatched: CardType[] = [];
+    for (const card of cards) {
+      if (card.isMatched && !prevMatched.has(card.id)) {
+        newlyMatched.push(card);
       }
+    }
 
-      // Try to get position from cache (captured when card was flipped)
-      let rect = cardPositionCache.current.get(card.id);
-
-      // Fallback: try to get from DOM ref (might still exist on first render)
-      if (!rect) {
-        const cardElement = cardRefs.current.get(card.id);
-        if (cardElement) {
-          const domRect = cardElement.getBoundingClientRect();
-          rect = {
-            left: domRect.left,
-            top: domRect.top,
-            width: domRect.width,
-            height: domRect.height
-          };
-        }
-      }
-
-      if (!rect) {
-        console.warn('[FLY DATA] No position data for flying card', { cardId: card.id });
-        return null;
-      }
-
-      // Calculate card's actual center position
-      const cardCenterX = rect.left + rect.width / 2;
-      const cardCenterY = rect.top + rect.height / 2;
-
-      // Calculate target position (next to player name)
-      // Player 1 is on the left, Player 2 is on the right
-      const headerY = 120; // Approximate header Y position
-      const viewportWidth = window.innerWidth;
-      const targetX = card.flyingToPlayerId === 1
-        ? viewportWidth * 0.25 // Left side for Player 1
-        : viewportWidth * 0.75; // Right side for Player 2
-
-      // Calculate rotation angle based on direction from card to player name
-      const deltaX = targetX - cardCenterX;
-      const deltaY = headerY - cardCenterY;
-      const rotationAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-
-      // Final position: continue off screen above the player name
-      const finalY = -cardSize - 50; // Off screen above
-
-      const flyData: FlyData = {
-        startX: rect.left,
-        startY: rect.top,
-        endX: targetX - cardSize / 2,
-        endY: headerY - cardSize / 2,
-        finalY: finalY,
-        rotationAngle: rotationAngle,
-        playerId: card.flyingToPlayerId
-      };
-
-      console.log('[FLY DATA] Calculated fly data for card', {
-        cardId: card.id,
-        source: cardPositionCache.current.has(card.id) ? 'cache' : 'dom',
-        positions: {
-          start: { x: flyData.startX, y: flyData.startY },
-          end: { x: flyData.endX, y: flyData.endY }
-        },
-        rotationAngle: flyData.rotationAngle,
-        playerId: flyData.playerId
+    // If we have newly matched cards, trigger flying animation
+    if (newlyMatched.length > 0) {
+      console.log('[MATCH TRANSITION] Detected newly matched cards', {
+        newlyMatched: newlyMatched.map(c => c.id),
+        matchedByPlayerId: newlyMatched[0]?.matchedByPlayerId
       });
 
-      // Store in ref so it persists across re-renders
-      flyDataRef.current.set(card.id, flyData);
+      const newFlyingCards = new Map(flyingCards);
 
-      return flyData;
-    });
-  }, [cards, cardSize]);
+      for (const card of newlyMatched) {
+        // Try to get position from cache (captured when card was flipped)
+        let rect = cardPositionCache.current.get(card.id);
 
-  // Clean up fly data for cards that stopped flying
+        // Fallback: try to get from DOM ref (might still exist on first render)
+        if (!rect) {
+          const cardElement = cardRefs.current.get(card.id);
+          if (cardElement) {
+            const domRect = cardElement.getBoundingClientRect();
+            rect = {
+              left: domRect.left,
+              top: domRect.top,
+              width: domRect.width,
+              height: domRect.height
+            };
+          }
+        }
+
+        if (!rect) {
+          console.warn('[FLY DATA] No position data for matched card', { cardId: card.id });
+          continue;
+        }
+
+        // Calculate card's actual center position
+        const cardCenterX = rect.left + rect.width / 2;
+        const cardCenterY = rect.top + rect.height / 2;
+
+        // Calculate target position (next to player name)
+        // Player 1 is on the left, Player 2 is on the right
+        const headerY = 120; // Approximate header Y position
+        const viewportWidth = window.innerWidth;
+        const playerId = card.matchedByPlayerId;
+        const targetX = playerId === 1
+          ? viewportWidth * 0.25 // Left side for Player 1
+          : viewportWidth * 0.75; // Right side for Player 2
+
+        // Calculate rotation angle based on direction from card to player name
+        const deltaX = targetX - cardCenterX;
+        const deltaY = headerY - cardCenterY;
+        const rotationAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+        // Final position: continue off screen above the player name
+        const finalY = -cardSize - 50; // Off screen above
+
+        const flyData: FlyData = {
+          startX: rect.left,
+          startY: rect.top,
+          endX: targetX - cardSize / 2,
+          endY: headerY - cardSize / 2,
+          finalY: finalY,
+          rotationAngle: rotationAngle,
+          playerId: playerId
+        };
+
+        console.log('[FLY DATA] Calculated fly data for card', {
+          cardId: card.id,
+          source: cardPositionCache.current.has(card.id) ? 'cache' : 'dom',
+          positions: {
+            start: { x: flyData.startX, y: flyData.startY },
+            end: { x: flyData.endX, y: flyData.endY }
+          },
+          rotationAngle: flyData.rotationAngle,
+          playerId: flyData.playerId
+        });
+
+        newFlyingCards.set(card.id, {
+          playerId: playerId,
+          flyData: flyData,
+          card: card
+        });
+      }
+
+      setFlyingCards(newFlyingCards);
+
+      // Set a timer to remove flying cards after animation completes (3 seconds)
+      const cardIdsToRemove = newlyMatched.map(c => c.id);
+      setTimeout(() => {
+        setFlyingCards(prev => {
+          const next = new Map(prev);
+          for (const cardId of cardIdsToRemove) {
+            next.delete(cardId);
+            cardPositionCache.current.delete(cardId);
+          }
+          console.log('[FLY DATA] Cleaning up fly data for cards that finished animation', { cardIds: cardIdsToRemove });
+          return next;
+        });
+      }, 3000);
+    }
+
+    // Update previous matched state
+    prevMatchedRef.current = currentMatched;
+  }, [cards, cardSize, flyingCards]);
+
+  // Clean up position cache for cards that are no longer relevant
   useEffect(() => {
-    const currentFlyingCardIds = new Set(cards.filter(c => c.isFlyingToPlayer).map(c => c.id));
-
-    for (const [cardId] of flyDataRef.current) {
-      if (!currentFlyingCardIds.has(cardId)) {
-        console.log('[FLY DATA] Cleaning up fly data for card that stopped flying', { cardId });
-        flyDataRef.current.delete(cardId);
+    for (const [cardId] of cardPositionCache.current) {
+      const card = cards.find(c => c.id === cardId);
+      const isFlying = flyingCards.has(cardId);
+      if (card && !card.isFlipped && !isFlying) {
         cardPositionCache.current.delete(cardId);
       }
     }
-  }, [cards]);
+  }, [cards, flyingCards]);
 
   return (
     <>
-      {/* Flying cards overlay */}
-      {cards.map((card, index) => {
-        const flyData = flyToPlayerData[index];
+      {/* Flying cards overlay - now uses local state */}
+      {Array.from(flyingCards.entries()).map(([cardId, flyingState]) => {
+        const { flyData, card } = flyingState;
 
-        // Log all cards being processed
-        if (card.isFlyingToPlayer) {
-          console.log('[RENDER] Card is marked as flying', {
-            cardId: card.id,
-            index,
-            hasFlyData: !!flyData,
-            flyData: flyData ? {
-              startX: flyData.startX,
-              startY: flyData.startY,
-              endX: flyData.endX,
-              endY: flyData.endY,
-              rotationAngle: flyData.rotationAngle
-            } : null
-          });
-        }
-
-        if (!card.isFlyingToPlayer || !flyData) {
-          if (card.isFlyingToPlayer && !flyData) {
-            console.warn('[RENDER] ⚠️ Card marked as flying but no fly data!', {
-              cardId: card.id,
-              index,
-              cardState: {
-                isFlyingToPlayer: card.isFlyingToPlayer,
-                flyingToPlayerId: card.flyingToPlayerId
-              }
-            });
-          }
-          return null;
-        }
-
-        console.log('[RENDER] ✓ Rendering flying card overlay', {
-          cardId: card.id,
+        console.log('[RENDER] Rendering flying card overlay', {
+          cardId: cardId,
           style: {
             left: `${flyData.startX}px`,
             top: `${flyData.startY}px`,
@@ -338,7 +342,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
 
         return (
           <div
-            key={`flying-${card.id}`}
+            key={`flying-${cardId}`}
             className="fixed z-50 card-fly-to-player"
             style={{
               left: `${flyData.startX}px`,
@@ -356,7 +360,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           >
             <Card
               card={card}
-              onClick={() => setLightboxCardId(card.id)}
+              onClick={() => setLightboxCardId(cardId)}
               size={cardSize}
               useWhiteBackground={useWhiteCardBackground}
               emojiSizePercentage={emojiSizePercentage}
@@ -395,14 +399,16 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
         )}
 
         {cards.map((card, index) => {
-          const shouldShowPlaceholder = card.isMatched || card.isFlyingToPlayer;
+          // Show placeholder for matched cards OR cards currently flying (local state)
+          const isFlying = flyingCards.has(card.id);
+          const shouldShowPlaceholder = card.isMatched || isFlying;
 
           if (shouldShowPlaceholder) {
             console.log('[RENDER] Showing placeholder for card', {
               cardId: card.id,
               index,
               isMatched: card.isMatched,
-              isFlyingToPlayer: card.isFlyingToPlayer,
+              isFlying: isFlying,
               reason: card.isMatched ? 'matched' : 'flying'
             });
           }
