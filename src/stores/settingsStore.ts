@@ -60,7 +60,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 	useWhiteCardBackground: false,
 	flipDuration: 1500,
 	emojiSizePercentage: 72,
-	ttsEnabled: true,
+	ttsEnabled: false,
 	backgroundBlurEnabled: true,
 	cardPack: "animals",
 	background: "default",

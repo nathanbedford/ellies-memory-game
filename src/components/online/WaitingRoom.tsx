@@ -11,6 +11,7 @@ import { CARD_PACKS } from '../../hooks/useCardPacks';
 import { BACKGROUND_OPTIONS } from '../../hooks/useBackgroundSelector';
 import { CARD_BACK_OPTIONS } from '../../hooks/useCardBackSelector';
 import { useOnlineStore } from '../../stores/onlineStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Modal } from '../Modal';
 import { ThemeSelectorModal } from '../ThemeSelectorModal';
 import { CardPackModal } from '../CardPackModal';
@@ -39,6 +40,8 @@ export const WaitingRoom = ({
 }: WaitingRoomProps) => {
   const [openModal, setOpenModal] = useState<OpenModal>('none');
   const { updateRoomConfig, getLastOnlinePreferences, presenceData } = useOnlineStore();
+  const setOnlinePairCount = useSettingsStore((state) => state.setOnlinePairCount);
+  const savedOnlinePairCount = useSettingsStore((state) => state.settings.onlinePairCount);
 
   const players = Object.entries(presenceData);
   const hasOpponent = players.length === 2;
@@ -81,6 +84,8 @@ export const WaitingRoom = ({
   const currentCardPack = room.config?.cardPack || initialSettings.cardPack;
   const currentBackground = room.config?.background || initialSettings.background;
   const currentCardBack = room.config?.cardBack || initialSettings.cardBack;
+  // Use room config pairCount, fallback to DEFAULT_PAIR_COUNT (not guest's local setting)
+  // This ensures both host and guest see the same value
   const currentPairCount = room.config?.pairCount ?? DEFAULT_PAIR_COUNT;
 
   // Load stored preferences into room config if host and no config exists
@@ -92,10 +97,11 @@ export const WaitingRoom = ({
           cardPack: storedPrefs.cardPack as CardPack,
           background: storedPrefs.background,
           cardBack: storedPrefs.cardBack,
+          pairCount: savedOnlinePairCount,
         }).catch(console.error);
       }
     }
-  }, [isHost, room.config, getLastOnlinePreferences, updateRoomConfig]);
+  }, [isHost, room.config, getLastOnlinePreferences, updateRoomConfig, savedOnlinePairCount]);
 
   // Find display info for current selections
   const cardPackInfo = CARD_PACKS.find(p => p.id === currentCardPack);
@@ -143,6 +149,8 @@ export const WaitingRoom = ({
   const handlePairCountChange = async (pairCount: number) => {
     if (!isHost) return;
     await updateRoomConfig({ pairCount });
+    // Persist to localStorage for future sessions
+    setOnlinePairCount(pairCount);
     // Close wizard - all settings configured
     setOpenModal('none');
   };

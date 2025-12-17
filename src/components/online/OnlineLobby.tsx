@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { UserPlus, LogIn } from 'lucide-react';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useOnlineStore, useSettingsStore } from '../../stores';
 import { ConnectionStatus } from './ConnectionStatus';
 import { RoomCodeDisplay } from './RoomCodeDisplay';
@@ -25,7 +26,16 @@ interface OnlineLobbyProps {
 }
 
 export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
-  const [view, setView] = useState<LobbyView>('choice');
+  const navigate = useNavigate();
+  const routerState = useRouterState();
+  const currentPath = routerState.location.pathname;
+  
+  // Derive view from current route
+  const view: LobbyView = currentPath === '/online/create' ? 'create' :
+                          currentPath === '/online/join' ? 'join' :
+                          currentPath === '/online/waiting' ? 'waiting' :
+                          'choice';
+  
   const [isLoading, setIsLoading] = useState(false);
   const hasStartedGame = useRef(false);
   const [playerNameInput, setPlayerNameInput] = useState('');
@@ -72,7 +82,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     try {
       // Get card images for the selected pack
       const cardPack = room.config?.cardPack || settings.cardPack;
-      const pairCount = room.config?.pairCount ?? DEFAULT_PAIR_COUNT;
+      const pairCount = room.config?.pairCount ?? settings.onlinePairCount ?? DEFAULT_PAIR_COUNT;
       
       // Get all images then randomly select subset based on pair count
       const allImages = getPackImages(cardPack);
@@ -136,11 +146,11 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
   // Move to waiting view when room is created/joined
   useEffect(() => {
-    if (roomCode && (view === 'create' || view === 'join')) {
-      setView('waiting');
+    if (roomCode && (view === 'create' || view === 'join') && currentPath !== '/online/waiting') {
+      navigate({ to: '/online/waiting' });
       setIsLoading(false);
     }
-  }, [roomCode, view]);
+  }, [roomCode, view, currentPath, navigate]);
 
   // Auto-transition to game when host starts (for guest players)
   // Game state is now in separate /games/{roomCode} document, so fetch it from adapter
@@ -176,6 +186,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
         cardPack: (storedPrefs.cardPack as CardPack) || settings.cardPack,
         background: storedPrefs.background || settings.background,
         cardBack: storedPrefs.cardBack || settings.cardBack,
+        pairCount: settings.onlinePairCount,
       });
     } catch {
       setIsLoading(false);
@@ -197,7 +208,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
   const handleLeaveRoom = async () => {
     await leaveRoom();
-    setView('choice');
+    navigate({ to: '/online' });
   };
 
   const handleBack = () => {
@@ -206,7 +217,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     } else if (view === 'choice') {
       onBack();
     } else {
-      setView('choice');
+      navigate({ to: '/online' });
       clearError();
     }
   };
@@ -270,7 +281,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
               <button
                 type="button"
                 onClick={() => {
-                  setView('create');
+                  navigate({ to: '/online/create' });
                   handleCreateRoom();
                 }}
                 disabled={isLoading}
@@ -289,7 +300,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
               <button
                 type="button"
-                onClick={() => setView('join')}
+                onClick={() => navigate({ to: '/online/join' })}
                 disabled={isLoading}
                 className="p-8 rounded-xl border-3 border-gray-200 bg-white hover:border-purple-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50"
               >

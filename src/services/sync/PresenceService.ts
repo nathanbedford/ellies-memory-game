@@ -165,14 +165,17 @@ export class PresenceService {
   ): () => void {
     const roomPresenceRef = ref(rtdb, `presence/${roomCode}`);
 
-    onValue(roomPresenceRef, (snapshot) => {
+    // Store the callback function so we can unsubscribe just THIS listener
+    const listenerCallback = (snapshot: import('firebase/database').DataSnapshot) => {
       const data = snapshot.val() as Record<string, PresenceDataInternal> | null;
       callback(data || {});
-    });
+    };
+    
+    onValue(roomPresenceRef, listenerCallback);
 
-    // Return unsubscribe function
+    // Return unsubscribe function that removes ONLY this specific listener
     return () => {
-      off(roomPresenceRef);
+      off(roomPresenceRef, 'value', listenerCallback);
     };
   }
 

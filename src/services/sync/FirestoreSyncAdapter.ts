@@ -116,6 +116,7 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 				cardPack: options.cardPack,
 				background: options.background,
 				cardBack: options.cardBack,
+				pairCount: options.pairCount,
 			},
 			playerSlots: {
 				[this.odahId]: 1, // Host is always slot 1
@@ -304,6 +305,18 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		}
 
 		await updateDoc(roomRef, updates);
+	}
+
+	async resetRoomToWaiting(roomCode: string): Promise<void> {
+		if (!this.isHost) {
+			throw new Error("Only host can reset room status");
+		}
+
+		const roomRef = doc(db, "rooms", roomCode);
+		await updateDoc(roomRef, {
+			status: "waiting",
+			lastActivity: serverTimestamp(),
+		});
 	}
 
 	async startGame(roomCode: string, initialState: GameState): Promise<void> {

@@ -94,6 +94,7 @@ interface OnlineStoreActions {
 		cardPack: CardPack;
 		background: string;
 		cardBack: string;
+		pairCount: number;
 	}) => Promise<string>;
 	joinRoom: (
 		roomCode: string,
@@ -109,6 +110,7 @@ interface OnlineStoreActions {
 		cardBack?: string;
 		pairCount?: number;
 	}) => Promise<void>;
+	resetRoomToWaiting: () => Promise<void>;
 
 	// Player actions
 	updatePlayerName: (name: string) => Promise<void>;
@@ -276,6 +278,7 @@ export const useOnlineStore = create<OnlineStore>()(
 					cardPack: options.cardPack,
 					background: options.background,
 					cardBack: options.cardBack,
+					pairCount: options.pairCount,
 				});
 
 				// Save preferences after creating room
@@ -405,6 +408,28 @@ export const useOnlineStore = create<OnlineStore>()(
 						error instanceof Error
 							? error.message
 							: "Failed to update room config",
+				});
+				throw error;
+			}
+		},
+
+		resetRoomToWaiting: async () => {
+			const { roomCode, isHost } = get();
+			if (!roomCode || !isHost) {
+				throw new Error("Only host can reset room status");
+			}
+
+			set({ error: null });
+
+			try {
+				const adapter = getFirestoreSyncAdapter();
+				await adapter.resetRoomToWaiting(roomCode);
+			} catch (error) {
+				set({
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to reset room status",
 				});
 				throw error;
 			}

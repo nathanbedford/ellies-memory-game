@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Player } from '../types';
 
 const ENABLE_SETUP_DEBUG_LOGS = true;
@@ -31,6 +31,20 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
     1: player1?.color || '#3b82f6',
     2: player2?.color || '#10b981'
   });
+
+  // Sync local state with players prop when it changes (e.g., after Zustand hydration)
+  useEffect(() => {
+    const p1 = players.find(p => p.id === 1);
+    const p2 = players.find(p => p.id === 2);
+    setTempNames({
+      1: p1?.name || 'Player 1',
+      2: p2?.name || 'Player 2'
+    });
+    setTempColors({
+      1: p1?.color || '#3b82f6',
+      2: p2?.color || '#10b981'
+    });
+  }, [players]);
 
   // Predefined color options
   const colorOptions = [

@@ -16,6 +16,7 @@ export interface CreateRoomOptions {
 	cardPack: CardPack;
 	background: string;
 	cardBack: string;
+	pairCount: number;
 }
 
 export interface JoinRoomOptions {

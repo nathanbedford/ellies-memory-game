@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useLocalGame } from './hooks/useLocalGame';
 import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme, BACKGROUND_OPTIONS } from './hooks/useBackgroundSelector';
@@ -35,6 +36,7 @@ import { PairCountModal } from './components/PairCountModal';
 import { useSettingsStore } from './stores/settingsStore';
 import screenfull from 'screenfull';
 
+// SetupStep type is now derived from route paths
 type SetupStep = 'modeSelect' | 'theme' | 'cardPack' | 'background' | 'cardBack' | 'pairCount' | 'startGame' | null;
 
 const ENABLE_SETUP_DEBUG_LOGS = true;
@@ -44,10 +46,7 @@ const setupWizardLog = (...args: unknown[]) => {
   console.log('[Setup Wizard]', ...args);
 };
 
-const setupWizardWarn = (...args: unknown[]) => {
-  if (!ENABLE_SETUP_DEBUG_LOGS) return;
-  console.warn('[Setup Wizard]', ...args);
-};
+// Removed setupWizardWarn - no longer needed with router navigation
 
 // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
 const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
@@ -55,6 +54,10 @@ const COMBO_SEQUENCE = ['p', 'p', 'o', 'n', 'g'];
 const TEST_COMBO_SEQUENCE = ['1', '2', '2', '5', '1', '2', '2', '5'];
 
 function App() {
+  const navigate = useNavigate();
+  const routerState = useRouterState();
+  const currentPath = routerState.location.pathname;
+
   const { selectedPack, setSelectedPack, getCurrentPackImages, getPackImagesForPairCount, cardPacks } = useCardPacks();
 
   // Get pair count settings from settings store
@@ -72,7 +75,22 @@ function App() {
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [setupStep, setSetupStep] = useState<SetupStep>(null);
+
+  // Derive setupStep from current route
+  const setupStep: SetupStep = useMemo(() => {
+    if (currentPath === '/') return 'modeSelect';
+    if (currentPath === '/local/theme') return 'theme';
+    if (currentPath === '/local/card-pack') return 'cardPack';
+    if (currentPath === '/local/background') return 'background';
+    if (currentPath === '/local/card-back') return 'cardBack';
+    if (currentPath === '/local/pair-count') return 'pairCount';
+    if (currentPath === '/local/start') return 'startGame';
+    if (currentPath === '/local/game') return null;
+    if (currentPath === '/online') return 'modeSelect';
+    if (currentPath === '/online/game') return null;
+    if (currentPath === '/game-over') return null;
+    return null;
+  }, [currentPath]);
   const [isResetting, setIsResetting] = useState(false);
   const [cameFromTheme, setCameFromTheme] = useState(false); // Track if we came from theme selection
   const [originalPack, setOriginalPack] = useState<string | null>(null);
@@ -105,9 +123,48 @@ function App() {
   const [showMobileWarning, setShowMobileWarning] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [showPWAInstall, setShowPWAInstall] = useState(false);
+  const refreshCheckDoneRef = useRef(false);
+  const isRefreshRedirectingRef = useRef(false);
+
+  // Clear navigation flag on page unload (before refresh)
+  // This ensures refresh detection works correctly
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      sessionStorage.removeItem('appNavigation');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // Refresh detection: Redirect to home on page refresh
+  // This ensures the app always starts fresh after a refresh, regardless of the URL
+  // Using useLayoutEffect to run synchronously before other useEffect hooks (like route guards)
+  // that might set the appNavigation flag
+  useLayoutEffect(() => {
+    // Only check once on initial mount
+    if (refreshCheckDoneRef.current) return;
+    refreshCheckDoneRef.current = true;
+
+    // Check if this is a page refresh (not programmatic navigation)
+    const isAppNavigation = sessionStorage.getItem('appNavigation');
+
+    // If we're on a route other than '/' and there's no navigation flag,
+    // it means the user refreshed the page - redirect to home
+    if (currentPath !== '/' && !isAppNavigation) {
+      console.log('[REFRESH] Page refreshed on route:', currentPath, '- redirecting to home');
+      isRefreshRedirectingRef.current = true;
+      navigate({ to: '/' });
+      return;
+    }
+
+    // Note: The flag is cleared on page unload, so refresh will always redirect
+  }, [currentPath, navigate]); // Include dependencies but use ref to ensure single execution
 
   // Online multiplayer state
-  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, setPlayerNamePreference, presenceData, updatePlayerName: updateOnlinePlayerName } = useOnlineStore();
+  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, resetRoomToWaiting, setPlayerNamePreference, presenceData, updatePlayerName: updateOnlinePlayerName } = useOnlineStore();
   // Get local player slot from presence data
   const localPlayerSlot = odahId && presenceData[odahId] ? presenceData[odahId].slot : null;
 
@@ -220,6 +277,73 @@ function App() {
     }
     return { winner: null, isTie: false };
   }, [gameState.gameStatus, gameState.cards, players]);
+
+  // Navigate to game-over route when game finishes
+  useEffect(() => {
+    if (gameState.gameStatus === 'finished' && currentPath !== '/game-over') {
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/game-over' });
+    }
+  }, [gameState.gameStatus, currentPath, navigate]);
+
+  // Navigate to game route when game starts playing (handles guest receiving replay from host)
+  useEffect(() => {
+    if (isOnlineMode && gameState.gameStatus === 'playing' && gameState.cards.length > 0 && currentPath === '/game-over') {
+      console.log('[GAME STATUS] Game is playing while on game-over route - navigating to game');
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/online/game' });
+    }
+  }, [isOnlineMode, gameState.gameStatus, gameState.cards.length, currentPath, navigate]);
+
+  // Set game mode based on current route
+  useEffect(() => {
+    if (currentPath.startsWith('/local')) {
+      setGameMode('local');
+    } else if (currentPath.startsWith('/online')) {
+      setGameMode('online');
+    } else if (currentPath === '/') {
+      // Don't reset gameMode on home - let user choose
+    }
+  }, [currentPath]);
+
+  // Route guards: Redirect if trying to access game routes without setup
+  // Skip if a refresh redirect is already in progress
+  useEffect(() => {
+    if (isRefreshRedirectingRef.current) return;
+
+    if (currentPath === '/local/game' && gameState.cards.length === 0 && gameState.gameStatus !== 'playing') {
+      // No cards and not playing - redirect to theme selection
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/local/theme' });
+    }
+    if (currentPath === '/online/game' && !roomCode) {
+      // No room code - redirect to online lobby
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/online' });
+    }
+
+    // Online route guards
+    if (currentPath === '/online/waiting' && !roomCode) {
+      // On waiting room but no room code - redirect to choice
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/online' });
+    }
+    if ((currentPath === '/online/create' || currentPath === '/online/join') && roomCode) {
+      // Room already created/joined - redirect to waiting room
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/online/waiting' });
+    }
+  }, [currentPath, gameState.cards.length, gameState.gameStatus, roomCode, navigate]);
+
+  // Navigate to waiting room when room status changes to 'waiting' during online game
+  // This handles the case where host clicks "New Game" - guest is taken back to waiting room
+  useEffect(() => {
+    if (currentPath === '/online/game' && room?.status === 'waiting') {
+      console.log('[ROOM STATUS] Room status is waiting while on game route - navigating to waiting room');
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/online/waiting' });
+    }
+  }, [currentPath, room?.status, navigate]);
 
   // Get opponent's odahId for cursor sync
   const opponentOdahId = useMemo(() => {
@@ -379,65 +503,49 @@ function App() {
   const gameBoardContainerRef = useRef<HTMLDivElement>(null);
   const layoutMeasureRafRef = useRef<number | null>(null);
 
-  // Track if we're in a back navigation to allow intentional backward steps
-  const isBackNavigationRef = useRef(false);
+  // Helper function to navigate to setup steps
+  const navigateToStep = useCallback((step: SetupStep, reason: string) => {
+    setupWizardLog('Navigating to step', { to: step, reason });
 
-  // Guarded setSetupStep that prevents unintended backward navigation
-  const guardedSetSetupStep = useCallback((newStep: SetupStep, reason: string) => {
-    const stepOrder: SetupStep[] = ['modeSelect', 'theme', 'cardPack', 'background', 'cardBack', 'pairCount', 'startGame'];
-    const diagnosticBase = {
-      from: setupStep,
-      to: newStep,
-      reason,
-      isBackNavigation: isBackNavigationRef.current,
+    // Set navigation flag to indicate this is programmatic navigation, not a refresh
+    sessionStorage.setItem('appNavigation', 'true');
+
+    if (step === null) {
+      // Handle closing wizard - navigate based on game state
+      if (gameState.gameStatus === 'playing') {
+        // If closing wizard and game is playing, navigate to game route
+        navigate({ to: gameMode === 'online' ? '/online/game' : '/local/game' });
+      } else if (gameState.gameStatus === 'finished') {
+        // If closing wizard and game is finished, navigate to game over
+        navigate({ to: '/game-over' });
+      } else {
+        // Default: go to home
+        navigate({ to: '/' });
+        // Clear flag when navigating to home
+        sessionStorage.removeItem('appNavigation');
+      }
+      return;
+    }
+
+    const routeMap: Record<Exclude<SetupStep, null>, string> = {
+      modeSelect: '/',
+      theme: '/local/theme',
+      cardPack: '/local/card-pack',
+      background: '/local/background',
+      cardBack: '/local/card-back',
+      pairCount: '/local/pair-count',
+      startGame: '/local/start',
     };
 
-    if (newStep === null) {
-      setupWizardLog('Closing wizard', diagnosticBase);
-      setSetupStep(null);
-      sessionStorage.removeItem('setupStep');
-      return;
+    const targetRoute = routeMap[step];
+    if (targetRoute) {
+      if (targetRoute === '/') {
+        // Clear flag when navigating to home
+        sessionStorage.removeItem('appNavigation');
+      }
+      navigate({ to: targetRoute as '/' | '/local/theme' | '/local/card-pack' | '/local/background' | '/local/card-back' | '/local/pair-count' | '/local/start' });
     }
-
-    if (setupStep === null) {
-      setupWizardLog('Opening wizard', diagnosticBase);
-      setSetupStep(newStep);
-      sessionStorage.setItem('setupStep', newStep);
-      return;
-    }
-
-    const currentIndex = stepOrder.indexOf(setupStep);
-    const newIndex = stepOrder.indexOf(newStep);
-    const diagnostic = {
-      ...diagnosticBase,
-      currentIndex,
-      newIndex,
-      stepOrder,
-    };
-
-    setupWizardLog('Step change requested', diagnostic);
-
-    if (isBackNavigationRef.current) {
-      setupWizardLog('Allowing backward navigation (explicit back trigger)', diagnostic);
-      isBackNavigationRef.current = false;
-      setSetupStep(newStep);
-      sessionStorage.setItem('setupStep', newStep);
-      return;
-    }
-
-    if (newIndex >= currentIndex) {
-      setupWizardLog('Allowing forward navigation', diagnostic);
-      setSetupStep(newStep);
-      sessionStorage.setItem('setupStep', newStep);
-      return;
-    }
-
-    const error = new Error('guardedSetSetupStep blocked navigation');
-    setupWizardWarn('BLOCKED unintended backward navigation', {
-      ...diagnostic,
-      stack: error.stack,
-    });
-  }, [setupStep]);
+  }, [navigate, gameState.gameStatus, gameMode]);
 
   // Clear game state on page refresh - restart from scratch
   // But keep player preferences (names, colors, firstPlayer) and deck options
@@ -722,8 +830,11 @@ function App() {
       initializeGame(images, true);
       startGameWithFirstPlayer(lastConfig.firstPlayer);
       setIsReplaying(false);
+      // Navigate to game route for local mode replay
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/local/game' });
     }
-  }, [selectedPack, isReplaying, lastConfig, getPackImagesForPairCount, initializeGame, startGameWithFirstPlayer]);
+  }, [selectedPack, isReplaying, lastConfig, getPackImagesForPairCount, initializeGame, startGameWithFirstPlayer, navigate]);
 
   // Welcome screen shows when no cards exist and setupStep is null
   // User must click "Start Game" to begin setup flow
@@ -830,29 +941,29 @@ function App() {
     setSelectedCardBack(theme.cardBack as CardBackType);
     setCameFromTheme(true); // Mark that we came from theme selection
     // Go to pair count selection before start game
-    guardedSetSetupStep('pairCount', 'theme selected');
+    navigateToStep('pairCount', 'theme selected');
   };
 
   const handleBuildCustom = () => {
     setCameFromTheme(false); // Mark that we're building custom
     // Continue to card pack selection
-    guardedSetSetupStep('cardPack', 'build custom selected');
+    navigateToStep('cardPack', 'build custom selected');
   };
 
   const handlePackChange = (newPack: string) => {
     setSelectedPack(newPack as CardPack);
-    guardedSetSetupStep('background', 'pack selected');
+    navigateToStep('background', 'pack selected');
   };
 
   const handleBackgroundChange = (newBackground: BackgroundTheme) => {
     setSelectedBackground(newBackground);
-    guardedSetSetupStep('cardBack', 'background selected');
+    navigateToStep('cardBack', 'background selected');
   };
 
   const handleCardBackChange = (newCardBack: CardBackType) => {
     setSelectedCardBack(newCardBack);
     setCameFromTheme(false); // Mark that we came from custom build flow
-    guardedSetSetupStep('pairCount', 'card back selected');
+    navigateToStep('pairCount', 'card back selected');
   };
 
   const handlePairCountChange = (count: number) => {
@@ -862,15 +973,14 @@ function App() {
     } else {
       setLocalPairCount(count);
     }
-    guardedSetSetupStep('startGame', 'pair count selected');
+    navigateToStep('startGame', 'pair count selected');
   };
 
   const handlePairCountModalBack = () => {
-    isBackNavigationRef.current = true;
     if (cameFromTheme) {
-      guardedSetSetupStep('theme', 'back button from pair count modal (from theme)');
+      navigateToStep('theme', 'back button from pair count modal (from theme)');
     } else {
-      guardedSetSetupStep('cardBack', 'back button from pair count modal (from custom)');
+      navigateToStep('cardBack', 'back button from pair count modal (from custom)');
     }
   };
 
@@ -922,6 +1032,9 @@ function App() {
         firstPlayer: normalizedConfig.firstPlayer,
         pairCount: normalizedConfig.pairCount,
       });
+      // Navigate to game route for online mode replay
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/online/game' });
       return;
     }
 
@@ -933,10 +1046,32 @@ function App() {
     setSelectedCardBack(lastConfig.cardBack);
     setShowResetConfirmation(false);
     setIsReplaying(true);
-  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig, setSelectedPack, setSelectedBackground, setSelectedCardBack, gameState.cards.length, onlineGame.gameState?.currentPlayer]);
+  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig, setSelectedPack, setSelectedBackground, setSelectedCardBack, gameState.cards.length, onlineGame.gameState?.currentPlayer, navigate]);
 
-  const handleNewGame = () => {
-    // Start new game setup flow using the current game configuration as the baseline
+  const handleNewGame = async () => {
+    // Close reset confirmation modal
+    setShowResetConfirmation(false);
+
+    // Reset game state
+    resetGame();
+
+    // Handle online mode differently - navigate to waiting room where host can change settings
+    if (isOnlineMode) {
+      // Reset room status to 'waiting' so the waiting room shows configuration UI
+      // instead of auto-transitioning back to game
+      if (isHost) {
+        try {
+          await resetRoomToWaiting();
+        } catch (error) {
+          console.error('Failed to reset room status:', error);
+        }
+      }
+      sessionStorage.setItem('appNavigation', 'true');
+      navigate({ to: '/online/waiting' });
+      return;
+    }
+
+    // Local mode: Start new game setup flow using the current game configuration as the baseline
     const activeConfig = getActiveConfig();
 
     setOriginalPack(activeConfig.pack);
@@ -955,9 +1090,7 @@ function App() {
 
     setIsResetting(true);
     setCameFromTheme(false); // Reset theme tracking
-    resetGame();
-    guardedSetSetupStep('theme', 'new game clicked');
-    setShowResetConfirmation(false);
+    navigateToStep('theme', 'new game clicked');
   };
 
   const handleBackToModeSelect = useCallback(async () => {
@@ -977,8 +1110,8 @@ function App() {
     resetGame();
     setGameMode(null);
     setIsResetting(false);
-    guardedSetSetupStep('modeSelect', 'back to mode select');
-  }, [gameMode, leaveRoom, resetGame, guardedSetSetupStep]);
+    navigateToStep('modeSelect', 'back to mode select');
+  }, [gameMode, leaveRoom, resetGame, navigateToStep]);
 
   const cancelSetupFlow = () => {
     // Restore original state if resetting
@@ -995,7 +1128,7 @@ function App() {
       setIsResetting(false);
     }
     setCameFromTheme(false); // Reset theme tracking
-    guardedSetSetupStep(null, 'cancel setup flow');
+    navigateToStep(null, 'cancel setup flow');
   };
 
   // Handler for leaving an online game (e.g., when opponent disconnects)
@@ -1009,25 +1142,22 @@ function App() {
     // Reset local game state
     resetGame();
     setGameMode(null);
-    guardedSetSetupStep('modeSelect', 'left online game after disconnect');
-  }, [leaveRoom, resetGame, guardedSetSetupStep]);
+    navigateToStep('modeSelect', 'left online game after disconnect');
+  }, [leaveRoom, resetGame, navigateToStep]);
 
   const handleStartModalBack = () => {
     // Go back to pair count selection (always, since it's the step before startGame)
-    isBackNavigationRef.current = true;
-    guardedSetSetupStep('pairCount', 'back button from start modal');
+    navigateToStep('pairCount', 'back button from start modal');
   };
 
   const handleCardBackModalBack = () => {
     // Go back to background selection (intentional backward navigation)
-    isBackNavigationRef.current = true;
-    guardedSetSetupStep('background', 'back button from card back modal');
+    navigateToStep('background', 'back button from card back modal');
   };
 
   const handleBackgroundModalBack = () => {
     // Go back to card pack selection (intentional backward navigation)
-    isBackNavigationRef.current = true;
-    guardedSetSetupStep('cardPack', 'back button from background modal');
+    navigateToStep('cardPack', 'back button from background modal');
   };
 
   const handleStartGame = (firstPlayer: number) => {
@@ -1050,7 +1180,7 @@ function App() {
         pairCount: activePairCount,
       });
 
-      guardedSetSetupStep(null, 'game started');
+      navigateToStep(null, 'game started');
       setIsResetting(false);
       setLastConfig({
         pack: selectedPack,
@@ -1066,7 +1196,9 @@ function App() {
     const images = getPackImagesForPairCount(activePairCount);
     initializeGame(images, true); // true = start playing with animation
     startGameWithFirstPlayer(firstPlayer);
-    guardedSetSetupStep(null, 'game started');
+    // Explicitly navigate to game route for local mode
+    sessionStorage.setItem('appNavigation', 'true');
+    navigate({ to: '/local/game' });
     setIsResetting(false);
 
     if (autoSizeEnabled) {
@@ -1441,16 +1573,19 @@ function App() {
 
           <main>
             {/* Mode Selection Screen (merged with Welcome) */}
-            {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode !== 'online' && (
+            {(currentPath === '/' || (setupStep === 'modeSelect' && gameMode !== 'online')) && (
               <div className="fixed inset-0 flex items-center justify-center z-0">
                 <div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
                   <ModeSelector
                     onSelectMode={(mode: GameMode) => {
                       setGameMode(mode);
                       if (mode === 'local') {
-                        guardedSetSetupStep('theme', 'local mode selected');
+                        navigateToStep('theme', 'local mode selected');
+                      } else if (mode === 'online') {
+                        sessionStorage.setItem('appNavigation', 'true');
+                        navigate({ to: '/online' });
                       }
-                      // For online mode, stay on modeSelect but render OnlineLobby
+                      // For online mode, navigate to online route
                     }}
                   />
                 </div>
@@ -1458,22 +1593,25 @@ function App() {
             )}
 
             {/* Online Lobby */}
-            {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode === 'online' && (
+            {(currentPath === '/online' || currentPath === '/online/create' || currentPath === '/online/join' || currentPath === '/online/waiting') && (
               <div className="flex flex-col items-center min-h-[60vh] overflow-y-auto max-h-[calc(100vh-4rem)] py-4">
                 <OnlineLobby
                   onBack={() => {
                     setGameMode(null);
+                    sessionStorage.removeItem('appNavigation');
+                    navigate({ to: '/' });
                   }}
                   onGameStart={(onlineGameState) => {
                     // Set the game state from online lobby
                     setFullGameState(onlineGameState);
-                    guardedSetSetupStep(null, 'online game started');
+                    sessionStorage.setItem('appNavigation', 'true');
+                    navigate({ to: '/online/game' });
                   }}
                 />
               </div>
             )}
 
-            {gameState.gameStatus === 'playing' && setupStep === null && (!isOnlineMode || room?.status === 'playing') && (
+            {gameState.gameStatus === 'playing' && (currentPath === '/local/game' || currentPath === '/online/game') && (!isOnlineMode || room?.status === 'playing') && (
               <div ref={boardWrapperRef} className="flex flex-col gap-6 items-center w-full max-w-full">
                 {/* Compact Header - Players Points and Current Player */}
                 <div ref={scoreboardRef} className="w-full max-w-2xl mx-auto">
@@ -1651,7 +1789,7 @@ function App() {
             />
           )}
 
-          {gameState.gameStatus === 'finished' && setupStep === null && (winner !== null || isTie === true) && (
+          {gameState.gameStatus === 'finished' && currentPath === '/game-over' && (winner !== null || isTie === true) && (
             <GameOver
               winner={winner}
               players={players}
@@ -1662,7 +1800,7 @@ function App() {
               onViewBackground={() => setShowBackgroundViewer(true)}
               onClose={() => {
                 resetGame();
-                guardedSetSetupStep(null, 'game over close');
+                navigateToStep(null, 'game over close');
               }}
               isOnlineMode={Boolean(isOnlineMode)}
               isHost={isHost}
@@ -1720,7 +1858,7 @@ function App() {
 
           {/* Game Start Modal */}
           <Modal
-            isOpen={setupStep === 'startGame'}
+            isOpen={setupStep === 'startGame' && currentPath === '/local/start'}
             onClose={cancelSetupFlow}
             onBack={handleStartModalBack}
             title={cameFromTheme ? "Step 3: Who Goes First?" : (isResetting ? "Step 5: Who Goes First?" : "Step 6: Who Goes First?")}
@@ -1738,11 +1876,10 @@ function App() {
 
           {/* Theme Selector Modal */}
           <Modal
-            isOpen={setupStep === 'theme'}
+            isOpen={setupStep === 'theme' && currentPath === '/local/theme'}
             onClose={cancelSetupFlow}
             onBack={() => {
-              isBackNavigationRef.current = true;
-              guardedSetSetupStep('modeSelect', 'back button from theme modal');
+              navigateToStep('modeSelect', 'back button from theme modal');
             }}
             title={isResetting ? "Step 1: Choose Your Theme" : "Step 1: Choose Your Theme"}
           >
@@ -1755,7 +1892,7 @@ function App() {
 
           {/* Card Pack Modal */}
           <Modal
-            isOpen={setupStep === 'cardPack'}
+            isOpen={setupStep === 'cardPack' && currentPath === '/local/card-pack'}
             onClose={cancelSetupFlow}
             title={isResetting ? "Step 1: Choose Your Card Pack" : "Step 2: Choose Your Card Pack"}
           >
@@ -1769,7 +1906,7 @@ function App() {
 
           {/* Background Modal */}
           <Modal
-            isOpen={setupStep === 'background'}
+            isOpen={setupStep === 'background' && currentPath === '/local/background'}
             onClose={cancelSetupFlow}
             onBack={handleBackgroundModalBack}
             title={isResetting ? "Step 2: Choose Your Background" : "Step 3: Choose Your Background"}
@@ -1785,7 +1922,7 @@ function App() {
 
           {/* Card Back Modal */}
           <Modal
-            isOpen={setupStep === 'cardBack'}
+            isOpen={setupStep === 'cardBack' && currentPath === '/local/card-back'}
             onClose={cancelSetupFlow}
             onBack={handleCardBackModalBack}
             title={isResetting ? "Step 3: Choose Your Card Back" : "Step 4: Choose Your Card Back"}
@@ -1801,7 +1938,7 @@ function App() {
 
           {/* Pair Count Modal */}
           <Modal
-            isOpen={setupStep === 'pairCount'}
+            isOpen={setupStep === 'pairCount' && currentPath === '/local/pair-count'}
             onClose={cancelSetupFlow}
             onBack={handlePairCountModalBack}
             title={cameFromTheme ? "Step 2: How Many Pairs?" : (isResetting ? "Step 4: How Many Pairs?" : "Step 5: How Many Pairs?")}
