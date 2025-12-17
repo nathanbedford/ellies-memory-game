@@ -504,6 +504,126 @@ function App() {
   const gameBoardContainerRef = useRef<HTMLDivElement>(null);
   const layoutMeasureRafRef = useRef<number | null>(null);
 
+  // Long-press detection for background viewer during gameplay
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const LONG_PRESS_DURATION = 1000;
+  const LONG_PRESS_MOVE_THRESHOLD = 10; // pixels - cancel if moved more than this
+
+  const handleBackgroundLongPressStart = useCallback((clientX: number, clientY: number) => {
+    // Only enable during gameplay
+    if (gameState.gameStatus !== 'playing') return;
+
+    // Clear any existing timer
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    // Store starting position to detect movement
+    longPressStartPosRef.current = { x: clientX, y: clientY };
+
+    // Start the long press timer
+    longPressTimerRef.current = window.setTimeout(() => {
+      setShowBackgroundViewer(true);
+      longPressTimerRef.current = null;
+      longPressStartPosRef.current = null;
+    }, LONG_PRESS_DURATION);
+  }, [gameState.gameStatus]);
+
+  const handleBackgroundLongPressEnd = useCallback(() => {
+    // Cancel the long press timer
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartPosRef.current = null;
+  }, []);
+
+  const handleBackgroundLongPressMove = useCallback((clientX: number, clientY: number) => {
+    // If no long press in progress, ignore
+    if (!longPressStartPosRef.current || !longPressTimerRef.current) return;
+
+    // Calculate movement distance
+    const dx = clientX - longPressStartPosRef.current.x;
+    const dy = clientY - longPressStartPosRef.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Cancel if moved too much
+    if (distance > LONG_PRESS_MOVE_THRESHOLD) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+      longPressStartPosRef.current = null;
+    }
+  }, []);
+
+  // Clean up long press timer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Document-level event listeners for long-press background viewer
+  // Only active during gameplay, ignores clicks on interactive elements
+  useEffect(() => {
+    if (gameState.gameStatus !== 'playing') return;
+
+    const isInteractiveElement = (target: EventTarget | null): boolean => {
+      if (!target || !(target instanceof HTMLElement)) return false;
+      // Check if target or any ancestor is an interactive element
+      const interactiveSelectors = 'button, a, input, textarea, [role="button"], [data-card], .card-container';
+      return target.closest(interactiveSelectors) !== null;
+    };
+
+    const handleDocumentMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return; // Only left click
+      if (isInteractiveElement(e.target)) return; // Ignore interactive elements
+      handleBackgroundLongPressStart(e.clientX, e.clientY);
+    };
+
+    const handleDocumentMouseUp = () => {
+      handleBackgroundLongPressEnd();
+    };
+
+    const handleDocumentMouseMove = (e: MouseEvent) => {
+      handleBackgroundLongPressMove(e.clientX, e.clientY);
+    };
+
+    const handleDocumentTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      if (isInteractiveElement(e.target)) return; // Ignore interactive elements
+      handleBackgroundLongPressStart(e.touches[0].clientX, e.touches[0].clientY);
+    };
+
+    const handleDocumentTouchEnd = () => {
+      handleBackgroundLongPressEnd();
+    };
+
+    const handleDocumentTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        handleBackgroundLongPressMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    document.addEventListener('mouseup', handleDocumentMouseUp);
+    document.addEventListener('mousemove', handleDocumentMouseMove);
+    document.addEventListener('touchstart', handleDocumentTouchStart);
+    document.addEventListener('touchend', handleDocumentTouchEnd);
+    document.addEventListener('touchmove', handleDocumentTouchMove);
+
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+      document.removeEventListener('mousemove', handleDocumentMouseMove);
+      document.removeEventListener('touchstart', handleDocumentTouchStart);
+      document.removeEventListener('touchend', handleDocumentTouchEnd);
+      document.removeEventListener('touchmove', handleDocumentTouchMove);
+    };
+  }, [gameState.gameStatus, handleBackgroundLongPressStart, handleBackgroundLongPressEnd, handleBackgroundLongPressMove]);
+
   // Helper function to navigate to setup steps
   const navigateToStep = useCallback((step: SetupStep, reason: string) => {
     setupWizardLog('Navigating to step', { to: step, reason });
