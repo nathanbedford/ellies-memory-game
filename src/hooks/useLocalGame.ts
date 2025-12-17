@@ -53,6 +53,8 @@ export interface UseLocalGameReturn {
 	endTurn: () => void;
 	resetGame: () => void;
 	setFullGameState: (state: GameState) => void;
+	/** Trigger game finish after final match animation completes */
+	triggerGameFinish: () => void;
 
 	// Settings actions
 	updatePlayerName: (playerId: number, name: string) => void;
@@ -567,6 +569,7 @@ export function useLocalGame(): UseLocalGameReturn {
 		endTurn: controller.endTurn,
 		resetGame: controller.resetGame,
 		setFullGameState: controller.setFullGameState,
+		triggerGameFinish: controller.triggerGameFinish,
 
 		// Settings actions
 		updatePlayerName,

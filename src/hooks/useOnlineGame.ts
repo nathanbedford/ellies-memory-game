@@ -87,5 +87,6 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		isAuthoritative: controller.isAuthoritative,
 		toggleAllCardsFlipped: controller.toggleAllCardsFlipped,
 		endGameEarly: controller.endGameEarly,
+		triggerGameFinish: controller.triggerGameFinish,
 	};
 }

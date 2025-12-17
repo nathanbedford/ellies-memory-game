@@ -26,6 +26,8 @@ interface GameBoardProps {
   onCursorMove?: (event: React.MouseEvent<HTMLDivElement>, boardRect: DOMRect) => void;
   onCursorLeave?: () => void;
   remoteCursor?: RemoteCursorData | null;
+  // Callback when the final match animation completes (all cards matched and animations done)
+  onLastMatchAnimationComplete?: () => void;
 }
 
 interface CardAnimationData {
@@ -60,7 +62,7 @@ interface FlyingCardState {
   card: CardType;
 }
 
-export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack, columns: columnsProp, onCursorMove, onCursorLeave, remoteCursor }: GameBoardProps) => {
+export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = false, useWhiteCardBackground = false, emojiSizePercentage = 72, cardBack, columns: columnsProp, onCursorMove, onCursorLeave, remoteCursor, onLastMatchAnimationComplete }: GameBoardProps) => {
   const [lightboxCardId, setLightboxCardId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -98,6 +100,36 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       onCursorLeave();
     }
   }, [onCursorLeave]);
+
+  // Handle flying card animation end - remove from state and check if game should finish
+  const handleFlyingCardAnimationEnd = useCallback((cardId: string) => {
+    console.log('[ANIMATION END] Flying card animation completed', { cardId });
+    
+    setFlyingCards(prev => {
+      const next = new Map(prev);
+      next.delete(cardId);
+      cardPositionCache.current.delete(cardId);
+      
+      // Check if all cards are matched and this was the last flying card
+      const allCardsMatched = cards.every(c => c.isMatched);
+      const noMoreFlyingCards = next.size === 0;
+      
+      console.log('[ANIMATION END] Checking game completion', {
+        cardId,
+        allCardsMatched,
+        remainingFlyingCards: next.size,
+        noMoreFlyingCards
+      });
+      
+      if (allCardsMatched && noMoreFlyingCards && onLastMatchAnimationComplete) {
+        console.log('[ANIMATION END] All animations complete, triggering game finish callback');
+        // Use setTimeout(0) to ensure state update completes before callback
+        setTimeout(() => onLastMatchAnimationComplete(), 0);
+      }
+      
+      return next;
+    });
+  }, [cards, onLastMatchAnimationComplete]);
 
   // Monitor card state changes for debugging
   useEffect(() => {
@@ -266,7 +298,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           startX: rect.left,
           startY: rect.top,
           endX: targetX - cardSize / 2,
-          endY: headerY - cardSize * 0.8,  // 30% higher than before
+          endY: headerY - cardSize * 1.0,  // Higher up to be more out of the way
           finalY: finalY,
           rotationAngle: rotationAngle,
           playerId: playerId
@@ -291,20 +323,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
       }
 
       setFlyingCards(newFlyingCards);
-
-      // Set a timer to remove flying cards after animation completes (3 seconds)
-      const cardIdsToRemove = newlyMatched.map(c => c.id);
-      setTimeout(() => {
-        setFlyingCards(prev => {
-          const next = new Map(prev);
-          for (const cardId of cardIdsToRemove) {
-            next.delete(cardId);
-            cardPositionCache.current.delete(cardId);
-          }
-          console.log('[FLY DATA] Cleaning up fly data for cards that finished animation', { cardIds: cardIdsToRemove });
-          return next;
-        });
-      }, 3000);
+      // Note: Flying cards are now cleaned up via onAnimationEnd handler instead of setTimeout
     }
 
     // Update previous matched state
@@ -344,6 +363,7 @@ export const GameBoard = ({ cards, onCardClick, cardSize = 100, isAnimating = fa
           <div
             key={`flying-${cardId}`}
             className="fixed z-50 card-fly-to-player"
+            onAnimationEnd={() => handleFlyingCardAnimationEnd(cardId)}
             style={{
               left: `${flyData.startX}px`,
               top: `${flyData.startY}px`,

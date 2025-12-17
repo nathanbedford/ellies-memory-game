@@ -19,7 +19,8 @@ import {
 	checkMatch,
 	applyMatch,
 	applyNoMatchWithReset,
-	checkAndFinishGame,
+	isGameOver,
+	finishGame,
 	endTurn as engineEndTurn,
 	getPlayerById,
 	calculateWinner,
@@ -92,6 +93,8 @@ export interface GameControllerReturn {
 	) => void;
 	startGame: () => void;
 	startGameWithFirstPlayer: (firstPlayer: number) => void;
+	/** Trigger game finish after final match animation completes */
+	triggerGameFinish: () => void;
 
 	// Player management
 	updatePlayerName: (playerId: number, newName: string) => void;
@@ -406,28 +409,32 @@ export function useGameController(
 				getPlayerById(players, currentPlayerId)?.name ||
 				`Player ${currentPlayerId}`;
 
-			if (isMatch) {
-				// Apply match directly - animation is handled locally by GameBoard
-				const matchedState = applyMatch(currentState, matchResult);
-				const finalState = checkAndFinishGame(matchedState);
+		if (isMatch) {
+			// Apply match directly - animation is handled locally by GameBoard
+			// NOTE: We intentionally don't call finishGame() here even if all cards are matched.
+			// The game finish is triggered by GameBoard's onLastMatchAnimationComplete callback
+			// after the flying card animation completes. This ensures the animation plays before
+			// the game over modal appears.
+			const matchedState = applyMatch(currentState, matchResult);
 
-				setGameState(finalState);
-				if (isOnlineMode) {
-					syncToFirestore(finalState, `match:complete`);
-				}
+			setGameState(matchedState);
+			if (isOnlineMode) {
+				syncToFirestore(matchedState, `match:complete`);
+			}
 
-				// Notify effect manager (TTS will announce match with card name)
-				const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
-				effectManager?.notifyMatchFound(currentPlayerName, currentPlayerId, matchedCardName);
+			// Notify effect manager (TTS will announce match with card name)
+			const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
+			effectManager?.notifyMatchFound(currentPlayerName, currentPlayerId, matchedCardName);
 
-				// Check for game over - derive winner/isTie from cards
-				if (finalState.gameStatus === "finished") {
-					const { winner, isTie } = calculateWinner(finalState.cards, players);
-					effectManager?.notifyGameOver(winner, isTie);
-				}
+			// Check if this was the final match - notify game over effects
+			// (but don't set status to 'finished' yet - that happens after animation)
+			if (isGameOver(matchedState)) {
+				const { winner, isTie } = calculateWinner(matchedState.cards, players);
+				effectManager?.notifyGameOver(winner, isTie);
+			}
 
-				isCheckingMatchRef.current = false;
-			} else {
+			isCheckingMatchRef.current = false;
+		} else {
 				// No match - flip back and switch turns
 				const noMatchState = applyNoMatchWithReset(currentState, cardIds);
 
@@ -628,6 +635,33 @@ export function useGameController(
 		},
 		[effectManager, players],
 	);
+
+	/**
+	 * Trigger game finish - called by GameBoard after final match animation completes.
+	 * This sets gameStatus to 'finished' which triggers the GameOver modal.
+	 */
+	const triggerGameFinish = useCallback(() => {
+		// In online mode, only the authoritative player should trigger game finish
+		// This prevents race conditions where both players try to sync state
+		if (isOnlineMode && !isAuthoritative) {
+			console.log("[GAME FINISH] Ignoring - not authoritative player");
+			return;
+		}
+
+		// Only finish if all cards are matched (sanity check)
+		if (!isGameOver(gameState)) {
+			console.warn("[GAME FINISH] triggerGameFinish called but game is not over");
+			return;
+		}
+
+		console.log("[GAME FINISH] Animation complete, setting game status to finished");
+		const finishedState = finishGame(gameState);
+		setGameState(finishedState);
+
+		if (isOnlineMode) {
+			syncToFirestore(finishedState, "gameFinish:afterAnimation");
+		}
+	}, [isOnlineMode, isAuthoritative, gameState, syncToFirestore]);
 
 	// ============================================
 	// Player Management
@@ -853,6 +887,7 @@ export function useGameController(
 		initializeGame,
 		startGame,
 		startGameWithFirstPlayer,
+		triggerGameFinish,
 
 		// Player management
 		updatePlayerName,

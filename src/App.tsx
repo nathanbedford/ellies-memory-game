@@ -386,6 +386,7 @@ function App() {
   const endTurn = isOnlineMode ? onlineGame.endTurn : localGame.endTurn;
   const toggleAllCardsAdmin = isOnlineMode ? onlineGame.toggleAllCardsFlipped : localGame.toggleAllCardsFlipped;
   const endGameEarly = isOnlineMode ? onlineGame.endGameEarly : localGame.endGameEarly;
+  const triggerGameFinish = isOnlineMode ? onlineGame.triggerGameFinish : localGame.triggerGameFinish;
 
   // Settings and game functions come from useLocalGame (unified hook)
   const {
@@ -1778,6 +1779,7 @@ function App() {
                     onCursorMove={cursorSyncEnabled ? handleCursorMove : undefined}
                     onCursorLeave={cursorSyncEnabled ? handleCursorLeave : undefined}
                     remoteCursor={remoteCursorData}
+                    onLastMatchAnimationComplete={triggerGameFinish}
                   />
                 </div>
               </div>
