@@ -1052,8 +1052,13 @@ function App() {
     // Close reset confirmation modal
     setShowResetConfirmation(false);
 
-    // Reset game state
+    // Reset game state - explicitly set to setup state
     resetGame();
+    setFullGameState({
+      cards: [],
+      currentPlayer: gameState.currentPlayer, // Keep current player preference
+      gameStatus: 'setup',
+    });
 
     // Handle online mode differently - navigate to waiting room where host can change settings
     if (isOnlineMode) {
