@@ -27,8 +27,7 @@ export const PlayerNameEditor = ({ playerId, initialName, onSave, className }: P
     e.preventDefault();
     if (name.trim()) {
       onSave(playerId, name.trim());
-      // Save to localStorage
-      localStorage.setItem(`player${playerId}Name`, name.trim());
+      // Persistence is handled by the onSave callback (via Zustand store)
       setIsEditing(false);
     }
   };

@@ -81,6 +81,7 @@ function App() {
     background: BackgroundTheme;
     cardBack: CardBackType;
     firstPlayer: number;
+    pairCount: number;
   } | null>(null);
   const [isReplaying, setIsReplaying] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -102,7 +103,7 @@ function App() {
   const [showPWAInstall, setShowPWAInstall] = useState(false);
 
   // Online multiplayer state
-  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, setPlayerNamePreference, presenceData } = useOnlineStore();
+  const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, setPlayerNamePreference, presenceData, updatePlayerName: updateOnlinePlayerName } = useOnlineStore();
   // Get local player slot from presence data
   const localPlayerSlot = odahId && presenceData[odahId] ? presenceData[odahId].slot : null;
 
@@ -152,7 +153,7 @@ function App() {
         const imagesToUse = pairCount < allPackImages.length
           ? allPackImages.sort(() => Math.random() - 0.5).slice(0, pairCount)
           : allPackImages;
-        
+
         const cards = initializeCards(imagesToUse);
         // Player info is stored in presence data, not game state
         const initialState = createInitialState(options.firstPlayer);
@@ -309,22 +310,25 @@ function App() {
     };
   }, [isOnlineMode, room, selectedPack, selectedBackground, selectedCardBack]);
 
-  const handlePlayerNameChange = useCallback((playerId: 1 | 2, name: string) => {
+  const handlePlayerNameChange = useCallback(async (playerId: 1 | 2, name: string) => {
     if (isOnlineMode) {
       // In online mode, player names are managed via presence data (RTDB)
-      // Just update the local preference; presence subscription handles sync
+      // Only allow updating own name (verified by slot)
       if (localPlayerSlot === playerId) {
+        // Update RTDB presence (syncs to other player)
+        await updateOnlinePlayerName(name);
+        // Also persist preference for future sessions
         setPlayerNamePreference(name);
       }
     } else {
       updatePlayerName(playerId, name);
     }
-  }, [isOnlineMode, localPlayerSlot, setPlayerNamePreference, updatePlayerName]);
+  }, [isOnlineMode, localPlayerSlot, updateOnlinePlayerName, setPlayerNamePreference, updatePlayerName]);
 
   // Reconciliation helper - fixes race condition where matchedByPlayerId is set but isMatched is false
   const reconcileScores = useCallback(async () => {
     const reconciledState = reconcileMatchedCards(gameState);
-    
+
     // Only update if reconciliation actually changed something
     if (reconciledState !== gameState) {
       console.log('[RECONCILE] Reconciling matched cards', {
@@ -332,11 +336,11 @@ function App() {
           c => c.matchedByPlayerId !== undefined && !c.isMatched
         ).length,
       });
-      
+
       if (isOnlineMode) {
         // For online mode, update state and sync to Firestore
         setFullGameState(reconciledState);
-        
+
         // Manually sync to Firestore
         try {
           const adapter = getFirestoreSyncAdapter();
@@ -438,10 +442,10 @@ function App() {
     sessionStorage.removeItem('gameState');
     sessionStorage.removeItem('setupStep');
     sessionStorage.removeItem('mobileWarningDismissed');
-    
+
     // Note: We keep localStorage items for player names, colors, firstPlayer
     // and card pack/background/cardBack preferences - only game state is cleared
-    
+
     console.log('[REFRESH] Cleared game state from storage (kept player preferences)');
   }, []); // Run once on mount
 
@@ -709,12 +713,13 @@ function App() {
   // Handle replay initialization when pack changes
   useEffect(() => {
     if (isReplaying && lastConfig && selectedPack === lastConfig.pack) {
-      const images = getCurrentPackImages();
+      // Use the stored pair count to get the same number of cards
+      const images = getPackImagesForPairCount(lastConfig.pairCount);
       initializeGame(images, true);
       startGameWithFirstPlayer(lastConfig.firstPlayer);
       setIsReplaying(false);
     }
-  }, [selectedPack, isReplaying, lastConfig, getCurrentPackImages, initializeGame, startGameWithFirstPlayer]);
+  }, [selectedPack, isReplaying, lastConfig, getPackImagesForPairCount, initializeGame, startGameWithFirstPlayer]);
 
   // Welcome screen shows when no cards exist and setupStep is null
   // User must click "Start Game" to begin setup flow
@@ -868,10 +873,14 @@ function App() {
   const handleResetClick = () => {
     const activeConfig = getActiveConfig();
 
+    // Get pair count from current game's card count
+    const currentPairCount = Math.floor(gameState.cards.length / 2);
+
     // Store current configuration as last config
     setLastConfig({
       ...activeConfig,
-      firstPlayer: gameState.currentPlayer
+      firstPlayer: gameState.currentPlayer,
+      pairCount: currentPairCount,
     });
     setShowResetConfirmation(true);
   };
@@ -885,9 +894,12 @@ function App() {
       }
 
       const activeConfig = getActiveConfig();
+      // Get pair count from lastConfig, room config, or fallback to current game's card count
+      const currentPairCount = lastConfig?.pairCount || room?.config?.pairCount || Math.floor(gameState.cards.length / 2) || 20;
       const configSource = lastConfig || {
         ...activeConfig,
         firstPlayer: (onlineGame.gameState?.currentPlayer as 1 | 2) || 1,
+        pairCount: currentPairCount,
       };
 
       const normalizedConfig = {
@@ -895,6 +907,7 @@ function App() {
         background: configSource.background,
         cardBack: configSource.cardBack,
         firstPlayer: (configSource.firstPlayer === 2 ? 2 : 1) as 1 | 2,
+        pairCount: configSource.pairCount,
       };
 
       await startOnlineRound(normalizedConfig);
@@ -903,6 +916,7 @@ function App() {
         background: normalizedConfig.background,
         cardBack: normalizedConfig.cardBack,
         firstPlayer: normalizedConfig.firstPlayer,
+        pairCount: normalizedConfig.pairCount,
       });
       return;
     }
@@ -915,7 +929,7 @@ function App() {
     setSelectedCardBack(lastConfig.cardBack);
     setShowResetConfirmation(false);
     setIsReplaying(true);
-  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig, setSelectedPack, setSelectedBackground, setSelectedCardBack]);
+  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig, setSelectedPack, setSelectedBackground, setSelectedCardBack, gameState.cards.length, onlineGame.gameState?.currentPlayer]);
 
   const handleNewGame = () => {
     // Start new game setup flow using the current game configuration as the baseline
@@ -1014,7 +1028,7 @@ function App() {
 
   const handleStartGame = (firstPlayer: number) => {
     const normalizedFirstPlayer = (firstPlayer === 2 ? 2 : 1) as 1 | 2;
-    
+
     // Get the appropriate pair count based on game mode
     const activePairCount = gameMode === 'online' ? onlinePairCount : localPairCount;
 
@@ -1039,6 +1053,7 @@ function App() {
         background: selectedBackground,
         cardBack: selectedCardBack,
         firstPlayer: normalizedFirstPlayer,
+        pairCount: activePairCount,
       });
       return;
     }
@@ -1068,6 +1083,7 @@ function App() {
       background: selectedBackground,
       cardBack: selectedCardBack,
       firstPlayer,
+      pairCount: activePairCount,
     });
   };
 
@@ -1618,6 +1634,9 @@ function App() {
               resetGame();
               guardedSetSetupStep(null, 'game over close');
             }}
+            isOnlineMode={Boolean(isOnlineMode)}
+            isHost={isHost}
+            onLeaveGame={handleLeaveOnlineGame}
           />
         )}
 
@@ -1632,6 +1651,8 @@ function App() {
             onNewGame={handleNewGame}
             onChangeMode={handleBackToModeSelect}
             onCancel={() => setShowResetConfirmation(false)}
+            isOnlineMode={Boolean(isOnlineMode)}
+            isHost={isHost}
           />
         </Modal>
 

@@ -12,9 +12,12 @@ interface GameOverProps {
   onExploreCards: () => void;
   onViewBackground: () => void;
   onClose: () => void;
+  isOnlineMode?: boolean;
+  isHost?: boolean;
+  onLeaveGame?: () => void;
 }
 
-export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExploreCards, onViewBackground, onClose }: GameOverProps) => {
+export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExploreCards, onViewBackground, onClose, isOnlineMode = false, isHost = true, onLeaveGame }: GameOverProps) => {
   useEffect(() => {
     // Full-screen confetti celebration
     const duration = 3000;
@@ -85,12 +88,23 @@ export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExplore
             </p>
           )}
           <div className="flex flex-col gap-3">
-            <button
-              onClick={onPlayAgain}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
-            >
-              Play Again
-            </button>
+            {/* Play Again button - disabled for online guests */}
+            {isOnlineMode && !isHost ? (
+              <button
+                disabled
+                className="bg-gray-400 text-white font-bold py-3 px-8 rounded-lg cursor-not-allowed opacity-75"
+              >
+                Waiting for Host...
+              </button>
+            ) : (
+              <button
+                onClick={onPlayAgain}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
+              >
+                Play Again
+              </button>
+            )}
+
             <button
               onClick={onExploreCards}
               className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 transform hover:scale-105"
@@ -104,6 +118,16 @@ export const GameOver = ({ winner, players, cards, isTie, onPlayAgain, onExplore
             >
               View Background
             </button>
+
+            {/* Leave Room button - shown for online mode, smaller and at bottom */}
+            {isOnlineMode && onLeaveGame && (
+              <button
+                onClick={onLeaveGame}
+                className="mt-2 text-gray-500 hover:text-gray-700 text-sm font-medium py-2 px-4 rounded-lg border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors duration-200"
+              >
+                Leave Room
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -4,12 +4,15 @@ import { Card as CardComponent } from './Card';
 import type { CardBackOption } from '../hooks/useCardBackSelector';
 import { CardLightbox } from './CardLightbox';
 
+// Fixed card size for modal display - independent of game board card size
+const MODAL_CARD_SIZE = 120;
+
 interface PlayerMatchesModalProps {
   isOpen: boolean;
   onClose: () => void;
   player: Player;
   cards: Card[];
-  cardSize?: number;
+  cardSize?: number; // Kept for API compatibility but not used
   useWhiteCardBackground?: boolean;
   emojiSizePercentage?: number;
   cardBack?: CardBackOption;
@@ -22,7 +25,7 @@ export const PlayerMatchesModal = ({
   onClose,
   player,
   cards,
-  cardSize = 100,
+  cardSize: _cardSize = 100, // Unused - modal uses fixed MODAL_CARD_SIZE
   useWhiteCardBackground = false,
   emojiSizePercentage = 72,
   cardBack,
@@ -166,7 +169,7 @@ export const PlayerMatchesModal = ({
                       <CardComponent
                         card={pair[0]}
                         onClick={() => {}}
-                        size={cardSize}
+                        size={MODAL_CARD_SIZE}
                         useWhiteBackground={useWhiteCardBackground}
                         emojiSizePercentage={emojiSizePercentage}
                         cardBack={cardBack}
