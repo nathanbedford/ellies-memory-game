@@ -1,18 +1,14 @@
 import { useState } from 'react';
-import { Card, Player } from '../types';
+import type { Card, Player } from '../types';
 import { Card as CardComponent } from './Card';
 import type { CardBackOption } from '../hooks/useCardBackSelector';
-import { CardLightbox } from './CardLightbox';
-
-// Fixed card size for modal display - independent of game board card size
-const MODAL_CARD_SIZE = 120;
+import { CardGridModal } from './CardGridModal';
 
 interface PlayerMatchesModalProps {
   isOpen: boolean;
   onClose: () => void;
   player: Player;
   cards: Card[];
-  cardSize?: number; // Kept for API compatibility but not used
   useWhiteCardBackground?: boolean;
   emojiSizePercentage?: number;
   cardBack?: CardBackOption;
@@ -25,22 +21,18 @@ export const PlayerMatchesModal = ({
   onClose,
   player,
   cards,
-  cardSize: _cardSize = 100, // Unused - modal uses fixed MODAL_CARD_SIZE
   useWhiteCardBackground = false,
   emojiSizePercentage = 72,
   cardBack,
   onPlayerNameChange,
   canEditName = true // Default to true for backwards compatibility
 }: PlayerMatchesModalProps) => {
-  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState(player.name);
 
-  if (!isOpen) return null;
-
   // Get all cards matched by this player, grouped by imageId (pairs)
   const matchedCards = cards.filter(c => c.isMatched && c.matchedByPlayerId === player.id);
-  
+
   // Group cards by imageId to show pairs
   const cardPairs: { [imageId: string]: Card[] } = {};
   matchedCards.forEach(card => {
@@ -51,150 +43,99 @@ export const PlayerMatchesModal = ({
   });
 
   const pairs = Object.values(cardPairs);
-  // Get unique cards (one per pair) for navigation
+  // Get unique cards (one per pair) for navigation in lightbox
   const uniqueCards = pairs.map(pair => pair[0]);
 
-  const handleCardClick = (index: number) => {
-    setSelectedCardIndex(index);
-  };
+  // Render editable title with player name
+  const renderTitle = () => (
+    <div className="flex items-center gap-2">
+      {isEditingName ? (
+        <input
+          type="text"
+          value={editNameValue}
+          onChange={(e) => setEditNameValue(e.target.value)}
+          onBlur={() => {
+            if (editNameValue.trim() && onPlayerNameChange) {
+              onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
+            }
+            setIsEditingName(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (editNameValue.trim() && onPlayerNameChange) {
+                onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
+              }
+              setIsEditingName(false);
+            } else if (e.key === 'Escape') {
+              setEditNameValue(player.name);
+              setIsEditingName(false);
+            }
+          }}
+          className="text-2xl font-bold text-gray-800 border-b-2 border-blue-500 outline-none bg-transparent"
+        />
+      ) : (
+        <h2 className="text-2xl font-bold text-gray-800">{player.name}'s Matches</h2>
+      )}
+      {onPlayerNameChange && canEditName && !isEditingName && (
+        <button
+          onClick={() => {
+            setEditNameValue(player.name);
+            setIsEditingName(true);
+          }}
+          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+          type="button"
+          title="Edit player name"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 
-  const handleCloseLightbox = () => {
-    setSelectedCardIndex(null);
-  };
-
-  const handleNavigate = (index: number) => {
-    setSelectedCardIndex(index);
-  };
+  // Custom card renderer to show pairs (only first card of each pair)
+  const renderCard = (card: Card, index: number, onCardClick: (index: number) => void) => (
+    <div
+      key={index}
+      className="flex flex-col items-center gap-2"
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onCardClick(index);
+        }}
+        className="cursor-pointer transition-transform hover:scale-110 active:scale-95 border-0 bg-transparent p-0"
+        title="Click to view card details"
+      >
+        <CardComponent
+          card={card}
+          onClick={() => { }}
+          size={200}
+          useWhiteBackground={useWhiteCardBackground}
+          emojiSizePercentage={emojiSizePercentage}
+          cardBack={cardBack}
+          forceGameplaySize={true}
+          forceGameplayBackground={true}
+        />
+      </button>
+    </div>
+  );
 
   return (
-    <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
-        />
-        
-        {/* Modal */}
-        <div 
-          className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <div>
-              <div className="flex items-center gap-2">
-                {isEditingName ? (
-                  <input
-                    type="text"
-                    value={editNameValue}
-                    onChange={(e) => setEditNameValue(e.target.value)}
-                    onBlur={() => {
-                      if (editNameValue.trim() && onPlayerNameChange) {
-                        onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
-                      }
-                      setIsEditingName(false);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        if (editNameValue.trim() && onPlayerNameChange) {
-                          onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
-                        }
-                        setIsEditingName(false);
-                      } else if (e.key === 'Escape') {
-                        setEditNameValue(player.name);
-                        setIsEditingName(false);
-                      }
-                    }}
-                    autoFocus
-                    className="text-2xl font-bold text-gray-800 border-b-2 border-blue-500 outline-none bg-transparent"
-                  />
-                ) : (
-                  <h2 className="text-2xl font-bold text-gray-800">{player.name}'s Matches</h2>
-                )}
-                {onPlayerNameChange && canEditName && !isEditingName && (
-                  <button
-                    onClick={() => {
-                      setEditNameValue(player.name);
-                      setIsEditingName(true);
-                    }}
-                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                    type="button"
-                    title="Edit player name"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 mt-1">{pairs.length} pair{pairs.length !== 1 ? 's' : ''} matched</p>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors z-10"
-              type="button"
-              title="Close"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-            {pairs.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No matches yet!</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                {pairs.map((pair, index) => (
-                  <div 
-                    key={index} 
-                    className="flex flex-col items-center gap-2"
-                  >
-                    {/* Show only one card per match pair */}
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCardClick(index);
-                      }}
-                      className="cursor-pointer transition-transform hover:scale-110 active:scale-95"
-                      title="Click to view card details"
-                    >
-                      <CardComponent
-                        card={pair[0]}
-                        onClick={() => {}}
-                        size={MODAL_CARD_SIZE}
-                        useWhiteBackground={useWhiteCardBackground}
-                        emojiSizePercentage={emojiSizePercentage}
-                        cardBack={cardBack}
-                        forceGameplaySize={true}
-                        forceGameplayBackground={true}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Card Lightbox */}
-      <CardLightbox
-        isOpen={selectedCardIndex !== null}
-        onClose={handleCloseLightbox}
-        card={selectedCardIndex !== null ? uniqueCards[selectedCardIndex] : null}
-        cards={uniqueCards}
-        currentIndex={selectedCardIndex ?? 0}
-        onNavigate={handleNavigate}
-      />
-    </>
+    <CardGridModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={renderTitle()}
+      subtitle={`${pairs.length} pair${pairs.length !== 1 ? 's' : ''} matched`}
+      cards={uniqueCards}
+      useWhiteCardBackground={useWhiteCardBackground}
+      emojiSizePercentage={emojiSizePercentage}
+      cardBack={cardBack}
+      emptyMessage="No matches yet!"
+      renderCard={renderCard}
+    />
   );
 };
 

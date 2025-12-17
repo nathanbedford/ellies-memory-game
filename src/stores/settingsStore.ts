@@ -29,6 +29,7 @@ export interface GameSettings {
 	flipDuration: number;
 	emojiSizePercentage: number;
 	ttsEnabled: boolean;
+	backgroundBlurEnabled: boolean;
 
 	// Game settings
 	cardPack: CardPack;
@@ -60,6 +61,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 	flipDuration: 1500,
 	emojiSizePercentage: 72,
 	ttsEnabled: true,
+	backgroundBlurEnabled: true,
 	cardPack: "animals",
 	background: "default",
 	cardBack: "default",
@@ -91,6 +93,7 @@ interface SettingsStoreActions {
 	setFlipDuration: (duration: number) => void;
 	setEmojiSizePercentage: (percentage: number) => void;
 	setTtsEnabled: (enabled: boolean) => void;
+	setBackgroundBlurEnabled: (enabled: boolean) => void;
 
 	// Game settings
 	setCardPack: (pack: CardPack) => void;
@@ -169,6 +172,11 @@ export const useSettingsStore = create<SettingsStore>()(
 					set({ settings: { ...settings, ttsEnabled: enabled } });
 				},
 
+				setBackgroundBlurEnabled: (enabled: boolean) => {
+					const { settings } = get();
+					set({ settings: { ...settings, backgroundBlurEnabled: enabled } });
+				},
+
 				// Game settings
 				setCardPack: (pack: CardPack) => {
 					const { settings } = get();
@@ -223,3 +231,4 @@ export const selectBackground = (state: SettingsStore) => state.settings.backgro
 export const selectCardBack = (state: SettingsStore) => state.settings.cardBack;
 export const selectLocalPairCount = (state: SettingsStore) => state.settings.localPairCount;
 export const selectOnlinePairCount = (state: SettingsStore) => state.settings.onlinePairCount;
+export const selectBackgroundBlurEnabled = (state: SettingsStore) => state.settings.backgroundBlurEnabled;

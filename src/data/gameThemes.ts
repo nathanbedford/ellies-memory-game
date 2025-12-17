@@ -42,7 +42,7 @@ export const GAME_THEMES: GameTheme[] = [
     description: 'Dive deep into the ocean with marine life cards',
     category: 'nature',
     cardPack: 'ocean-real',
-    background: 'ocean',
+    background: 'sun-drenched-coral-reef',
     cardBack: 'blue',
     previewEmoji: '🌊'
   },

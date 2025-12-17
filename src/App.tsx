@@ -63,6 +63,10 @@ function App() {
   const setLocalPairCount = useSettingsStore((state) => state.setLocalPairCount);
   const setOnlinePairCount = useSettingsStore((state) => state.setOnlinePairCount);
 
+  // Get blur settings from settings store
+  const backgroundBlurEnabled = useSettingsStore((state) => state.settings.backgroundBlurEnabled);
+  const setBackgroundBlurEnabled = useSettingsStore((state) => state.setBackgroundBlurEnabled);
+
   // Local game hook - uses useGameController internally for unified game logic
   const localGame = useLocalGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
@@ -1226,646 +1230,671 @@ function App() {
 
   // Only show custom background when playing the game (when cards exist)
   const shouldShowCustomBackground = gameState.cards.length > 0;
-  const backgroundStyle = shouldShowCustomBackground && currentBackground.imageUrl
+  const isPlaying = gameState.gameStatus === 'playing';
+
+  // Calculate effective blur: use per-background override if defined, otherwise default to 2px
+  const effectiveBlurAmount = currentBackground.blurAmount ?? 2;
+  const shouldBlur = isPlaying && backgroundBlurEnabled && effectiveBlurAmount > 0;
+  const blurFilter = shouldBlur ? `blur(${effectiveBlurAmount}px)` : 'none';
+
+  // Background styles for the separate background layer
+  const backgroundLayerStyle: React.CSSProperties = shouldShowCustomBackground && currentBackground.imageUrl
     ? {
       backgroundImage: `url(${currentBackground.imageUrl})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat'
+      backgroundRepeat: 'no-repeat',
+      filter: blurFilter,
+      transition: 'filter 0.3s ease',
     }
-    : {};
-  const backgroundClass = shouldShowCustomBackground && currentBackground.imageUrl
-    ? 'min-h-screen'
+    : {
+      filter: blurFilter,
+      transition: 'filter 0.3s ease',
+    };
+
+  // Background class for gradient backgrounds (applied to background layer)
+  const backgroundLayerClass = shouldShowCustomBackground && currentBackground.imageUrl
+    ? ''
     : shouldShowCustomBackground && currentBackground.gradient
-      ? `min-h-screen bg-gradient-to-br ${currentBackground.gradient}`
-      : 'min-h-screen bg-rainbow-gradient'; // Rainbow gradient for welcome screen
+      ? `bg-gradient-to-br ${currentBackground.gradient}`
+      : 'bg-rainbow-gradient'; // Rainbow gradient for welcome screen
 
   return (
-    <div className={`${backgroundClass} ${gameState.gameStatus === 'playing' ? 'pt-4' : 'py-8'}`} style={backgroundStyle}>
-      <div className="container mx-auto px-4 max-w-full">
-        {gameState.gameStatus === 'setup' ? (
-          <>
-            {/* Fixed position controls during setup */}
-            {/* Reload Button - fixed top left */}
-            <button
-              onClick={() => setShowReloadConfirmation(true)}
-              className="fixed top-5 left-5 z-10 p-2 text-gray-400 hover:text-gray-600 hover:bg-white/50 rounded-lg transition-colors duration-200"
-              title="Reload App"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-            </button>
+    <>
+      {/* Background layer - blurred during gameplay */}
+      {/* Extended beyond viewport (-8) to hide blur edge artifacts */}
+      <div
+        className={`fixed -inset-1 -z-10 ${backgroundLayerClass}`}
+        style={backgroundLayerStyle}
+      />
 
-            {/* Top right - Fullscreen Button or Settings Button (if fullscreen not available) */}
-            {screenfull.isEnabled ? (
+      {/* Main content container */}
+      <div className={`min-h-screen ${isPlaying ? 'pt-4' : 'py-8'}`}>
+        <div className="container mx-auto px-4 max-w-full">
+          {gameState.gameStatus === 'setup' ? (
+            <>
+              {/* Fixed position controls during setup */}
+              {/* Reload Button - fixed top left */}
               <button
-                onClick={toggleFullscreen}
-                className="fixed top-5 right-5 z-10 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                onClick={() => setShowReloadConfirmation(true)}
+                className="fixed top-5 left-5 z-10 p-2 text-gray-400 hover:text-gray-600 hover:bg-white/50 rounded-lg transition-colors duration-200"
+                title="Reload App"
               >
-                {isFullscreen ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="fixed top-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
-                title="Settings"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Fixed position controls */}
-            {/* Left side - Reset Button */}
-            <div className="fixed top-5 left-5 z-10 flex flex-col gap-2">
-              <button
-                onClick={handleResetClick}
-                className="p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
-                title="Reset Game"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                 </svg>
               </button>
 
-              {/* Admin Toggle Button - only show if admin is enabled */}
-              {adminEnabled && (
+              {/* Top right - Fullscreen Button or Settings Button (if fullscreen not available) */}
+              {screenfull.isEnabled ? (
                 <button
-                  onClick={() => setShowAdminSidebar(!showAdminSidebar)}
-                  className={`p-2 text-xs font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 ${showAdminSidebar
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                    : 'bg-gray-400 hover:bg-gray-500 text-white'
-                    }`}
-                  title={showAdminSidebar ? 'Hide Admin Panel' : 'Show Admin Panel'}
+                  onClick={toggleFullscreen}
+                  className="fixed top-5 right-5 z-10 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  {isFullscreen ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="fixed top-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+                  title="Settings"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </button>
               )}
-            </div>
+            </>
+          ) : (
+            <>
+              {/* Fixed position controls */}
+              {/* Left side - Reset Button */}
+              <div className="fixed top-5 left-5 z-10 flex flex-col gap-2">
+                <button
+                  onClick={handleResetClick}
+                  className="p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+                  title="Reset Game"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
 
-            {/* Top right - Fullscreen Button or Settings Button (if fullscreen not available) */}
-            {screenfull.isEnabled ? (
-              <button
-                onClick={toggleFullscreen}
-                className="fixed top-5 right-5 z-10 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-              >
-                {isFullscreen ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
+                {/* Admin Toggle Button - only show if admin is enabled */}
+                {adminEnabled && (
+                  <button
+                    onClick={() => setShowAdminSidebar(!showAdminSidebar)}
+                    className={`p-2 text-xs font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 ${showAdminSidebar
+                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                      : 'bg-gray-400 hover:bg-gray-500 text-white'
+                      }`}
+                    title={showAdminSidebar ? 'Hide Admin Panel' : 'Show Admin Panel'}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </button>
                 )}
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="fixed top-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
-                title="Settings"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
+              </div>
+
+              {/* Top right - Fullscreen Button or Settings Button (if fullscreen not available) */}
+              {screenfull.isEnabled ? (
+                <button
+                  onClick={toggleFullscreen}
+                  className="fixed top-5 right-5 z-10 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors duration-200"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                >
+                  {isFullscreen ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="fixed top-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+                  title="Settings"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              )}
+
+            </>
+          )}
+
+          {/* Settings Slide-over Menu - Available in both setup and gameplay */}
+          <div
+            className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'
+              }`}
+          >
+            <SettingsMenu
+              cardSize={cardSize}
+              autoSizeEnabled={autoSizeEnabled}
+              useWhiteCardBackground={useWhiteCardBackground}
+              flipDuration={flipDuration}
+              emojiSizePercentage={emojiSizePercentage}
+              ttsEnabled={ttsEnabled}
+              backgroundBlurEnabled={backgroundBlurEnabled}
+              onIncreaseSize={increaseCardSize}
+              onDecreaseSize={decreaseCardSize}
+              onToggleAutoSize={toggleAutoSize}
+              onToggleWhiteCardBackground={toggleWhiteCardBackground}
+              onIncreaseFlipDuration={increaseFlipDuration}
+              onDecreaseFlipDuration={decreaseFlipDuration}
+              onIncreaseEmojiSize={increaseEmojiSize}
+              onDecreaseEmojiSize={decreaseEmojiSize}
+              onToggleTtsEnabled={toggleTtsEnabled}
+              onToggleBackgroundBlur={() => setBackgroundBlurEnabled(!backgroundBlurEnabled)}
+              onClose={() => setIsSettingsOpen(false)}
+              onToggleFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+              onEndTurn={endTurn}
+              gameStatus={gameState.gameStatus}
+              onEnableAdmin={() => {
+                setAdminEnabled(true);
+                setShowAdminSidebar(true);
+              }}
+              onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
+              onReloadApp={() => setShowReloadConfirmation(true)}
+            />
+          </div>
+
+          {/* Backdrop when settings menu is open - Available in both setup and gameplay */}
+          {isSettingsOpen && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              onClick={() => setIsSettingsOpen(false)}
+            />
+          )}
+
+          {/* Settings Button - fixed bottom right, only visible when fullscreen is enabled */}
+          {screenfull.isEnabled && (
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="fixed bottom-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
+              title="Settings"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          )}
+
+          <main>
+            {/* Mode Selection Screen (merged with Welcome) */}
+            {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode !== 'online' && (
+              <div className="fixed inset-0 flex items-center justify-center z-0">
+                <div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
+                  <ModeSelector
+                    onSelectMode={(mode: GameMode) => {
+                      setGameMode(mode);
+                      if (mode === 'local') {
+                        guardedSetSetupStep('theme', 'local mode selected');
+                      }
+                      // For online mode, stay on modeSelect but render OnlineLobby
+                    }}
+                  />
+                </div>
+              </div>
             )}
 
-          </>
-        )}
-
-        {/* Settings Slide-over Menu - Available in both setup and gameplay */}
-        <div
-          className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'
-            }`}
-        >
-          <SettingsMenu
-            cardSize={cardSize}
-            autoSizeEnabled={autoSizeEnabled}
-            useWhiteCardBackground={useWhiteCardBackground}
-            flipDuration={flipDuration}
-            emojiSizePercentage={emojiSizePercentage}
-            ttsEnabled={ttsEnabled}
-            onIncreaseSize={increaseCardSize}
-            onDecreaseSize={decreaseCardSize}
-            onToggleAutoSize={toggleAutoSize}
-            onToggleWhiteCardBackground={toggleWhiteCardBackground}
-            onIncreaseFlipDuration={increaseFlipDuration}
-            onDecreaseFlipDuration={decreaseFlipDuration}
-            onIncreaseEmojiSize={increaseEmojiSize}
-            onDecreaseEmojiSize={decreaseEmojiSize}
-            onToggleTtsEnabled={toggleTtsEnabled}
-            onClose={() => setIsSettingsOpen(false)}
-            onToggleFullscreen={toggleFullscreen}
-            isFullscreen={isFullscreen}
-            onEndTurn={endTurn}
-            gameStatus={gameState.gameStatus}
-            onEnableAdmin={() => {
-              setAdminEnabled(true);
-              setShowAdminSidebar(true);
-            }}
-            onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
-            onReloadApp={() => setShowReloadConfirmation(true)}
-          />
-        </div>
-
-        {/* Backdrop when settings menu is open - Available in both setup and gameplay */}
-        {isSettingsOpen && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={() => setIsSettingsOpen(false)}
-          />
-        )}
-
-        {/* Settings Button - fixed bottom right, only visible when fullscreen is enabled */}
-        {screenfull.isEnabled && (
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="fixed bottom-5 right-5 z-10 p-3 text-base font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded-lg shadow-md transition-all duration-200 transform hover:scale-105"
-            title="Settings"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        )}
-
-        <main>
-          {/* Mode Selection Screen (merged with Welcome) */}
-          {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode !== 'online' && (
-            <div className="fixed inset-0 flex items-center justify-center z-0">
-              <div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
-                <ModeSelector
-                  onSelectMode={(mode: GameMode) => {
-                    setGameMode(mode);
-                    if (mode === 'local') {
-                      guardedSetSetupStep('theme', 'local mode selected');
-                    }
-                    // For online mode, stay on modeSelect but render OnlineLobby
+            {/* Online Lobby */}
+            {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode === 'online' && (
+              <div className="flex flex-col items-center min-h-[60vh] overflow-y-auto max-h-[calc(100vh-4rem)] py-4">
+                <OnlineLobby
+                  onBack={() => {
+                    setGameMode(null);
+                  }}
+                  onGameStart={(onlineGameState) => {
+                    // Set the game state from online lobby
+                    setFullGameState(onlineGameState);
+                    guardedSetSetupStep(null, 'online game started');
                   }}
                 />
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Online Lobby */}
-          {((setupStep === null && gameState.cards.length === 0) || setupStep === 'modeSelect') && gameMode === 'online' && (
-            <div className="flex flex-col items-center min-h-[60vh] overflow-y-auto max-h-[calc(100vh-4rem)] py-4">
-              <OnlineLobby
-                onBack={() => {
-                  setGameMode(null);
-                }}
-                onGameStart={(onlineGameState) => {
-                  // Set the game state from online lobby
-                  setFullGameState(onlineGameState);
-                  guardedSetSetupStep(null, 'online game started');
-                }}
-              />
-            </div>
-          )}
+            {gameState.gameStatus === 'playing' && setupStep === null && (!isOnlineMode || room?.status === 'playing') && (
+              <div ref={boardWrapperRef} className="flex flex-col gap-6 items-center w-full max-w-full">
+                {/* Compact Header - Players Points and Current Player */}
+                <div ref={scoreboardRef} className="w-full max-w-2xl mx-auto">
+                  <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-lg shadow-lg p-3 overflow-visible">
+                    <div className="flex items-center justify-between overflow-visible">
+                      {/* Player 1 */}
+                      <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 1
+                        ? 'bg-opacity-90 ring-2'
+                        : 'bg-gray-50 bg-opacity-50'
+                        } ${glowingPlayer === 1 ? 'player-turn-glow' : ''}`}
+                        style={(() => {
+                          const player1 = players.find(p => p.id === 1);
+                          const playerColor = player1?.color || '#3b82f6';
+                          const rgb = hexToRgb(playerColor);
+                          const baseStyle: React.CSSProperties & {
+                            '--tw-ring-color'?: string;
+                            '--glow-color-start'?: string;
+                            '--glow-color-mid'?: string;
+                            '--glow-color-outer'?: string;
+                            '--glow-color-end'?: string;
+                          } = {};
 
-          {gameState.gameStatus === 'playing' && setupStep === null && (!isOnlineMode || room?.status === 'playing') && (
-            <div ref={boardWrapperRef} className="flex flex-col gap-6 items-center w-full max-w-full">
-              {/* Compact Header - Players Points and Current Player */}
-              <div ref={scoreboardRef} className="w-full max-w-2xl mx-auto">
-                <div className="bg-white bg-opacity-80 backdrop-blur-sm rounded-lg shadow-lg p-3 overflow-visible">
-                  <div className="flex items-center justify-between overflow-visible">
-                    {/* Player 1 */}
-                    <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 1
-                      ? 'bg-opacity-90 ring-2'
-                      : 'bg-gray-50 bg-opacity-50'
-                      } ${glowingPlayer === 1 ? 'player-turn-glow' : ''}`}
-                      style={(() => {
-                        const player1 = players.find(p => p.id === 1);
-                        const playerColor = player1?.color || '#3b82f6';
-                        const rgb = hexToRgb(playerColor);
-                        const baseStyle: React.CSSProperties & {
-                          '--tw-ring-color'?: string;
-                          '--glow-color-start'?: string;
-                          '--glow-color-mid'?: string;
-                          '--glow-color-outer'?: string;
-                          '--glow-color-end'?: string;
-                        } = {};
+                          if (gameState.currentPlayer === 1) {
+                            baseStyle.backgroundColor = `${playerColor}20`;
+                            baseStyle['--tw-ring-color'] = playerColor;
+                          }
 
-                        if (gameState.currentPlayer === 1) {
-                          baseStyle.backgroundColor = `${playerColor}20`;
-                          baseStyle['--tw-ring-color'] = playerColor;
-                        }
+                          // Set glow color RGB strings for CSS variables with different opacities
+                          baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
+                          baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
+                          baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+                          baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
 
-                        // Set glow color RGB strings for CSS variables with different opacities
-                        baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
-                        baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
-                        baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
-                        baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
-
-                        return baseStyle;
-                      })()}
-                    >
-                      <div className="flex items-baseline gap-2">
-                        <button
-                          onClick={() => handleOpenPlayerMatches(1)}
-                          className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
-                          title="Click to view matches"
-                        >
-                          {players.find(p => p.id === 1)?.name || 'Player 1'}:
-                        </button>
-                        <button
-                          onClick={() => handleOpenPlayerMatches(1)}
-                          className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
-                          style={gameState.currentPlayer === 1 ? { color: players.find(p => p.id === 1)?.color || '#3b82f6' } : {}}
-                          title="Click to view matches"
-                        >
-                          {getPlayerScore(gameState.cards, 1)}
-                        </button>
-                      </div>
-                      {gameState.currentPlayer === 1 && (
-                        <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: players.find(p => p.id === 1)?.color || '#3b82f6' }}>
-                          <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-xs">
-                            {gameMode === 'online'
-                              ? (localPlayerSlot === 1 ? 'Your Turn!' : 'Waiting...')
-                              : 'Turn'}
-                          </span>
+                          return baseStyle;
+                        })()}
+                      >
+                        <div className="flex items-baseline gap-2">
+                          <button
+                            onClick={() => handleOpenPlayerMatches(1)}
+                            className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                            title="Click to view matches"
+                          >
+                            {players.find(p => p.id === 1)?.name || 'Player 1'}:
+                          </button>
+                          <button
+                            onClick={() => handleOpenPlayerMatches(1)}
+                            className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 1 ? '' : 'text-gray-400'}`}
+                            style={gameState.currentPlayer === 1 ? { color: players.find(p => p.id === 1)?.color || '#3b82f6' } : {}}
+                            title="Click to view matches"
+                          >
+                            {getPlayerScore(gameState.cards, 1)}
+                          </button>
                         </div>
-                      )}
-                    </div>
-
-                    {/* VS Divider with Room Code (online mode) */}
-                    <div className="flex flex-col items-center px-3">
-                      {isOnlineMode && roomCode && (
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(roomCode);
-                          }}
-                          className="text-xs text-blue-500 hover:text-blue-600 font-mono mb-1 cursor-pointer transition-colors"
-                          title="Click to copy room code"
-                        >
-                          {roomCode}
-                        </button>
-                      )}
-                      <div className="text-gray-400 font-semibold text-sm">VS</div>
-                    </div>
-
-                    {/* Player 2 */}
-                    <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 2
-                      ? 'bg-opacity-90 ring-2'
-                      : 'bg-gray-50 bg-opacity-50'
-                      } ${glowingPlayer === 2 ? 'player-turn-glow' : ''}`}
-                      style={(() => {
-                        const player2 = players.find(p => p.id === 2);
-                        const playerColor = player2?.color || '#10b981';
-                        const rgb = hexToRgb(playerColor);
-                        const baseStyle: React.CSSProperties & {
-                          '--tw-ring-color'?: string;
-                          '--glow-color-start'?: string;
-                          '--glow-color-mid'?: string;
-                          '--glow-color-outer'?: string;
-                          '--glow-color-end'?: string;
-                        } = {};
-
-                        if (gameState.currentPlayer === 2) {
-                          baseStyle.backgroundColor = `${playerColor}20`;
-                          baseStyle['--tw-ring-color'] = playerColor;
-                        }
-
-                        // Set glow color RGB strings for CSS variables with different opacities
-                        baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
-                        baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
-                        baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
-                        baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
-
-                        return baseStyle;
-                      })()}
-                    >
-                      <div className="flex items-baseline gap-2">
-                        <button
-                          onClick={() => handleOpenPlayerMatches(2)}
-                          className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
-                          title="Click to view matches"
-                        >
-                          {players.find(p => p.id === 2)?.name || 'Player 2'}:
-                        </button>
-                        <button
-                          onClick={() => handleOpenPlayerMatches(2)}
-                          className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
-                          style={gameState.currentPlayer === 2 ? { color: players.find(p => p.id === 2)?.color || '#10b981' } : {}}
-                          title="Click to view matches"
-                        >
-                          {getPlayerScore(gameState.cards, 2)}
-                        </button>
+                        {gameState.currentPlayer === 1 && (
+                          <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: players.find(p => p.id === 1)?.color || '#3b82f6' }}>
+                            <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-xs">
+                              {gameMode === 'online'
+                                ? (localPlayerSlot === 1 ? 'Your Turn!' : 'Waiting...')
+                                : 'Turn'}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      {gameState.currentPlayer === 2 && (
-                        <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: players.find(p => p.id === 2)?.color || '#10b981' }}>
-                          <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-xs">
-                            {gameMode === 'online'
-                              ? (localPlayerSlot === 2 ? 'Your Turn!' : 'Waiting...')
-                              : 'Turn'}
-                          </span>
+
+                      {/* VS Divider with Room Code (online mode) */}
+                      <div className="flex flex-col items-center px-3">
+                        {isOnlineMode && roomCode && (
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(roomCode);
+                            }}
+                            className="text-xs text-blue-500 hover:text-blue-600 font-mono mb-1 cursor-pointer transition-colors"
+                            title="Click to copy room code"
+                          >
+                            {roomCode}
+                          </button>
+                        )}
+                        <div className="text-gray-400 font-semibold text-sm">VS</div>
+                      </div>
+
+                      {/* Player 2 */}
+                      <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${gameState.currentPlayer === 2
+                        ? 'bg-opacity-90 ring-2'
+                        : 'bg-gray-50 bg-opacity-50'
+                        } ${glowingPlayer === 2 ? 'player-turn-glow' : ''}`}
+                        style={(() => {
+                          const player2 = players.find(p => p.id === 2);
+                          const playerColor = player2?.color || '#10b981';
+                          const rgb = hexToRgb(playerColor);
+                          const baseStyle: React.CSSProperties & {
+                            '--tw-ring-color'?: string;
+                            '--glow-color-start'?: string;
+                            '--glow-color-mid'?: string;
+                            '--glow-color-outer'?: string;
+                            '--glow-color-end'?: string;
+                          } = {};
+
+                          if (gameState.currentPlayer === 2) {
+                            baseStyle.backgroundColor = `${playerColor}20`;
+                            baseStyle['--tw-ring-color'] = playerColor;
+                          }
+
+                          // Set glow color RGB strings for CSS variables with different opacities
+                          baseStyle['--glow-color-start'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`;
+                          baseStyle['--glow-color-mid'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`;
+                          baseStyle['--glow-color-outer'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+                          baseStyle['--glow-color-end'] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`;
+
+                          return baseStyle;
+                        })()}
+                      >
+                        <div className="flex items-baseline gap-2">
+                          <button
+                            onClick={() => handleOpenPlayerMatches(2)}
+                            className="text-3xl text-gray-600 font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                            title="Click to view matches"
+                          >
+                            {players.find(p => p.id === 2)?.name || 'Player 2'}:
+                          </button>
+                          <button
+                            onClick={() => handleOpenPlayerMatches(2)}
+                            className={`text-3xl font-bold cursor-pointer hover:opacity-75 transition-opacity leading-none ${gameState.currentPlayer === 2 ? '' : 'text-gray-400'}`}
+                            style={gameState.currentPlayer === 2 ? { color: players.find(p => p.id === 2)?.color || '#10b981' } : {}}
+                            title="Click to view matches"
+                          >
+                            {getPlayerScore(gameState.cards, 2)}
+                          </button>
                         </div>
-                      )}
+                        {gameState.currentPlayer === 2 && (
+                          <div className="font-semibold flex flex-col items-center justify-center gap-1" style={{ color: players.find(p => p.id === 2)?.color || '#10b981' }}>
+                            <svg className="animate-pulse" fill="currentColor" viewBox="0 0 20 20" style={{ width: '30px', height: '30px' }}>
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-xs">
+                              {gameMode === 'online'
+                                ? (localPlayerSlot === 2 ? 'Your Turn!' : 'Waiting...')
+                                : 'Turn'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Center Game Area - Full Width Below */}
-              <div ref={gameBoardContainerRef} className="w-full flex justify-center">
-                <GameBoard
-                  cards={gameState.cards}
-                  onCardClick={flipCard}
-                  cardSize={cardSize}
-                  isAnimating={isAnimatingCards}
-                  useWhiteCardBackground={useWhiteCardBackground}
-                  emojiSizePercentage={emojiSizePercentage}
-                  cardBack={effectiveCardBack}
-                  onCursorMove={cursorSyncEnabled ? handleCursorMove : undefined}
-                  onCursorLeave={cursorSyncEnabled ? handleCursorLeave : undefined}
-                  remoteCursor={remoteCursorData}
-                />
+                {/* Center Game Area - Full Width Below */}
+                <div ref={gameBoardContainerRef} className="w-full flex justify-center">
+                  <GameBoard
+                    cards={gameState.cards}
+                    onCardClick={flipCard}
+                    cardSize={cardSize}
+                    isAnimating={isAnimatingCards}
+                    useWhiteCardBackground={useWhiteCardBackground}
+                    emojiSizePercentage={emojiSizePercentage}
+                    cardBack={effectiveCardBack}
+                    onCursorMove={cursorSyncEnabled ? handleCursorMove : undefined}
+                    onCursorLeave={cursorSyncEnabled ? handleCursorLeave : undefined}
+                    remoteCursor={remoteCursorData}
+                  />
+                </div>
               </div>
-            </div>
+            )}
+          </main>
+
+          {/* Opponent Disconnect Overlay - Online Mode Only */}
+          {isOnlineMode && gameState.gameStatus === 'playing' && disconnectState.isDisconnected && (
+            <OpponentDisconnectOverlay
+              isVisible={true}
+              opponentName={disconnectState.opponentName}
+              secondsRemaining={disconnectState.secondsRemaining}
+              onLeaveGame={handleLeaveOnlineGame}
+            />
           )}
-        </main>
 
-        {/* Opponent Disconnect Overlay - Online Mode Only */}
-        {isOnlineMode && gameState.gameStatus === 'playing' && disconnectState.isDisconnected && (
-          <OpponentDisconnectOverlay
-            isVisible={true}
-            opponentName={disconnectState.opponentName}
-            secondsRemaining={disconnectState.secondsRemaining}
-            onLeaveGame={handleLeaveOnlineGame}
-          />
-        )}
+          {gameState.gameStatus === 'finished' && setupStep === null && (winner !== null || isTie === true) && (
+            <GameOver
+              winner={winner}
+              players={players}
+              cards={gameState.cards}
+              isTie={isTie}
+              onPlayAgain={handleResetClick}
+              onExploreCards={() => setShowCardExplorer(true)}
+              onViewBackground={() => setShowBackgroundViewer(true)}
+              onClose={() => {
+                resetGame();
+                guardedSetSetupStep(null, 'game over close');
+              }}
+              isOnlineMode={Boolean(isOnlineMode)}
+              isHost={isHost}
+              onLeaveGame={handleLeaveOnlineGame}
+            />
+          )}
 
-        {gameState.gameStatus === 'finished' && setupStep === null && (winner !== null || isTie === true) && (
-          <GameOver
-            winner={winner}
-            players={players}
-            cards={gameState.cards}
-            isTie={isTie}
-            onPlayAgain={handleResetClick}
-            onExploreCards={() => setShowCardExplorer(true)}
-            onViewBackground={() => setShowBackgroundViewer(true)}
-            onClose={() => {
-              resetGame();
-              guardedSetSetupStep(null, 'game over close');
-            }}
-            isOnlineMode={Boolean(isOnlineMode)}
-            isHost={isHost}
-            onLeaveGame={handleLeaveOnlineGame}
-          />
-        )}
+          {/* Reset Confirmation Modal */}
+          <Modal
+            isOpen={showResetConfirmation}
+            onClose={() => setShowResetConfirmation(false)}
+            title="Reset Game"
+          >
+            <ResetConfirmationModal
+              onReplay={handleReplay}
+              onNewGame={handleNewGame}
+              onChangeMode={handleBackToModeSelect}
+              onCancel={() => setShowResetConfirmation(false)}
+              isOnlineMode={Boolean(isOnlineMode)}
+              isHost={isHost}
+            />
+          </Modal>
 
-        {/* Reset Confirmation Modal */}
-        <Modal
-          isOpen={showResetConfirmation}
-          onClose={() => setShowResetConfirmation(false)}
-          title="Reset Game"
-        >
-          <ResetConfirmationModal
-            onReplay={handleReplay}
-            onNewGame={handleNewGame}
-            onChangeMode={handleBackToModeSelect}
-            onCancel={() => setShowResetConfirmation(false)}
-            isOnlineMode={Boolean(isOnlineMode)}
-            isHost={isHost}
-          />
-        </Modal>
-
-        {/* Reload App Confirmation Modal */}
-        <Modal
-          isOpen={showReloadConfirmation}
-          onClose={() => setShowReloadConfirmation(false)}
-          title="Reload App"
-        >
-          <div className="text-center space-y-6">
-            <div>
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
+          {/* Reload App Confirmation Modal */}
+          <Modal
+            isOpen={showReloadConfirmation}
+            onClose={() => setShowReloadConfirmation(false)}
+            title="Reload App"
+          >
+            <div className="text-center space-y-6">
+              <div>
+                <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                </div>
+                <p className="text-gray-600">This will refresh the app. Any unsaved progress may be lost.</p>
               </div>
-              <p className="text-gray-600">This will refresh the app. Any unsaved progress may be lost.</p>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowReloadConfirmation(false)}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+                >
+                  Reload
+                </button>
+              </div>
             </div>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setShowReloadConfirmation(false)}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
-              >
-                Reload
-              </button>
-            </div>
-          </div>
-        </Modal>
+          </Modal>
 
-        {/* Game Start Modal */}
-        <Modal
-          isOpen={setupStep === 'startGame'}
-          onClose={cancelSetupFlow}
-          onBack={handleStartModalBack}
-          title={cameFromTheme ? "Step 3: Who Goes First?" : (isResetting ? "Step 5: Who Goes First?" : "Step 6: Who Goes First?")}
-        >
-          <GameStartModal
-            players={players}
-            currentPlayer={gameState.currentPlayer}
-            onStartGame={handleStartGame}
-            onPlayerNameChange={handlePlayerNameChange}
-            onPlayerColorChange={updatePlayerColor}
+          {/* Game Start Modal */}
+          <Modal
+            isOpen={setupStep === 'startGame'}
+            onClose={cancelSetupFlow}
             onBack={handleStartModalBack}
-            isResetting={isResetting}
-          />
-        </Modal>
+            title={cameFromTheme ? "Step 3: Who Goes First?" : (isResetting ? "Step 5: Who Goes First?" : "Step 6: Who Goes First?")}
+          >
+            <GameStartModal
+              players={players}
+              currentPlayer={gameState.currentPlayer}
+              onStartGame={handleStartGame}
+              onPlayerNameChange={handlePlayerNameChange}
+              onPlayerColorChange={updatePlayerColor}
+              onBack={handleStartModalBack}
+              isResetting={isResetting}
+            />
+          </Modal>
 
-        {/* Theme Selector Modal */}
-        <Modal
-          isOpen={setupStep === 'theme'}
-          onClose={cancelSetupFlow}
-          onBack={() => {
-            isBackNavigationRef.current = true;
-            guardedSetSetupStep('modeSelect', 'back button from theme modal');
-          }}
-          title={isResetting ? "Step 1: Choose Your Theme" : "Step 1: Choose Your Theme"}
-        >
-          <ThemeSelectorModal
-            onSelectTheme={handleThemeSelect}
-            onBuildCustom={handleBuildCustom}
+          {/* Theme Selector Modal */}
+          <Modal
+            isOpen={setupStep === 'theme'}
             onClose={cancelSetupFlow}
-          />
-        </Modal>
+            onBack={() => {
+              isBackNavigationRef.current = true;
+              guardedSetSetupStep('modeSelect', 'back button from theme modal');
+            }}
+            title={isResetting ? "Step 1: Choose Your Theme" : "Step 1: Choose Your Theme"}
+          >
+            <ThemeSelectorModal
+              onSelectTheme={handleThemeSelect}
+              onBuildCustom={handleBuildCustom}
+              onClose={cancelSetupFlow}
+            />
+          </Modal>
 
-        {/* Card Pack Modal */}
-        <Modal
-          isOpen={setupStep === 'cardPack'}
-          onClose={cancelSetupFlow}
-          title={isResetting ? "Step 1: Choose Your Card Pack" : "Step 2: Choose Your Card Pack"}
-        >
-          <CardPackModal
-            cardPacks={cardPacks}
-            selectedPack={selectedPack}
-            onSelect={handlePackChange}
+          {/* Card Pack Modal */}
+          <Modal
+            isOpen={setupStep === 'cardPack'}
             onClose={cancelSetupFlow}
-          />
-        </Modal>
+            title={isResetting ? "Step 1: Choose Your Card Pack" : "Step 2: Choose Your Card Pack"}
+          >
+            <CardPackModal
+              cardPacks={cardPacks}
+              selectedPack={selectedPack}
+              onSelect={handlePackChange}
+              onClose={cancelSetupFlow}
+            />
+          </Modal>
 
-        {/* Background Modal */}
-        <Modal
-          isOpen={setupStep === 'background'}
-          onClose={cancelSetupFlow}
-          onBack={handleBackgroundModalBack}
-          title={isResetting ? "Step 2: Choose Your Background" : "Step 3: Choose Your Background"}
-        >
-          <BackgroundModal
-            selectedBackground={selectedBackground}
-            onSelect={(bg) => handleBackgroundChange(bg as BackgroundTheme)}
+          {/* Background Modal */}
+          <Modal
+            isOpen={setupStep === 'background'}
             onClose={cancelSetupFlow}
             onBack={handleBackgroundModalBack}
-            isResetting={isResetting}
-          />
-        </Modal>
+            title={isResetting ? "Step 2: Choose Your Background" : "Step 3: Choose Your Background"}
+          >
+            <BackgroundModal
+              selectedBackground={selectedBackground}
+              onSelect={(bg) => handleBackgroundChange(bg as BackgroundTheme)}
+              onClose={cancelSetupFlow}
+              onBack={handleBackgroundModalBack}
+              isResetting={isResetting}
+            />
+          </Modal>
 
-        {/* Card Back Modal */}
-        <Modal
-          isOpen={setupStep === 'cardBack'}
-          onClose={cancelSetupFlow}
-          onBack={handleCardBackModalBack}
-          title={isResetting ? "Step 3: Choose Your Card Back" : "Step 4: Choose Your Card Back"}
-        >
-          <CardBackModal
-            selectedCardBack={selectedCardBack}
-            onSelect={(cb) => handleCardBackChange(cb as CardBackType)}
+          {/* Card Back Modal */}
+          <Modal
+            isOpen={setupStep === 'cardBack'}
             onClose={cancelSetupFlow}
             onBack={handleCardBackModalBack}
-            isResetting={isResetting}
-          />
-        </Modal>
+            title={isResetting ? "Step 3: Choose Your Card Back" : "Step 4: Choose Your Card Back"}
+          >
+            <CardBackModal
+              selectedCardBack={selectedCardBack}
+              onSelect={(cb) => handleCardBackChange(cb as CardBackType)}
+              onClose={cancelSetupFlow}
+              onBack={handleCardBackModalBack}
+              isResetting={isResetting}
+            />
+          </Modal>
 
-        {/* Pair Count Modal */}
-        <Modal
-          isOpen={setupStep === 'pairCount'}
-          onClose={cancelSetupFlow}
-          onBack={handlePairCountModalBack}
-          title={cameFromTheme ? "Step 2: How Many Pairs?" : (isResetting ? "Step 4: How Many Pairs?" : "Step 5: How Many Pairs?")}
-        >
-          <PairCountModal
-            selectedPairCount={gameMode === 'online' ? onlinePairCount : localPairCount}
-            onSelect={handlePairCountChange}
+          {/* Pair Count Modal */}
+          <Modal
+            isOpen={setupStep === 'pairCount'}
             onClose={cancelSetupFlow}
-          />
-        </Modal>
+            onBack={handlePairCountModalBack}
+            title={cameFromTheme ? "Step 2: How Many Pairs?" : (isResetting ? "Step 4: How Many Pairs?" : "Step 5: How Many Pairs?")}
+          >
+            <PairCountModal
+              selectedPairCount={gameMode === 'online' ? onlinePairCount : localPairCount}
+              onSelect={handlePairCountChange}
+              onClose={cancelSetupFlow}
+            />
+          </Modal>
 
-        {/* Player Matches Modal */}
-        {selectedPlayerForMatches !== null && players[selectedPlayerForMatches - 1] && (
-          <PlayerMatchesModal
-            isOpen={selectedPlayerForMatches !== null}
-            onClose={() => setSelectedPlayerForMatches(null)}
-            player={players[selectedPlayerForMatches - 1]}
+          {/* Player Matches Modal */}
+          {selectedPlayerForMatches !== null && players[selectedPlayerForMatches - 1] && (
+            <PlayerMatchesModal
+              isOpen={selectedPlayerForMatches !== null}
+              onClose={() => setSelectedPlayerForMatches(null)}
+              player={players[selectedPlayerForMatches - 1]}
+              cards={gameState.cards}
+              useWhiteCardBackground={useWhiteCardBackground}
+              emojiSizePercentage={emojiSizePercentage}
+              cardBack={effectiveCardBack}
+              onPlayerNameChange={(playerId, name) => {
+                handlePlayerNameChange(playerId as 1 | 2, name);
+              }}
+              canEditName={
+                gameMode === 'local' || // Local mode: can edit both
+                localPlayerSlot === 1 || // Host (slot 1): can edit both
+                selectedPlayerForMatches === localPlayerSlot // Guest: can only edit own name
+              }
+            />
+          )}
+
+          {/* Hidden Pong Game */}
+          <Pong isOpen={showPong} onClose={() => setShowPong(false)} />
+
+          {/* Card Explorer Modal */}
+          <CardExplorerModal
+            isOpen={showCardExplorer}
+            onClose={() => setShowCardExplorer(false)}
             cards={gameState.cards}
-            cardSize={cardSize}
             useWhiteCardBackground={useWhiteCardBackground}
             emojiSizePercentage={emojiSizePercentage}
             cardBack={effectiveCardBack}
-            onPlayerNameChange={(playerId, name) => {
-              handlePlayerNameChange(playerId as 1 | 2, name);
-            }}
-            canEditName={
-              gameMode === 'local' || // Local mode: can edit both
-              localPlayerSlot === 1 || // Host (slot 1): can edit both
-              selectedPlayerForMatches === localPlayerSlot // Guest: can only edit own name
-            }
           />
-        )}
 
-        {/* Hidden Pong Game */}
-        <Pong isOpen={showPong} onClose={() => setShowPong(false)} />
-
-        {/* Card Explorer Modal */}
-        <CardExplorerModal
-          isOpen={showCardExplorer}
-          onClose={() => setShowCardExplorer(false)}
-          cards={gameState.cards}
-          cardSize={cardSize}
-          useWhiteCardBackground={useWhiteCardBackground}
-          emojiSizePercentage={emojiSizePercentage}
-          cardBack={effectiveCardBack}
-        />
-
-        {/* Background Viewer */}
-        <BackgroundViewer
-          isOpen={showBackgroundViewer}
-          onClose={() => setShowBackgroundViewer(false)}
-          background={currentBackground}
-        />
-
-        {/* Admin Sidebar */}
-        {adminEnabled && (
-          <AdminSidebar
-            isOpen={showAdminSidebar}
-            onClose={() => setShowAdminSidebar(false)}
-            onEndGameEarly={() => {
-              endGameEarly();
-              setShowAdminSidebar(false);
-            }}
-            onToggleFlipAll={toggleAllCardsAdmin}
-            allCardsFlipped={
-              gameState.cards.length > 0 &&
-              gameState.cards
-                .filter(c => !c.isMatched)
-                .every(c => c.isFlipped)
-            }
-            onViewLogs={() => setShowLogViewer(true)}
+          {/* Background Viewer */}
+          <BackgroundViewer
+            isOpen={showBackgroundViewer}
+            onClose={() => setShowBackgroundViewer(false)}
+            background={currentBackground}
           />
-        )}
 
-        {/* Log Viewer Modal */}
-        <LogViewerModal
-          isOpen={showLogViewer}
-          onClose={() => setShowLogViewer(false)}
-          roomCode={roomCode ?? undefined}
-        />
+          {/* Admin Sidebar */}
+          {adminEnabled && (
+            <AdminSidebar
+              isOpen={showAdminSidebar}
+              onClose={() => setShowAdminSidebar(false)}
+              onEndGameEarly={() => {
+                endGameEarly();
+                setShowAdminSidebar(false);
+              }}
+              onToggleFlipAll={toggleAllCardsAdmin}
+              allCardsFlipped={
+                gameState.cards.length > 0 &&
+                gameState.cards
+                  .filter(c => !c.isMatched)
+                  .every(c => c.isFlipped)
+              }
+              onViewLogs={() => setShowLogViewer(true)}
+            />
+          )}
 
-        {/* Mobile Warning Modal */}
-        <MobileWarningModal
-          isOpen={showMobileWarning}
-          onClose={handleMobileWarningClose}
-        />
+          {/* Log Viewer Modal */}
+          <LogViewerModal
+            isOpen={showLogViewer}
+            onClose={() => setShowLogViewer(false)}
+            roomCode={roomCode ?? undefined}
+          />
 
-        {/* PWA Install Modal */}
-        <PWAInstallModal
-          isOpen={showPWAInstall}
-          onClose={handlePWAInstallClose}
-        />
+          {/* Mobile Warning Modal */}
+          <MobileWarningModal
+            isOpen={showMobileWarning}
+            onClose={handleMobileWarningClose}
+          />
+
+          {/* PWA Install Modal */}
+          <PWAInstallModal
+            isOpen={showPWAInstall}
+            onClose={handlePWAInstallClose}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

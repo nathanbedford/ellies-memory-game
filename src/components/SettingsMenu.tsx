@@ -5,6 +5,7 @@ interface SettingsMenuProps {
   flipDuration: number;
   emojiSizePercentage: number;
   ttsEnabled: boolean;
+  backgroundBlurEnabled: boolean;
   onIncreaseSize: () => void;
   onDecreaseSize: () => void;
   onToggleAutoSize: () => void;
@@ -14,6 +15,7 @@ interface SettingsMenuProps {
   onIncreaseEmojiSize: () => void;
   onDecreaseEmojiSize: () => void;
   onToggleTtsEnabled: () => void;
+  onToggleBackgroundBlur: () => void;
   onClose: () => void;
   onToggleFullscreen: () => void;
   isFullscreen: boolean;
@@ -24,7 +26,7 @@ interface SettingsMenuProps {
   onReloadApp: () => void;
 }
 
-export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin, onShowPWAInstall, onReloadApp }: SettingsMenuProps) => {
+export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, backgroundBlurEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onToggleBackgroundBlur, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin, onShowPWAInstall, onReloadApp }: SettingsMenuProps) => {
   return (
     <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -61,7 +63,7 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
               </span>
             </div>
           </button>
-          
+
           {/* PWA Install Instructions Button - only show on iPad */}
           {onShowPWAInstall && (
             <button
@@ -84,6 +86,28 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
               </svg>
             </button>
           )}
+
+          {/* Background Blur Toggle */}
+          <label className="flex items-center gap-3 px-4 py-3 mt-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={backgroundBlurEnabled}
+              onChange={onToggleBackgroundBlur}
+              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+            />
+            <div className="flex items-center gap-3 flex-1">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span className="text-base font-medium text-gray-800">
+                Background Blur
+              </span>
+            </div>
+          </label>
+          <p className="text-xs text-gray-500 mt-2 px-4">
+            Apply a subtle blur to the background during gameplay
+          </p>
         </div>
 
         {/* Card Size Section */}
@@ -110,12 +134,12 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
             >
               −
             </button>
-            
+
             <div className="flex-1 text-center">
               <div className="text-sm text-gray-600 mb-1">Current Size</div>
               <div className="text-2xl font-bold text-gray-800">{cardSize}px</div>
             </div>
-            
+
             <button
               onClick={onIncreaseSize}
               disabled={autoSizeEnabled || cardSize >= 300}
@@ -125,7 +149,7 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
               +
             </button>
           </div>
-          
+
           {/* Auto-Size Toggle */}
           <div className="mt-4">
             <label className="flex items-center gap-3 px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 cursor-pointer">
@@ -207,12 +231,12 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
             >
               −
             </button>
-            
+
             <div className="flex-1 text-center">
               <div className="text-sm text-gray-600 mb-1">Current Duration</div>
               <div className="text-2xl font-bold text-gray-800">{flipDuration / 1000}s</div>
             </div>
-            
+
             <button
               onClick={onIncreaseFlipDuration}
               disabled={flipDuration >= 10000}
@@ -239,12 +263,12 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
             >
               −
             </button>
-            
+
             <div className="flex-1 text-center">
               <div className="text-sm text-gray-600 mb-1">Current Size</div>
               <div className="text-2xl font-bold text-gray-800">{emojiSizePercentage}%</div>
             </div>
-            
+
             <button
               onClick={onIncreaseEmojiSize}
               disabled={emojiSizePercentage >= 150}
