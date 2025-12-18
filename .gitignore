@@ -27,3 +27,4 @@ dist-ssr
 
 # Cursor debug files
 .cursor
+.tanstack

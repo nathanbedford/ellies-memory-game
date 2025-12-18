@@ -37,6 +37,7 @@ import { ModeSelector, OnlineLobby, OpponentDisconnectOverlay } from './componen
 import { useOpponentDisconnect } from './hooks/useOpponentDisconnect';
 import { PairCountModal } from './components/PairCountModal';
 import { useSettingsStore } from './stores/settingsStore';
+import { useImagePreloader } from './hooks/useImagePreloader';
 import screenfull from 'screenfull';
 
 // SetupStep type is now derived from route paths
@@ -94,6 +95,7 @@ function App() {
     if (currentPath === '/game-over') return null;
     return null;
   }, [currentPath]);
+
   const [isResetting, setIsResetting] = useState(false);
   const [cameFromTheme, setCameFromTheme] = useState(false); // Track if we came from theme selection
   const [originalPack, setOriginalPack] = useState<string | null>(null);
@@ -126,6 +128,17 @@ function App() {
   const [showMobileWarning, setShowMobileWarning] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [showPWAInstall, setShowPWAInstall] = useState(false);
+
+  // Preload images when user reaches pair count or start game step
+  // This gives time for assets to cache while user configures the game
+  const preloadEnabled = setupStep === 'pairCount' || setupStep === 'startGame';
+  useImagePreloader({
+    background: selectedBackground,
+    cardBack: selectedCardBack,
+    cardPack: selectedPack,
+    pairCount: gameMode === 'online' ? onlinePairCount : localPairCount,
+    enabled: preloadEnabled,
+  });
   const refreshCheckDoneRef = useRef(false);
   const isRefreshRedirectingRef = useRef(false);
   const navigateRef = useRef(navigate);
