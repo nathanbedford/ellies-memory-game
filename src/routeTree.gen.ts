@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OnlineRouteImport } from './routes/online'
 import { Route as LocalRouteImport } from './routes/local'
 import { Route as GameOverRouteImport } from './routes/game-over'
@@ -25,6 +27,16 @@ import { Route as LocalCardPackRouteImport } from './routes/local.card-pack'
 import { Route as LocalCardBackRouteImport } from './routes/local.card-back'
 import { Route as LocalBackgroundRouteImport } from './routes/local.background'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnlineRoute = OnlineRouteImport.update({
   id: '/online',
   path: '/online',
@@ -106,6 +118,8 @@ export interface FileRoutesByFullPath {
   '/game-over': typeof GameOverRoute
   '/local': typeof LocalRouteWithChildren
   '/online': typeof OnlineRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/local/background': typeof LocalBackgroundRoute
   '/local/card-back': typeof LocalCardBackRoute
   '/local/card-pack': typeof LocalCardPackRoute
@@ -123,6 +137,8 @@ export interface FileRoutesByTo {
   '/game-over': typeof GameOverRoute
   '/local': typeof LocalRouteWithChildren
   '/online': typeof OnlineRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/local/background': typeof LocalBackgroundRoute
   '/local/card-back': typeof LocalCardBackRoute
   '/local/card-pack': typeof LocalCardPackRoute
@@ -141,6 +157,8 @@ export interface FileRoutesById {
   '/game-over': typeof GameOverRoute
   '/local': typeof LocalRouteWithChildren
   '/online': typeof OnlineRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/local/background': typeof LocalBackgroundRoute
   '/local/card-back': typeof LocalCardBackRoute
   '/local/card-pack': typeof LocalCardPackRoute
@@ -160,6 +178,8 @@ export interface FileRouteTypes {
     | '/game-over'
     | '/local'
     | '/online'
+    | '/privacy'
+    | '/terms'
     | '/local/background'
     | '/local/card-back'
     | '/local/card-pack'
@@ -177,6 +197,8 @@ export interface FileRouteTypes {
     | '/game-over'
     | '/local'
     | '/online'
+    | '/privacy'
+    | '/terms'
     | '/local/background'
     | '/local/card-back'
     | '/local/card-pack'
@@ -194,6 +216,8 @@ export interface FileRouteTypes {
     | '/game-over'
     | '/local'
     | '/online'
+    | '/privacy'
+    | '/terms'
     | '/local/background'
     | '/local/card-back'
     | '/local/card-pack'
@@ -212,10 +236,26 @@ export interface RootRouteChildren {
   GameOverRoute: typeof GameOverRoute
   LocalRoute: typeof LocalRouteWithChildren
   OnlineRoute: typeof OnlineRouteWithChildren
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/online': {
       id: '/online'
       path: '/online'
@@ -368,6 +408,8 @@ const rootRouteChildren: RootRouteChildren = {
   GameOverRoute: GameOverRoute,
   LocalRoute: LocalRouteWithChildren,
   OnlineRoute: OnlineRouteWithChildren,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

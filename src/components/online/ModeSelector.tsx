@@ -2,6 +2,7 @@
  * ModeSelector - Choose between local and online game modes
  */
 
+import { Link } from '@tanstack/react-router';
 import type { GameMode } from '../../types';
 
 interface ModeSelectorProps {
@@ -87,6 +88,16 @@ export const ModeSelector = ({ onSelectMode }: ModeSelectorProps) => {
           </div>
         </button>
       </div>
+
+      <footer className="mt-12 text-center text-sm text-gray-400">
+        <Link to="/terms" className="hover:text-gray-600 transition-colors">
+          Terms
+        </Link>
+        <span className="mx-2">·</span>
+        <Link to="/privacy" className="hover:text-gray-600 transition-colors">
+          Privacy
+        </Link>
+      </footer>
     </div>
   );
 };

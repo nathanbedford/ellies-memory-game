@@ -125,6 +125,10 @@ function App() {
   const [showPWAInstall, setShowPWAInstall] = useState(false);
   const refreshCheckDoneRef = useRef(false);
   const isRefreshRedirectingRef = useRef(false);
+  const navigateRef = useRef(navigate);
+
+  // Keep navigate ref updated (TanStack Router's navigate is stable, but this ensures we always have latest)
+  navigateRef.current = navigate;
 
   // Clear navigation flag on page unload (before refresh)
   // This ensures refresh detection works correctly
@@ -144,24 +148,29 @@ function App() {
   // Using useLayoutEffect to run synchronously before other useEffect hooks (like route guards)
   // that might set the appNavigation flag
   useLayoutEffect(() => {
-    // Only check once on initial mount
-    if (refreshCheckDoneRef.current) return;
+    // Only check once per page load
+    if (refreshCheckDoneRef.current) {
+      return;
+    }
     refreshCheckDoneRef.current = true;
 
     // Check if this is a page refresh (not programmatic navigation)
     const isAppNavigation = sessionStorage.getItem('appNavigation');
+    const path = window.location.pathname;
 
-    // If we're on a route other than '/' and there's no navigation flag,
-    // it means the user refreshed the page - redirect to home
-    if (currentPath !== '/' && !isAppNavigation) {
-      console.log('[REFRESH] Page refreshed on route:', currentPath, '- redirecting to home');
+    // Standalone pages that can be bookmarked/shared - don't redirect these
+    const standalonePages = ['/terms', '/privacy'];
+    const isStandalonePage = standalonePages.includes(path);
+
+    // Use window.location.pathname instead of routerState to avoid reactive updates
+    // This reads the actual browser URL without triggering React re-renders
+    if (path !== '/' && !isAppNavigation && !isStandalonePage) {
+      console.log('[REFRESH] Page refreshed on route:', path, '- redirecting to home');
       isRefreshRedirectingRef.current = true;
-      navigate({ to: '/' });
-      return;
+      // Use ref to avoid dependency on navigate function
+      navigateRef.current({ to: '/' });
     }
-
-    // Note: The flag is cleared on page unload, so refresh will always redirect
-  }, [currentPath, navigate]); // Include dependencies but use ref to ensure single execution
+  }, []); // Empty deps - only run once on mount, use ref for navigate
 
   // Online multiplayer state
   const { roomCode, room, odahId, leaveRoom, subscribeToPresence, isHost, updateRoomConfig, resetRoomToWaiting, setPlayerNamePreference, presenceData, updatePlayerName: updateOnlinePlayerName } = useOnlineStore();
@@ -309,7 +318,9 @@ function App() {
   // Route guards: Redirect if trying to access game routes without setup
   // Skip if a refresh redirect is already in progress
   useEffect(() => {
-    if (isRefreshRedirectingRef.current) return;
+    if (isRefreshRedirectingRef.current) {
+      return;
+    }
 
     if (currentPath === '/local/game' && gameState.cards.length === 0 && gameState.gameStatus !== 'playing') {
       // No cards and not playing - redirect to theme selection
@@ -1516,6 +1527,12 @@ function App() {
     : shouldShowCustomBackground && currentBackground.gradient
       ? `bg-gradient-to-br ${currentBackground.gradient}`
       : 'bg-rainbow-gradient'; // Rainbow gradient for welcome screen
+
+  // Standalone pages (Terms, Privacy) are rendered by the router's Outlet
+  // Return null so App doesn't render any UI for these paths
+  if (currentPath === '/terms' || currentPath === '/privacy') {
+    return null;
+  }
 
   return (
     <>
