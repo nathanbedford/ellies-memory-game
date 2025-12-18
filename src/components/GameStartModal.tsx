@@ -101,9 +101,6 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
       ...prev,
       [playerId]: newColor
     }));
-    if (onPlayerColorChange) {
-      onPlayerColorChange(playerId, newColor);
-    }
   };
 
   const handlePlayerSelection = (playerId: 1 | 2) => {
