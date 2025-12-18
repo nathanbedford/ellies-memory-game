@@ -1353,7 +1353,16 @@ function App() {
 
   // Set overflow hidden to prevent page scrolling
   // Settings sidebar will still scroll due to overflow-y-auto on its inner content
+  // Skip for standalone pages (terms, privacy) that need to scroll
+  const isStandalonePage = currentPath === '/terms' || currentPath === '/privacy';
   useEffect(() => {
+    if (isStandalonePage) {
+      // Allow scrolling on standalone pages
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      return;
+    }
+
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
 
@@ -1362,7 +1371,7 @@ function App() {
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
-  }, []);
+  }, [isStandalonePage]);
 
   // Disable context menu globally
   useEffect(() => {
