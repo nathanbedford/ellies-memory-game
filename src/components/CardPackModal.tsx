@@ -19,10 +19,10 @@ interface CardPackModalProps {
 }
 
 export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackModalProps) => {
-  // Determine initial tab based on selected pack
+  // Determine initial tab based on selected pack (default to pictures to highlight images)
   const getInitialTab = () => {
-    const picturePackIds = ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real', 'plush-cute-animals-real', 'construction-real', 'animals-from-china-real', 'thanksgiving', 'christmas', 'dinos'];
-    return picturePackIds.includes(selectedPack) ? 'pictures' : 'emoji';
+    const emojiPackIds = ['animals', 'plants', 'buildings', 'colors', 'ocean', 'construction'];
+    return emojiPackIds.includes(selectedPack) ? 'emoji' : 'pictures';
   };
 
   const [activeTab, setActiveTab] = useState<'emoji' | 'pictures'>(getInitialTab());
@@ -183,15 +183,6 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200">
         <button
-          onClick={() => setActiveTab('emoji')}
-          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${activeTab === 'emoji'
-            ? 'border-blue-500 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-        >
-          Emoji
-        </button>
-        <button
           onClick={() => setActiveTab('pictures')}
           className={`px-6 py-3 font-semibold transition-colors border-b-2 ${activeTab === 'pictures'
             ? 'border-blue-500 text-blue-600'
@@ -199,6 +190,15 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
             }`}
         >
           Pictures
+        </button>
+        <button
+          onClick={() => setActiveTab('emoji')}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${activeTab === 'emoji'
+            ? 'border-blue-500 text-blue-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+        >
+          Emoji
         </button>
       </div>
 

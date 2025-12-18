@@ -17,7 +17,7 @@ interface BackgroundModalProps {
 }
 
 export const BackgroundModal = ({ selectedBackground, onSelect }: BackgroundModalProps) => {
-  const [activeTab, setActiveTab] = useState<'colors' | 'pictures'>('colors');
+  const [activeTab, setActiveTab] = useState<'colors' | 'pictures'>('pictures');
 
   const handleSelect = (e: React.MouseEvent, backgroundId: string) => {
     e.stopPropagation(); // Prevent event bubbling
@@ -34,16 +34,6 @@ export const BackgroundModal = ({ selectedBackground, onSelect }: BackgroundModa
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200">
         <button
-          onClick={() => setActiveTab('colors')}
-          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
-            activeTab === 'colors'
-              ? 'border-purple-500 text-purple-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Colors
-        </button>
-        <button
           onClick={() => setActiveTab('pictures')}
           className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
             activeTab === 'pictures'
@@ -52,6 +42,16 @@ export const BackgroundModal = ({ selectedBackground, onSelect }: BackgroundModa
           }`}
         >
           Pictures
+        </button>
+        <button
+          onClick={() => setActiveTab('colors')}
+          className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+            activeTab === 'colors'
+              ? 'border-purple-500 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Colors
         </button>
       </div>
 

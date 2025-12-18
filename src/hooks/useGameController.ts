@@ -190,6 +190,10 @@ export function useGameController(
 		null,
 	);
 
+	// Players ref - always kept in sync to avoid stale closure issues with TTS
+	const playersRef = useRef(players);
+	playersRef.current = players;
+
 	// ============================================
 	// Computed Values
 	// ============================================
@@ -327,13 +331,13 @@ export function useGameController(
 			syncToFirestore(newState, "endTurn");
 		}
 
-		// Notify turn change (players passed in from settings/presence)
+		// Notify turn change (use ref to always get latest player names)
 		const nextPlayerId = newState.currentPlayer;
 		const nextPlayerName =
-			getPlayerById(players, nextPlayerId)?.name ||
+			getPlayerById(playersRef.current, nextPlayerId)?.name ||
 			`Player ${nextPlayerId}`;
 		effectManager?.notifyTurnChange(nextPlayerName, nextPlayerId);
-	}, [gameState, isOnlineMode, syncToFirestore, effectManager, players]);
+	}, [gameState, isOnlineMode, syncToFirestore, effectManager]);
 
 	// ============================================
 	// Stuck Game Detection
@@ -402,12 +406,13 @@ export function useGameController(
 				return;
 			}
 
-			const { isMatch, firstCard, secondCard } = matchResult;
-			const cardIds: [string, string] = [firstCard.id, secondCard.id];
-			const currentPlayerId = currentState.currentPlayer;
-			const currentPlayerName =
-				getPlayerById(players, currentPlayerId)?.name ||
-				`Player ${currentPlayerId}`;
+		const { isMatch, firstCard, secondCard } = matchResult;
+		const cardIds: [string, string] = [firstCard.id, secondCard.id];
+		const currentPlayerId = currentState.currentPlayer;
+		// Use ref to always get latest player names
+		const currentPlayerName =
+			getPlayerById(playersRef.current, currentPlayerId)?.name ||
+			`Player ${currentPlayerId}`;
 
 		if (isMatch) {
 			// Apply match directly - animation is handled locally by GameBoard
@@ -429,7 +434,7 @@ export function useGameController(
 			// Check if this was the final match - notify game over effects
 			// (but don't set status to 'finished' yet - that happens after animation)
 			if (isGameOver(matchedState)) {
-				const { winner, isTie } = calculateWinner(matchedState.cards, players);
+				const { winner, isTie } = calculateWinner(matchedState.cards, playersRef.current);
 				effectManager?.notifyGameOver(winner, isTie);
 			}
 
@@ -443,17 +448,17 @@ export function useGameController(
 					syncToFirestore(noMatchState, `noMatch`);
 				}
 
-				// Notify effect manager of turn change
+				// Notify effect manager of turn change (use ref for latest names)
 				const nextPlayerId = noMatchState.currentPlayer;
 				const nextPlayerName =
-					getPlayerById(players, nextPlayerId)?.name ||
+					getPlayerById(playersRef.current, nextPlayerId)?.name ||
 					`Player ${nextPlayerId}`;
 				effectManager?.notifyTurnChange(nextPlayerName, nextPlayerId);
 
 				isCheckingMatchRef.current = false;
 			}
 		},
-		[isOnlineMode, localPlayerSlot, syncToFirestore, effectManager, players],
+		[isOnlineMode, localPlayerSlot, syncToFirestore, effectManager],
 	);
 
 	// ============================================
@@ -609,18 +614,19 @@ export function useGameController(
 		}));
 		setIsAnimating(false);
 
-		// Notify game start (players passed in from settings/presence)
+		// Notify game start (use ref to always get latest player names)
 		const firstPlayerId = gameState.currentPlayer;
 		const firstPlayerName =
-			getPlayerById(players, firstPlayerId)?.name ||
+			getPlayerById(playersRef.current, firstPlayerId)?.name ||
 			`Player ${firstPlayerId}`;
 		effectManager?.notifyGameStart(firstPlayerName, firstPlayerId);
-	}, [gameState.currentPlayer, players, effectManager]);
+	}, [gameState.currentPlayer, effectManager]);
 
 	const startGameWithFirstPlayer = useCallback(
 		(firstPlayer: number) => {
+			// Use ref to always get latest player names
 			const firstPlayerName =
-				getPlayerById(players, firstPlayer)?.name || `Player ${firstPlayer}`;
+				getPlayerById(playersRef.current, firstPlayer)?.name || `Player ${firstPlayer}`;
 
 			// Notify effects (TTS will announce first player's turn)
 			effectManager?.notifyGameStart(firstPlayerName, firstPlayer);
@@ -633,7 +639,7 @@ export function useGameController(
 
 			// Note: firstPlayer preference is persisted via useSettingsStore in useLocalGame
 		},
-		[effectManager, players],
+		[effectManager],
 	);
 
 	/**
