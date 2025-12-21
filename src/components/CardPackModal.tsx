@@ -40,7 +40,7 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
     ['animals', 'plants', 'buildings', 'colors', 'ocean', 'construction'].includes(pack.id)
   );
   const picturePacks = cardPacks.filter(pack =>
-    ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real', 'plush-cute-animals-real', 'construction-real', 'animals-from-china-real', 'thanksgiving', 'christmas', 'dinos'].includes(pack.id)
+    ['animals-real', 'ocean-real', 'emotions-real', 'insects-real', 'jungle-animals-real', 'plush-cute-animals-real', 'construction-real', 'animals-from-china-real', 'thanksgiving', 'christmas', 'dinos', 'hotwheels'].includes(pack.id)
   );
 
   // Get preview images for animals-real deck
@@ -141,6 +141,14 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
     return deck.cards.slice(0, 4);
   };
 
+  // Get preview images for hotwheels deck
+  const getHotwheelsPreview = () => {
+    const deck = CARD_DECKS.find(d => d.id === 'hotwheels');
+    if (!deck) return [];
+    // First 4 cards for preview
+    return deck.cards.slice(0, 4);
+  };
+
   const animalsRealPreview = getAnimalsRealPreview();
   const oceanRealPreview = getOceanRealPreview();
   const emotionsRealPreview = getEmotionsRealPreview();
@@ -152,6 +160,7 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
   const thanksgivingPreview = getThanksgivingPreview();
   const christmasPreview = getChristmasPreview();
   const dinosPreview = getDinosPreview();
+  const hotwheelsPreview = getHotwheelsPreview();
 
   // Determine which packs to show based on active tab
   const displayedPacks = activeTab === 'emoji' ? emojiPacks : picturePacks;
@@ -397,6 +406,22 @@ export const CardPackModal = ({ cardPacks, selectedPack, onSelect }: CardPackMod
                 <div className="mb-4">
                   <div className="w-full h-40 rounded-lg bg-gradient-to-br from-slate-500 to-slate-700 grid grid-cols-2 grid-rows-2 gap-1 p-1">
                     {dinosPreview.map((card) => (
+                      card.imageUrl && (
+                        <div key={card.id} className="w-full h-full flex items-center justify-center bg-white bg-opacity-20 rounded overflow-hidden">
+                          <img
+                            src={card.imageUrl}
+                            alt={card.id}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              ) : pack.id === 'hotwheels' ? (
+                <div className="mb-4">
+                  <div className="w-full h-40 rounded-lg bg-gradient-to-br from-slate-500 to-slate-700 grid grid-cols-2 grid-rows-2 gap-1 p-1">
+                    {hotwheelsPreview.map((card) => (
                       card.imageUrl && (
                         <div key={card.id} className="w-full h-full flex items-center justify-center bg-white bg-opacity-20 rounded overflow-hidden">
                           <img

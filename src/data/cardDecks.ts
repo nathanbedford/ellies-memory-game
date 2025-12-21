@@ -56,6 +56,11 @@ const getDinosImageUrl = (itemId: string): string => {
   return `/deck-images/dinos/${itemId}.jpg`;
 };
 
+// Helper function to get image URL for hotwheels deck
+const getHotwheelsImageUrl = (itemId: string): string => {
+  return `/deck-images/hotwheels/${itemId}.jpg`;
+};
+
 export interface CardData {
   id: string;
   emoji: string;
@@ -2008,6 +2013,33 @@ export const CARD_DECKS: CardDeck[] = [
       { id: 'tyrannosaurus-rex', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('tyrannosaurus-rex') },
       { id: 'velociraptor', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('velociraptor') },
       { id: 'volcanic-eruption', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getDinosImageUrl('volcanic-eruption') }
+    ]
+  },
+  {
+    id: 'hotwheels',
+    name: 'Hot Wheels',
+    emoji: '',
+    cards: [
+      { id: '67-camaro', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('67-camaro') },
+      { id: 'ambulance', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('ambulance') },
+      { id: 'apache-helicopter', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('apache-helicopter') },
+      { id: 'coast-guard-boat', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('coast-guard-boat') },
+      { id: 'coast-guard-helicopter', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('coast-guard-helicopter') },
+      { id: 'corvette-stingray', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('corvette-stingray') },
+      { id: 'dodge-charger', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('dodge-charger') },
+      { id: 'f16-fighter-jet', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('f16-fighter-jet') },
+      { id: 'fire-truck', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('fire-truck') },
+      { id: 'ford-gt', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('ford-gt') },
+      { id: 'humvee', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('humvee') },
+      { id: 'jeep-wrangler', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('jeep-wrangler') },
+      { id: 'm1-abrams-tank', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('m1-abrams-tank') },
+      { id: 'mars-rover', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('mars-rover') },
+      { id: 'military-truck', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('military-truck') },
+      { id: 'police-interceptor', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('police-interceptor') },
+      { id: 'police-motorcycle', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('police-motorcycle') },
+      { id: 'porsche-911', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('porsche-911') },
+      { id: 'swat-truck', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('swat-truck') },
+      { id: 'vw-bus', emoji: '', gradient: 'from-slate-400 to-slate-600', imageUrl: getHotwheelsImageUrl('vw-bus') }
     ]
   }
 ];
