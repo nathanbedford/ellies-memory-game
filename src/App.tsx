@@ -1613,6 +1613,7 @@ function App() {
               }}
               onShowPWAInstall={isIPad() && !isRunningAsPWA() ? handleShowPWAInstall : undefined}
               onReloadApp={() => setShowReloadConfirmation(true)}
+              onViewBuildInfo={() => setShowBuildInfo(true)}
             />
           </SettingsSidebarWrapper>
 
@@ -1908,7 +1909,6 @@ function App() {
                   .every(c => c.isFlipped)
               }
               onViewLogs={() => setShowLogViewer(true)}
-              onViewBuildInfo={() => setShowBuildInfo(true)}
             />
           )}
 
