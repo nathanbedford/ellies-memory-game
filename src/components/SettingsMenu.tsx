@@ -87,7 +87,6 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
       <div className="space-y-4 flex-1">
         {/* Quick Settings - Always Visible */}
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">🎮 Quick Settings</h3>
 
           {/* Fullscreen Toggle */}
           <button
@@ -144,22 +143,6 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
               </span>
             </div>
           </label>
-
-          {/* End Turn Button - only during gameplay */}
-          {onEndTurn && gameStatus === 'playing' && (
-            <button
-              onClick={() => {
-                onEndTurn();
-                onClose();
-              }}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors duration-200 font-medium"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-              <span>End Turn</span>
-            </button>
-          )}
         </div>
 
         {/* Display & Cards - Collapsible */}
@@ -279,6 +262,25 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
           onToggle={() => setAdvancedOpen(!advancedOpen)}
         >
           <div className="space-y-4">
+            {/* End Turn Button - only during gameplay */}
+            {onEndTurn && gameStatus === 'playing' && (
+              <div>
+                <h4 className="text-base font-semibold text-gray-800 mb-3">Game Actions</h4>
+                <button
+                  onClick={() => {
+                    onEndTurn();
+                    onClose();
+                  }}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                  <span>End Turn</span>
+                </button>
+              </div>
+            )}
+
             {/* Flip Duration Section */}
             <div>
               <h4 className="text-base font-semibold text-gray-800 mb-3">Card Flip Duration</h4>
