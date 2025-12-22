@@ -1,6 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute('/local/card-back')({
-  component: () => null, // Card back selection is handled in App.tsx based on route
+export const Route = createFileRoute("/local/card-back")({
+	component: () => null, // Card back selection is handled in App.tsx based on route
 });
-

@@ -1,2 +1,1 @@
-export { SettingsSidebarWrapper } from './SettingsSidebarWrapper';
-
+export { SettingsSidebarWrapper } from "./SettingsSidebarWrapper";

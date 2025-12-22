@@ -101,6 +101,7 @@ export const useUIStore = create<UIStore>()(
 // ============================================
 
 export const selectShowStartModal = (state: UIStore) => state.showStartModal;
-export const selectIsAnimatingCards = (state: UIStore) => state.isAnimatingCards;
+export const selectIsAnimatingCards = (state: UIStore) =>
+	state.isAnimatingCards;
 export const selectAllCardsFlipped = (state: UIStore) => state.allCardsFlipped;
 export const selectLayoutMetrics = (state: UIStore) => state.layoutMetrics;

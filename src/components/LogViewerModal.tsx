@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
-import { Copy, Check } from "lucide-react";
+import { Check, Copy } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+	type LogEntry,
+	type LogLevel,
+	logger,
+} from "../services/logging/LogService";
 import { Modal } from "./Modal";
-import { logger, type LogEntry, type LogLevel } from "../services/logging/LogService";
 
 interface LogViewerModalProps {
 	isOpen: boolean;
@@ -32,8 +36,12 @@ export const LogViewerModal = ({
 	const [consoleLevel, setConsoleLevel] = useState<LogLevel>(
 		logger.getConsoleLevel(),
 	);
-	const [roomCodes, setRoomCodes] = useState<{ roomCode: string; lastActivity: number }[]>([]);
-	const [selectedRoomCode, setSelectedRoomCode] = useState<string>(initialRoomCode || "");
+	const [roomCodes, setRoomCodes] = useState<
+		{ roomCode: string; lastActivity: number }[]
+	>([]);
+	const [selectedRoomCode, setSelectedRoomCode] = useState<string>(
+		initialRoomCode || "",
+	);
 	const [copied, setCopied] = useState(false);
 
 	const loadLogs = useCallback(async () => {
@@ -124,12 +132,12 @@ export const LogViewerModal = ({
 
 	const filteredLogs = searchTerm
 		? logs.filter(
-				(log) =>
-					log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-					JSON.stringify(log.context)
-						.toLowerCase()
-						.includes(searchTerm.toLowerCase()),
-			)
+			(log) =>
+				log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+				JSON.stringify(log.context)
+					.toLowerCase()
+					.includes(searchTerm.toLowerCase()),
+		)
 		: logs;
 
 	const formatTime = (timestamp: number) => {
@@ -167,8 +175,10 @@ export const LogViewerModal = ({
 			<div className="space-y-4">
 				{/* Room Code Selector */}
 				<div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-					<label className="text-sm font-medium text-gray-700">Room:</label>
+					<label htmlFor="room-select" className="text-sm font-medium text-gray-700">Room:</label>
+					{/** biome-ignore lint/correctness/useUniqueElementIds: Opus says this is fine */}
 					<select
+						id="room-select"
 						value={selectedRoomCode}
 						onChange={(e) => setSelectedRoomCode(e.target.value)}
 						className="flex-1 border rounded px-3 py-1.5 text-sm bg-white"
@@ -181,13 +191,13 @@ export const LogViewerModal = ({
 						))}
 					</select>
 					<button
+						type="button"
 						onClick={handleCopyLogs}
 						disabled={filteredLogs.length === 0}
-						className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
-							copied
-								? "bg-green-100 text-green-800"
-								: "bg-blue-100 hover:bg-blue-200 text-blue-800"
-						} disabled:opacity-50 disabled:cursor-not-allowed`}
+						className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${copied
+							? "bg-green-100 text-green-800"
+							: "bg-blue-100 hover:bg-blue-200 text-blue-800"
+							} disabled:opacity-50 disabled:cursor-not-allowed`}
 						title="Copy logs to clipboard"
 					>
 						{copied ? (
@@ -209,8 +219,10 @@ export const LogViewerModal = ({
 					{/* Filters */}
 					<div className="flex gap-3 items-center">
 						<div>
-							<label className="text-sm text-gray-600 mr-2">Show:</label>
+							<label htmlFor="min-level-select" className="text-sm text-gray-600 mr-2">Show:</label>
+							{/** biome-ignore lint/correctness/useUniqueElementIds: Opus says this is fine */}
 							<select
+								id="min-level-select"
 								value={minLevel}
 								onChange={(e) => setMinLevel(e.target.value as LogLevel)}
 								className="border rounded px-2 py-1 text-sm"
@@ -223,8 +235,10 @@ export const LogViewerModal = ({
 							</select>
 						</div>
 						<div>
-							<label className="text-sm text-gray-600 mr-2">Console:</label>
+							<label htmlFor="console-level-select" className="text-sm text-gray-600 mr-2">Console:</label>
+							{/** biome-ignore lint/correctness/useUniqueElementIds: Opus says this is fine */}
 							<select
+								id="console-level-select"
 								value={consoleLevel}
 								onChange={(e) =>
 									handleConsoleLevelChange(e.target.value as LogLevel)
@@ -253,6 +267,7 @@ export const LogViewerModal = ({
 							{stats.count.toLocaleString()} logs ({stats.sizeMB.toFixed(2)} MB)
 						</span>
 						<button
+							type="button"
 							onClick={loadLogs}
 							disabled={isLoading}
 							className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
@@ -260,12 +275,14 @@ export const LogViewerModal = ({
 							Refresh
 						</button>
 						<button
+							type="button"
 							onClick={handleExport}
 							className="px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 rounded transition-colors"
 						>
 							Export
 						</button>
 						<button
+							type="button"
 							onClick={handleClearLogs}
 							className="px-3 py-1 text-sm bg-red-100 hover:bg-red-200 text-red-800 rounded transition-colors"
 						>

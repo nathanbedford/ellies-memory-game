@@ -5,11 +5,15 @@
  * and online game modes using GameEngine pure functions.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { useGameController, type UseGameControllerOptions, type GameSettings } from "./useGameController";
-import type { GameState, Card, Player } from "../types";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EffectManager } from "../services/effects/EffectManager";
+import type { Card, GameState, Player } from "../types";
+import {
+	type GameSettings,
+	type UseGameControllerOptions,
+	useGameController,
+} from "./useGameController";
 
 // ============================================
 // Test Fixtures
@@ -44,7 +48,9 @@ function createTestGameState(overrides: Partial<GameState> = {}): GameState {
 	};
 }
 
-function createTestSettings(overrides: Partial<GameSettings> = {}): GameSettings {
+function createTestSettings(
+	overrides: Partial<GameSettings> = {},
+): GameSettings {
 	return {
 		flipDuration: 1500,
 		cardSize: 100,
@@ -56,7 +62,9 @@ function createTestSettings(overrides: Partial<GameSettings> = {}): GameSettings
 	};
 }
 
-function createTestOptions(overrides: Partial<UseGameControllerOptions> = {}): UseGameControllerOptions {
+function createTestOptions(
+	overrides: Partial<UseGameControllerOptions> = {},
+): UseGameControllerOptions {
 	return {
 		mode: "local",
 		initialGameState: createTestGameState(),
@@ -72,8 +80,16 @@ function createTestOptions(overrides: Partial<UseGameControllerOptions> = {}): U
 // Create matched pair of cards
 function createMatchedPair(imageId: string, baseIndex: number): Card[] {
 	return [
-		createTestCard({ id: `card-${baseIndex}`, imageId, imageUrl: `/test/${imageId}.png` }),
-		createTestCard({ id: `card-${baseIndex + 1}`, imageId, imageUrl: `/test/${imageId}.png` }),
+		createTestCard({
+			id: `card-${baseIndex}`,
+			imageId,
+			imageUrl: `/test/${imageId}.png`,
+		}),
+		createTestCard({
+			id: `card-${baseIndex + 1}`,
+			imageId,
+			imageUrl: `/test/${imageId}.png`,
+		}),
 	];
 }
 
@@ -118,7 +134,9 @@ describe("useGameController", () => {
 		it("should have initial game state from options", () => {
 			const initialState = createTestGameState({ currentPlayer: 2 });
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			expect(result.current.gameState.currentPlayer).toBe(2);
@@ -126,7 +144,10 @@ describe("useGameController", () => {
 		});
 
 		it("should have initial settings from options", () => {
-			const settings = createTestSettings({ cardSize: 150, flipDuration: 2000 });
+			const settings = createTestSettings({
+				cardSize: 150,
+				flipDuration: 2000,
+			});
 			const { result } = renderHook(() =>
 				useGameController(createTestOptions({ initialSettings: settings })),
 			);
@@ -136,19 +157,25 @@ describe("useGameController", () => {
 		});
 
 		it("should start with isAnimating false", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			expect(result.current.isAnimating).toBe(false);
 		});
 
 		it("should start with isAnimatingCards false", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			expect(result.current.isAnimatingCards).toBe(false);
 		});
 
 		it("should have zero layout metrics initially", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			expect(result.current.layoutMetrics.boardWidth).toBe(0);
 			expect(result.current.layoutMetrics.boardAvailableHeight).toBe(0);
@@ -156,7 +183,9 @@ describe("useGameController", () => {
 		});
 
 		it("should be authoritative in local mode", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			expect(result.current.isAuthoritative).toBe(true);
 		});
@@ -168,7 +197,9 @@ describe("useGameController", () => {
 
 	describe("initializeGame", () => {
 		it("should create card pairs from images", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			const images = [
 				{ id: "cat", url: "/cat.png" },
@@ -184,7 +215,9 @@ describe("useGameController", () => {
 		});
 
 		it("should start playing when startPlaying is true", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			const images = [{ id: "cat", url: "/cat.png" }];
 
@@ -198,7 +231,9 @@ describe("useGameController", () => {
 		});
 
 		it("should end animation after timeout", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			const images = [{ id: "cat", url: "/cat.png" }];
 
@@ -221,7 +256,9 @@ describe("useGameController", () => {
 			const results: string[][] = [];
 
 			for (let i = 0; i < 3; i++) {
-				const { result } = renderHook(() => useGameController(createTestOptions()));
+				const { result } = renderHook(() =>
+					useGameController(createTestOptions()),
+				);
 
 				const images = [
 					{ id: "a", url: "/a.png" },
@@ -241,7 +278,9 @@ describe("useGameController", () => {
 		});
 
 		it("should preserve gradient property on cards", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			const images = [
 				{ id: "cat", url: "/cat.png", gradient: "linear-gradient(red, blue)" },
@@ -251,8 +290,12 @@ describe("useGameController", () => {
 				result.current.initializeGame(images);
 			});
 
-			expect(result.current.gameState.cards[0].gradient).toBe("linear-gradient(red, blue)");
-			expect(result.current.gameState.cards[1].gradient).toBe("linear-gradient(red, blue)");
+			expect(result.current.gameState.cards[0].gradient).toBe(
+				"linear-gradient(red, blue)",
+			);
+			expect(result.current.gameState.cards[1].gradient).toBe(
+				"linear-gradient(red, blue)",
+			);
 		});
 	});
 
@@ -295,7 +338,9 @@ describe("useGameController", () => {
 
 	describe("startGameWithFirstPlayer", () => {
 		it("should set current player to specified player", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			act(() => {
 				result.current.startGameWithFirstPlayer(2);
@@ -334,14 +379,18 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
 				result.current.flipCard("card-0");
 			});
 
-			const flippedCard = result.current.gameState.cards.find((c) => c.id === "card-0");
+			const flippedCard = result.current.gameState.cards.find(
+				(c) => c.id === "card-0",
+			);
 			expect(flippedCard?.isFlipped).toBe(true);
 		});
 
@@ -356,7 +405,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -364,14 +415,26 @@ describe("useGameController", () => {
 			});
 
 			// Card should still be flipped
-			const card = result.current.gameState.cards.find((c) => c.id === "card-0");
+			const card = result.current.gameState.cards.find(
+				(c) => c.id === "card-0",
+			);
 			expect(card?.isFlipped).toBe(true);
 		});
 
 		it("should not flip a matched card", () => {
 			const cards = [
-				createTestCard({ id: "card-0", imageId: "cat", isMatched: true, isFlipped: true }),
-				createTestCard({ id: "card-1", imageId: "cat", isMatched: true, isFlipped: true }),
+				createTestCard({
+					id: "card-0",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
+				createTestCard({
+					id: "card-1",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
 			];
 			const initialState = createTestGameState({
 				cards,
@@ -379,7 +442,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -402,7 +467,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -410,7 +477,9 @@ describe("useGameController", () => {
 			});
 
 			// Third card should not be flipped
-			const card = result.current.gameState.cards.find((c) => c.id === "card-2");
+			const card = result.current.gameState.cards.find(
+				(c) => c.id === "card-2",
+			);
 			expect(card?.isFlipped).toBe(false);
 		});
 
@@ -422,7 +491,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -430,7 +501,9 @@ describe("useGameController", () => {
 			});
 
 			// Card should not be flipped
-			const card = result.current.gameState.cards.find((c) => c.id === "card-0");
+			const card = result.current.gameState.cards.find(
+				(c) => c.id === "card-0",
+			);
 			expect(card?.isFlipped).toBe(false);
 		});
 	});
@@ -595,8 +668,18 @@ describe("useGameController", () => {
 	describe("triggerGameFinish", () => {
 		it("should set game status to finished when all cards matched", () => {
 			const cards = [
-				createTestCard({ id: "card-0", imageId: "cat", isMatched: true, isFlipped: true }),
-				createTestCard({ id: "card-1", imageId: "cat", isMatched: true, isFlipped: true }),
+				createTestCard({
+					id: "card-0",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
+				createTestCard({
+					id: "card-1",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
 			];
 			const initialState = createTestGameState({
 				cards,
@@ -604,7 +687,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -622,7 +707,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -683,7 +770,9 @@ describe("useGameController", () => {
 
 	describe("updateSettings", () => {
 		it("should update partial settings", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			act(() => {
 				result.current.updateSettings({ cardSize: 200 });
@@ -694,7 +783,9 @@ describe("useGameController", () => {
 		});
 
 		it("should update multiple settings at once", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			act(() => {
 				result.current.updateSettings({
@@ -712,7 +803,9 @@ describe("useGameController", () => {
 
 	describe("updateLayoutMetrics", () => {
 		it("should update layout metrics", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			act(() => {
 				result.current.updateLayoutMetrics({
@@ -728,7 +821,9 @@ describe("useGameController", () => {
 		});
 
 		it("should not update when values are same (rounded)", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			act(() => {
 				result.current.updateLayoutMetrics({
@@ -766,7 +861,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -785,7 +882,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			// First toggle - flip all
@@ -804,8 +903,18 @@ describe("useGameController", () => {
 
 		it("should not affect matched cards", () => {
 			const cards = [
-				createTestCard({ id: "card-0", imageId: "cat", isMatched: true, isFlipped: true }),
-				createTestCard({ id: "card-1", imageId: "cat", isMatched: true, isFlipped: true }),
+				createTestCard({
+					id: "card-0",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
+				createTestCard({
+					id: "card-1",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
 				createTestCard({ id: "card-2", imageId: "dog" }),
 				createTestCard({ id: "card-3", imageId: "dog" }),
 			];
@@ -815,7 +924,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -833,7 +944,9 @@ describe("useGameController", () => {
 			const initialState = createTestGameState({ cards: [] });
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -859,15 +972,21 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
 				result.current.endGameEarly();
 			});
 
-			const matchedCards = result.current.gameState.cards.filter((c) => c.isMatched);
-			const unmatchedCards = result.current.gameState.cards.filter((c) => !c.isMatched);
+			const matchedCards = result.current.gameState.cards.filter(
+				(c) => c.isMatched,
+			);
+			const unmatchedCards = result.current.gameState.cards.filter(
+				(c) => !c.isMatched,
+			);
 
 			// 4 cards matched, 2 unmatched
 			expect(matchedCards).toHaveLength(4);
@@ -885,7 +1004,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -903,7 +1024,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -997,7 +1120,9 @@ describe("useGameController", () => {
 
 	describe("setFullGameState", () => {
 		it("should replace entire game state", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			const newState = createTestGameState({
 				cards: createMatchedPair("cat", 0),
@@ -1028,7 +1153,9 @@ describe("useGameController", () => {
 			});
 
 			const { result } = renderHook(() =>
-				useGameController(createTestOptions({ initialGameState: initialState })),
+				useGameController(
+					createTestOptions({ initialGameState: initialState }),
+				),
 			);
 
 			act(() => {
@@ -1167,8 +1294,18 @@ describe("useGameController", () => {
 
 		it("should ignore triggerGameFinish when not authoritative", () => {
 			const cards = [
-				createTestCard({ id: "card-0", imageId: "cat", isMatched: true, isFlipped: true }),
-				createTestCard({ id: "card-1", imageId: "cat", isMatched: true, isFlipped: true }),
+				createTestCard({
+					id: "card-0",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
+				createTestCard({
+					id: "card-1",
+					imageId: "cat",
+					isMatched: true,
+					isFlipped: true,
+				}),
 			];
 			const initialState = createTestGameState({
 				cards,
@@ -1201,7 +1338,9 @@ describe("useGameController", () => {
 
 	describe("player management", () => {
 		it("updatePlayerName should be a no-op", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			// Should not throw
 			act(() => {
@@ -1210,7 +1349,9 @@ describe("useGameController", () => {
 		});
 
 		it("updatePlayerColor should be a no-op", () => {
-			const { result } = renderHook(() => useGameController(createTestOptions()));
+			const { result } = renderHook(() =>
+				useGameController(createTestOptions()),
+			);
 
 			// Should not throw
 			act(() => {

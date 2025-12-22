@@ -7,8 +7,6 @@
  * - renderHookWithProviders: For testing hooks
  */
 
-import React, { type ReactElement, type ReactNode } from "react";
-import { render, renderHook, type RenderOptions, type RenderHookOptions } from "@testing-library/react";
 import {
 	createMemoryHistory,
 	createRootRoute,
@@ -16,6 +14,13 @@ import {
 	createRouter,
 	RouterProvider,
 } from "@tanstack/react-router";
+import {
+	type RenderHookOptions,
+	type RenderOptions,
+	render,
+	renderHook,
+} from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
 
 // ============================================
 // Types
@@ -58,7 +63,10 @@ function BaseWrapper({ children }: WrapperProps): ReactElement {
  * Creates a router wrapper for testing route-dependent components.
  * Uses TanStack Router's memory history for testing.
  */
-function createRouterWrapper(initialPath: string = "/", additionalRoutes: string[] = []) {
+function createRouterWrapper(
+	initialPath: string = "/",
+	additionalRoutes: string[] = [],
+) {
 	// Create a root route
 	const rootRoute = createRootRoute({
 		component: () => null,
@@ -189,7 +197,10 @@ export function renderHookWithProviders<TResult, TProps>(
  */
 export function renderHookWithRouter<TResult, TProps>(
 	hook: (props: TProps) => TResult,
-	options?: RenderHookOptions<TProps> & { initialPath?: string; routes?: string[] },
+	options?: RenderHookOptions<TProps> & {
+		initialPath?: string;
+		routes?: string[];
+	},
 ) {
 	const { initialPath = "/", routes = [], ...hookOptions } = options ?? {};
 
@@ -215,7 +226,10 @@ export function renderHookWithRouter<TResult, TProps>(
  * ```
  */
 export async function waitForStoreUpdate<TState>(
-	store: { getState: () => TState; subscribe: (listener: (state: TState) => void) => () => void },
+	store: {
+		getState: () => TState;
+		subscribe: (listener: (state: TState) => void) => () => void;
+	},
 	predicate: (state: TState) => boolean,
 	timeout: number = 1000,
 ): Promise<void> {
@@ -249,11 +263,17 @@ export function createSpy<T extends (...args: unknown[]) => unknown>() {
 	const calls: Parameters<T>[] = [];
 	const spy = ((...args: Parameters<T>) => {
 		calls.push(args);
-	}) as T & { calls: Parameters<T>[]; callCount: number; lastCall: Parameters<T> | undefined };
+	}) as T & {
+		calls: Parameters<T>[];
+		callCount: number;
+		lastCall: Parameters<T> | undefined;
+	};
 
 	Object.defineProperty(spy, "calls", { get: () => calls });
 	Object.defineProperty(spy, "callCount", { get: () => calls.length });
-	Object.defineProperty(spy, "lastCall", { get: () => calls[calls.length - 1] });
+	Object.defineProperty(spy, "lastCall", {
+		get: () => calls[calls.length - 1],
+	});
 
 	return spy;
 }

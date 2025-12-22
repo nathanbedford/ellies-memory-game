@@ -5,12 +5,12 @@
  * with settings management and effect handling.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { useLocalGame } from "./useLocalGame";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useUIStore } from "../stores/uiStore";
-import { setupStorageMocks, resetStorageMocks } from "../test/mocks/storage";
+import { resetStorageMocks, setupStorageMocks } from "../test/mocks/storage";
+import { useLocalGame } from "./useLocalGame";
 
 // Mock speechSynthesis for TTS
 function createMockSpeechSynthesis() {

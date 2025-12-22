@@ -1,21 +1,20 @@
-import { createRootRoute, Outlet } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/router-devtools';
-import App from '../App';
+import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/router-devtools";
+import App from "../App";
 
-const isDev = import.meta.env.MODE === 'development';
+const isDev = import.meta.env.MODE === "development";
 
 // Named component to prevent remounting on route changes
 function RootComponent() {
-  return (
-    <>
-      <App />
-      <Outlet />
-      {isDev && <TanStackRouterDevtools />}
-    </>
-  );
+	return (
+		<>
+			<App />
+			<Outlet />
+			{isDev && <TanStackRouterDevtools />}
+		</>
+	);
 }
 
 export const Route = createRootRoute({
-  component: RootComponent,
+	component: RootComponent,
 });
-

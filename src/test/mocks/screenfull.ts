@@ -84,7 +84,9 @@ export const mockScreenfull = {
 				state.changeCallbacks.splice(index, 1);
 			}
 		} else if (event === "error") {
-			const index = state.errorCallbacks.indexOf(callback as (error: Error) => void);
+			const index = state.errorCallbacks.indexOf(
+				callback as (error: Error) => void,
+			);
 			if (index > -1) {
 				state.errorCallbacks.splice(index, 1);
 			}

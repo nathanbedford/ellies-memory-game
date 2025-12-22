@@ -5,15 +5,15 @@
  * when enabled, ensuring everything is cached before the game starts.
  */
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { preloadImages } from "../utils/imagePreloader";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CARD_DECKS } from "../data/cardDecks";
+import type { CardPack } from "../types";
+import { preloadImages } from "../utils/imagePreloader";
 import {
 	BACKGROUND_OPTIONS,
 	type BackgroundTheme,
 } from "./useBackgroundSelector";
 import { CARD_BACK_OPTIONS, type CardBackType } from "./useCardBackSelector";
-import type { CardPack } from "../types";
 
 interface PreloadState {
 	isLoading: boolean;
@@ -196,4 +196,3 @@ export function useImagePreloader({
 		progress,
 	};
 }
-

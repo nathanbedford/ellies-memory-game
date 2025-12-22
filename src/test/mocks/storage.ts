@@ -5,8 +5,6 @@
  * for testing persistence behavior.
  */
 
-import { vi } from "vitest";
-
 // ============================================
 // Mock Storage Implementation
 // ============================================
@@ -128,10 +126,13 @@ export function resetStorageMocks() {
  */
 export function setupWithMatchimusSettings(settings: Record<string, unknown>) {
 	const storage = getMockLocalStorage();
-	storage.setItem("matchimus-settings", JSON.stringify({
-		state: { settings },
-		version: 0,
-	}));
+	storage.setItem(
+		"matchimus-settings",
+		JSON.stringify({
+			state: { settings },
+			version: 0,
+		}),
+	);
 }
 
 /**

@@ -5,19 +5,16 @@
  * Extends patterns from GameEngine.test.ts.
  */
 
-import type {
-	Card,
-	Player,
-	GameState,
-	GameStatus,
-	CardPack,
-	Room,
-	RoomStatus,
-	PresenceData,
-	OnlineGameState,
-} from "../types";
 import type { GameSettings } from "../stores/settingsStore";
 import type { LayoutMetrics } from "../stores/uiStore";
+import type {
+	Card,
+	GameState,
+	OnlineGameState,
+	Player,
+	PresenceData,
+	Room,
+} from "../types";
 
 // ============================================
 // Card Fixtures

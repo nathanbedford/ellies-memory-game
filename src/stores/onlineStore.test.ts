@@ -5,23 +5,23 @@
  * room operations, and presence tracking.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	useOnlineStore,
-	selectIsOnline,
-	selectIsConnected,
-	selectIsInRoom,
-	selectCanStartGame,
-	selectOpponent,
-	selectSelf,
-} from "./onlineStore";
-import {
-	setupFirebaseMocks,
 	getMockFirestoreSyncAdapter,
 	resetFirebaseMocks,
+	setupFirebaseMocks,
 } from "../test/mocks/firebase";
-import { setupStorageMocks, resetStorageMocks } from "../test/mocks/storage";
-import { createTestPresenceData, createHostPresence, createGuestPresence } from "../test/testUtils";
+import { resetStorageMocks, setupStorageMocks } from "../test/mocks/storage";
+import { createGuestPresence, createHostPresence } from "../test/testUtils";
+import {
+	selectCanStartGame,
+	selectIsConnected,
+	selectIsInRoom,
+	selectIsOnline,
+	selectOpponent,
+	selectSelf,
+	useOnlineStore,
+} from "./onlineStore";
 
 // Mock the FirestoreSyncAdapter module
 vi.mock("../services/sync/FirestoreSyncAdapter", () => ({
@@ -32,7 +32,7 @@ vi.mock("../services/sync/FirestoreSyncAdapter", () => ({
 // Mock PresenceService
 vi.mock("../services/sync/PresenceService", () => ({
 	PresenceService: {
-		subscribeToRoomPresence: vi.fn((roomCode, callback) => {
+		subscribeToRoomPresence: vi.fn((_roomCode, _callback) => {
 			// Return unsubscribe function
 			return () => {};
 		}),
@@ -203,7 +203,8 @@ describe("onlineStore", () => {
 		});
 
 		it("should join a room", async () => {
-			const { createRoom, reset, connect, joinRoom } = useOnlineStore.getState();
+			const { createRoom, reset, connect, joinRoom } =
+				useOnlineStore.getState();
 
 			// First create a room as host
 			await createRoom({
@@ -299,7 +300,9 @@ describe("onlineStore", () => {
 
 			await updateRoomConfig({ cardPack: "food" });
 
-			expect(adapter.updateRoomConfig).toHaveBeenCalledWith("MOCK", { cardPack: "food" });
+			expect(adapter.updateRoomConfig).toHaveBeenCalledWith("MOCK", {
+				cardPack: "food",
+			});
 		});
 
 		it("should reset room to waiting as host", async () => {
@@ -369,7 +372,10 @@ describe("onlineStore", () => {
 			// Set presence with opponent online
 			setPresenceData({
 				[odahId!]: createHostPresence({ odahId: odahId!, online: true }),
-				"opponent-id": createGuestPresence({ odahId: "opponent-id", online: true }),
+				"opponent-id": createGuestPresence({
+					odahId: "opponent-id",
+					online: true,
+				}),
 			});
 
 			expect(useOnlineStore.getState().opponentConnected).toBe(true);
@@ -384,7 +390,10 @@ describe("onlineStore", () => {
 			// Set presence with opponent offline
 			setPresenceData({
 				[odahId!]: createHostPresence({ odahId: odahId!, online: true }),
-				"opponent-id": createGuestPresence({ odahId: "opponent-id", online: false }),
+				"opponent-id": createGuestPresence({
+					odahId: "opponent-id",
+					online: false,
+				}),
 			});
 
 			expect(useOnlineStore.getState().opponentConnected).toBe(false);
@@ -518,7 +527,8 @@ describe("onlineStore", () => {
 		});
 
 		it("selectCanStartGame should return true when conditions are met", async () => {
-			const { connect, createRoom, setPresenceData } = useOnlineStore.getState();
+			const { connect, createRoom, setPresenceData } =
+				useOnlineStore.getState();
 
 			await connect();
 			const { odahId } = useOnlineStore.getState();
@@ -542,7 +552,8 @@ describe("onlineStore", () => {
 		});
 
 		it("selectCanStartGame should return false when opponent not connected", async () => {
-			const { connect, createRoom, setPresenceData } = useOnlineStore.getState();
+			const { connect, createRoom, setPresenceData } =
+				useOnlineStore.getState();
 
 			await connect();
 			const { odahId } = useOnlineStore.getState();

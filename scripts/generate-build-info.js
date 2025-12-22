@@ -1,7 +1,7 @@
-import { writeFileSync } from 'fs';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { execSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -10,12 +10,12 @@ const __dirname = dirname(__filename);
 let commitHash = process.env.VERCEL_GIT_COMMIT_SHA;
 
 if (!commitHash) {
-  try {
-    commitHash = execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim();
-  } catch (error) {
-    // If git command fails, use a placeholder
-    commitHash = 'unknown';
-  }
+	try {
+		commitHash = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+	} catch (_error) {
+		// If git command fails, use a placeholder
+		commitHash = "unknown";
+	}
 }
 
 // Generate build timestamp
@@ -23,15 +23,14 @@ const buildTime = new Date().toISOString();
 
 // Create build info object
 const buildInfo = {
-  commitHash,
-  buildTime,
+	commitHash,
+	buildTime,
 };
 
 // Write to src/build-info.json
-const outputPath = join(__dirname, '..', 'src', 'build-info.json');
+const outputPath = join(__dirname, "..", "src", "build-info.json");
 writeFileSync(outputPath, JSON.stringify(buildInfo, null, 2));
 
 console.log(`Build info generated: ${outputPath}`);
 console.log(`  Commit: ${commitHash}`);
 console.log(`  Build time: ${buildTime}`);
-

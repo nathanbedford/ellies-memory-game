@@ -218,17 +218,32 @@ export const selectSettings = (state: SettingsStore) => state.settings;
 
 // Derive players from settings
 export const selectPlayers = (state: SettingsStore): Player[] => [
-	{ id: 1, name: state.settings.player1Name, color: state.settings.player1Color },
-	{ id: 2, name: state.settings.player2Name, color: state.settings.player2Color },
+	{
+		id: 1,
+		name: state.settings.player1Name,
+		color: state.settings.player1Color,
+	},
+	{
+		id: 2,
+		name: state.settings.player2Name,
+		color: state.settings.player2Color,
+	},
 ];
 
-export const selectFirstPlayer = (state: SettingsStore) => state.settings.firstPlayer;
+export const selectFirstPlayer = (state: SettingsStore) =>
+	state.settings.firstPlayer;
 export const selectCardSize = (state: SettingsStore) => state.settings.cardSize;
-export const selectAutoSizeEnabled = (state: SettingsStore) => state.settings.autoSizeEnabled;
-export const selectFlipDuration = (state: SettingsStore) => state.settings.flipDuration;
+export const selectAutoSizeEnabled = (state: SettingsStore) =>
+	state.settings.autoSizeEnabled;
+export const selectFlipDuration = (state: SettingsStore) =>
+	state.settings.flipDuration;
 export const selectCardPack = (state: SettingsStore) => state.settings.cardPack;
-export const selectBackground = (state: SettingsStore) => state.settings.background;
+export const selectBackground = (state: SettingsStore) =>
+	state.settings.background;
 export const selectCardBack = (state: SettingsStore) => state.settings.cardBack;
-export const selectLocalPairCount = (state: SettingsStore) => state.settings.localPairCount;
-export const selectOnlinePairCount = (state: SettingsStore) => state.settings.onlinePairCount;
-export const selectBackgroundBlurEnabled = (state: SettingsStore) => state.settings.backgroundBlurEnabled;
+export const selectLocalPairCount = (state: SettingsStore) =>
+	state.settings.localPairCount;
+export const selectOnlinePairCount = (state: SettingsStore) =>
+	state.settings.onlinePairCount;
+export const selectBackgroundBlurEnabled = (state: SettingsStore) =>
+	state.settings.backgroundBlurEnabled;

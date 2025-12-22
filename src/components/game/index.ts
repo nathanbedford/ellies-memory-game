@@ -1,5 +1,4 @@
-export { GameplayHeader } from './GameplayHeader';
-export { FixedGameControls } from './FixedGameControls';
-export { SetupControls } from './SetupControls';
-export { FloatingSettingsButton } from './FloatingSettingsButton';
-
+export { FixedGameControls } from "./FixedGameControls";
+export { FloatingSettingsButton } from "./FloatingSettingsButton";
+export { GameplayHeader } from "./GameplayHeader";
+export { SetupControls } from "./SetupControls";

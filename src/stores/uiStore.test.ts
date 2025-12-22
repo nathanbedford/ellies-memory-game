@@ -5,15 +5,15 @@
  * animation flags, and layout metrics.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-	useUIStore,
-	selectShowStartModal,
-	selectIsAnimatingCards,
-	selectAllCardsFlipped,
-	selectLayoutMetrics,
-} from "./uiStore";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createTestLayoutMetrics } from "../test/testUtils";
+import {
+	selectAllCardsFlipped,
+	selectIsAnimatingCards,
+	selectLayoutMetrics,
+	selectShowStartModal,
+	useUIStore,
+} from "./uiStore";
 
 describe("uiStore", () => {
 	beforeEach(() => {

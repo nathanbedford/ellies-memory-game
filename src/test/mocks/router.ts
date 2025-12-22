@@ -31,14 +31,16 @@ let routerState: MockRouterState = {
  * Mock useNavigate hook.
  * Returns a function that updates the mock router state.
  */
-export const mockNavigate = vi.fn((options: { to: string; search?: Record<string, string> } | string) => {
-	const path = typeof options === "string" ? options : options.to;
-	const search = typeof options === "object" ? options.search || {} : {};
+export const mockNavigate = vi.fn(
+	(options: { to: string; search?: Record<string, string> } | string) => {
+		const path = typeof options === "string" ? options : options.to;
+		const search = typeof options === "object" ? options.search || {} : {};
 
-	routerState.currentPath = path;
-	routerState.searchParams = search;
-	routerState.history.push(path);
-});
+		routerState.currentPath = path;
+		routerState.searchParams = search;
+		routerState.history.push(path);
+	},
+);
 
 export const useNavigateMock = vi.fn(() => mockNavigate);
 
@@ -108,7 +110,10 @@ export const useMatchMock = vi.fn((path?: string) => {
  * // Component now sees path as "/local/game"
  * ```
  */
-export function setMockRoute(path: string, search: Record<string, string> = {}) {
+export function setMockRoute(
+	path: string,
+	search: Record<string, string> = {},
+) {
 	routerState.currentPath = path;
 	routerState.searchParams = search;
 	routerState.history.push(path);

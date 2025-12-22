@@ -8,20 +8,20 @@
 import {
 	doc,
 	getDoc,
-	setDoc,
-	updateDoc,
 	onSnapshot,
 	serverTimestamp,
+	setDoc,
+	updateDoc,
 } from "firebase/firestore";
 import { db, getOrCreateUserId } from "../../lib/firebase";
+import type { GameState, OnlineGameState, Room, RoomConfig } from "../../types";
+import { generateRoomCode } from "../game/GameEngine";
 import {
 	BaseSyncAdapter,
-	CreateRoomOptions,
-	JoinRoomOptions,
+	type CreateRoomOptions,
+	type JoinRoomOptions,
 } from "./ISyncAdapter";
 import { PresenceService } from "./PresenceService";
-import { generateRoomCode } from "../game/GameEngine";
-import type { GameState, Room, RoomConfig, OnlineGameState } from "../../types";
 
 export class FirestoreSyncAdapter extends BaseSyncAdapter {
 	private connected = false;
@@ -164,9 +164,12 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		// Support both new playerSlots format and legacy players format
 		// New format: playerSlots = { [odahId]: 1 | 2 }
 		// Legacy format: players = { [odahId]: { slot, name, color } }
-		const playerSlots: Record<string, 1 | 2> = room.playerSlots ||
+		const playerSlots: Record<string, 1 | 2> =
+			room.playerSlots ||
 			(room.players
-				? Object.fromEntries(Object.entries(room.players).map(([k, v]) => [k, v.slot]))
+				? Object.fromEntries(
+						Object.entries(room.players).map(([k, v]) => [k, v.slot]),
+					)
 				: {});
 
 		// Check if player is already in the room (rejoining)
@@ -185,7 +188,9 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		}
 
 		// Determine player slot (host is always 1, guest is always 2)
-		const playerSlot: 1 | 2 = isExistingPlayer ? playerSlots[options.odahId] : 2;
+		const playerSlot: 1 | 2 = isExistingPlayer
+			? playerSlots[options.odahId]
+			: 2;
 
 		// Add/update player slot in room (just the slot number, not name/color)
 		// Name/color come from RTDB presence only
@@ -390,7 +395,8 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 			};
 			// Only include optional fields if they have values
 			if (card.gradient !== undefined) cleaned.gradient = card.gradient;
-			if (card.matchedByPlayerId !== undefined) cleaned.matchedByPlayerId = card.matchedByPlayerId;
+			if (card.matchedByPlayerId !== undefined)
+				cleaned.matchedByPlayerId = card.matchedByPlayerId;
 			return cleaned;
 		});
 
@@ -422,23 +428,32 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		}
 
 		const roomCode = this.roomCode;
-		console.log(`[Adapter] Setting up state subscription for /games/${roomCode}`);
+		console.log(
+			`[Adapter] Setting up state subscription for /games/${roomCode}`,
+		);
 		const gameRef = doc(db, "games", roomCode);
 
 		const unsubscribe = onSnapshot(
 			gameRef,
 			(snapshot) => {
-				console.log(`[Adapter] onSnapshot callback fired for /games/${roomCode}`, {
-					exists: snapshot.exists(),
-					fromCache: snapshot.metadata.fromCache,
-					hasPendingWrites: snapshot.metadata.hasPendingWrites,
-				});
+				console.log(
+					`[Adapter] onSnapshot callback fired for /games/${roomCode}`,
+					{
+						exists: snapshot.exists(),
+						fromCache: snapshot.metadata.fromCache,
+						hasPendingWrites: snapshot.metadata.hasPendingWrites,
+					},
+				);
 				if (snapshot.exists()) {
 					const gameState = snapshot.data() as OnlineGameState;
-					console.log(`[Adapter] Calling callback with syncVersion=${(gameState as any).syncVersion}`);
+					console.log(
+						`[Adapter] Calling callback with syncVersion=${(gameState as any).syncVersion}`,
+					);
 					callback(gameState);
 				} else {
-					console.warn(`[Adapter] Game document does not exist: /games/${roomCode}`);
+					console.warn(
+						`[Adapter] Game document does not exist: /games/${roomCode}`,
+					);
 				}
 			},
 			(error) => {

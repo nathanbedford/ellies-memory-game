@@ -11,20 +11,20 @@
 
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
-import type { GameState } from "../types";
 import {
-	createInitialState,
-	resetGameState,
-	startGameWithCards,
-	flipCard,
-	checkMatch,
 	applyMatch,
 	applyNoMatch,
-	checkAndFinishGame,
-	endTurn,
-	initializeCards,
 	type CardImage,
+	checkAndFinishGame,
+	checkMatch,
+	createInitialState,
+	endTurn,
+	flipCard,
+	initializeCards,
+	resetGameState,
+	startGameWithCards,
 } from "../services/game/GameEngine";
+import type { GameState } from "../types";
 
 // ============================================
 // Store State
@@ -124,9 +124,8 @@ export const selectIsGameOver = (state: GameStore) =>
 	state.gameState.gameStatus === "finished";
 
 export const selectCanFlipBase = (state: GameStore) => {
-	const selectedCards = state.gameState.cards.filter(c => c.isFlipped && !c.isMatched);
-	return (
-		state.gameState.gameStatus === "playing" &&
-		selectedCards.length < 2
+	const selectedCards = state.gameState.cards.filter(
+		(c) => c.isFlipped && !c.isMatched,
 	);
+	return state.gameState.gameStatus === "playing" && selectedCards.length < 2;
 };

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 
 // Local background images from public/backgrounds/ folder
 // Add new background images here - they will be automatically included
