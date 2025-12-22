@@ -68,21 +68,39 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
     });
     const currentPlayer1 = players.find(p => p.id === 1);
     const currentPlayer2 = players.find(p => p.id === 2);
+
+    // Track if any changes were made that require state updates
+    let hasChanges = false;
+
     // Apply any name changes before starting
     if (tempNames[1] !== currentPlayer1?.name && onPlayerNameChange) {
       onPlayerNameChange(1, tempNames[1]);
+      hasChanges = true;
     }
     if (tempNames[2] !== currentPlayer2?.name && onPlayerNameChange) {
       onPlayerNameChange(2, tempNames[2]);
+      hasChanges = true;
     }
     // Apply any color changes before starting
     if (tempColors[1] !== currentPlayer1?.color && onPlayerColorChange) {
       onPlayerColorChange(1, tempColors[1]);
+      hasChanges = true;
     }
     if (tempColors[2] !== currentPlayer2?.color && onPlayerColorChange) {
       onPlayerColorChange(2, tempColors[2]);
+      hasChanges = true;
     }
-    onStartGame(selectedPlayer);
+
+    // If changes were made, defer game start to allow React to process state updates.
+    // This fixes a bug where changed player names wouldn't appear on the first turn
+    // because the derived players array hadn't updated yet.
+    if (hasChanges) {
+      setTimeout(() => {
+        onStartGame(selectedPlayer);
+      }, 0);
+    } else {
+      onStartGame(selectedPlayer);
+    }
   };
 
   const handleNameClick = (playerId: 1 | 2) => {
