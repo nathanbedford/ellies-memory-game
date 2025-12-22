@@ -68,6 +68,15 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
     });
     const currentPlayer1 = players.find(p => p.id === 1);
     const currentPlayer2 = players.find(p => p.id === 2);
+    
+    // Check if any changes need to be applied
+    const nameChanged = 
+      (tempNames[1] !== currentPlayer1?.name) || 
+      (tempNames[2] !== currentPlayer2?.name);
+    const colorChanged = 
+      (tempColors[1] !== currentPlayer1?.color) || 
+      (tempColors[2] !== currentPlayer2?.color);
+    
     // Apply any name changes before starting
     if (tempNames[1] !== currentPlayer1?.name && onPlayerNameChange) {
       onPlayerNameChange(1, tempNames[1]);
@@ -82,7 +91,15 @@ export const GameStartModal = ({ players, currentPlayer, onStartGame, onPlayerNa
     if (tempColors[2] !== currentPlayer2?.color && onPlayerColorChange) {
       onPlayerColorChange(2, tempColors[2]);
     }
-    onStartGame(selectedPlayer);
+    
+    // If names or colors changed, defer game start to next tick to allow React to update
+    if (nameChanged || colorChanged) {
+      setTimeout(() => {
+        onStartGame(selectedPlayer);
+      }, 0);
+    } else {
+      onStartGame(selectedPlayer);
+    }
   };
 
   const handleNameClick = (playerId: 1 | 2) => {
