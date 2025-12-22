@@ -1,10 +1,9 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { useLocalGame } from './hooks/useLocalGame';
+import { useGame } from './hooks/useGame';
 import { useCardPacks } from './hooks/useCardPacks';
 import { useBackgroundSelector, BackgroundTheme, BACKGROUND_OPTIONS } from './hooks/useBackgroundSelector';
 import { useCardBackSelector, CardBackType, CARD_BACK_OPTIONS } from './hooks/useCardBackSelector';
-import { useOnlineGame } from './hooks/useOnlineGame';
 import { useOnlineStore } from './stores/onlineStore';
 import { useCursorSync } from './hooks/useCursorSync';
 import { CardPack, GameMode, OnlineGameState } from './types';
@@ -74,8 +73,6 @@ function App() {
   const backgroundBlurEnabled = useSettingsStore((state) => state.settings.backgroundBlurEnabled);
   const setBackgroundBlurEnabled = useSettingsStore((state) => state.setBackgroundBlurEnabled);
 
-  // Local game hook - uses useGameController internally for unified game logic
-  const localGame = useLocalGame();
   const { selectedBackground, setSelectedBackground, getCurrentBackground } = useBackgroundSelector();
   const { selectedCardBack, setSelectedCardBack, getCurrentCardBack } = useCardBackSelector();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -193,17 +190,13 @@ function App() {
   // Get local player slot from presence data
   const localPlayerSlot = odahId && presenceData[odahId] ? presenceData[odahId].slot : null;
 
-  // Online game hook - only meaningful when in online mode with valid room
-  // Game state is loaded from separate /games/{roomCode} document via Firestore subscription
-  // Pass 0 when localPlayerSlot is not yet known from presence data - the hook will delay
-  // subscription until a valid slot (1 or 2) is received, preventing race conditions
-  const onlineGame = useOnlineGame({
+  // Unified game hook - handles both local and online modes
+  // Internally uses useLocalGame for settings and useOnlineGame for online state/actions
+  const game = useGame({
+    mode: gameMode,
     roomCode: roomCode || '',
     localPlayerSlot: localPlayerSlot || 0,
-    flipDuration: localGame.flipDuration,
-    initialGameState: localGame.gameState, // Used as fallback until Firestore snapshot arrives
-    players: getPlayersFromPresence(presenceData),
-    effectManager: localGame.effectManager,
+    presenceData,
   });
 
   const getPackImagesById = useCallback((packId: CardPack) => {
@@ -245,8 +238,8 @@ function App() {
         const initialState = createInitialState(options.firstPlayer);
         const nextState = startGameWithCards(initialState, cards);
 
-        // Increment gameRound for new game - read current round from online game state
-        const currentGameRound = (onlineGame.gameState as OnlineGameState)?.gameRound || 0;
+        // Increment gameRound for new game - read current round from game state
+        const currentGameRound = (game.gameState as OnlineGameState)?.gameRound || 0;
         const newGameRound = currentGameRound + 1;
 
         // Create online state with incremented gameRound
@@ -261,7 +254,7 @@ function App() {
 
         // Update local game state and refs so host's subsequent actions use correct gameRound
         // This is critical - without this, the host's card flips would send gameRound: 0
-        onlineGame.setFullGameState(onlineState);
+        game.setFullGameState(onlineState);
 
         const configUpdates: { cardPack?: CardPack; background?: string; cardBack?: string; pairCount?: number } = {};
         if (room.config?.cardPack !== options.pack) configUpdates.cardPack = options.pack;
@@ -275,25 +268,17 @@ function App() {
         console.error('Failed to start online round', error);
       }
     },
-    [roomCode, room, isHost, getPackImagesById, updateRoomConfig, presenceData, onlineGame]
+    [roomCode, room, isHost, getPackImagesById, updateRoomConfig, presenceData, game]
   );
 
-  // Select which game interface to use based on mode
-  // In online mode: use onlineGame for state/actions, localGame for settings
+  // Determine if we're in online mode (used for UI/routing decisions)
   const isOnlineMode = gameMode === 'online' && roomCode && localPlayerSlot !== null;
 
   // Disconnect detection for online mode
   const disconnectState = useOpponentDisconnect({ timeoutSeconds: 60 });
 
-  const gameState = isOnlineMode ? onlineGame.gameState : localGame.gameState;
-
-  // Derive players from presence data (online) or settings (local)
-  const players = useMemo(() => {
-    if (isOnlineMode) {
-      return getPlayersFromPresence(presenceData);
-    }
-    return localGame.players;
-  }, [isOnlineMode, presenceData, localGame.players]);
+  // Game state and players come from the unified hook (handles both modes)
+  const { gameState, players } = game;
 
   // Derive winner/isTie from game state when game is finished
   const { winner, isTie } = useMemo(() => {
@@ -408,15 +393,12 @@ function App() {
       unsubPresence();
     };
   }, [isOnlineMode, roomCode, gameState.gameStatus, subscribeToPresence]);
-  const setFullGameState = isOnlineMode ? onlineGame.setFullGameState : localGame.setFullGameState;
-  const flipCard = isOnlineMode ? onlineGame.flipCard : localGame.flipCard;
-  const endTurn = isOnlineMode ? onlineGame.endTurn : localGame.endTurn;
-  const toggleAllCardsAdmin = isOnlineMode ? onlineGame.toggleAllCardsFlipped : localGame.toggleAllCardsFlipped;
-  const endGameEarly = isOnlineMode ? onlineGame.endGameEarly : localGame.endGameEarly;
-  const triggerGameFinish = isOnlineMode ? onlineGame.triggerGameFinish : localGame.triggerGameFinish;
 
-  // Settings and game functions come from useLocalGame (unified hook)
+  // All game actions and settings come from the unified hook
   const {
+    // Game actions (work in both local and online modes)
+    setFullGameState, flipCard, endTurn, resetGame, triggerGameFinish,
+    toggleAllCardsFlipped: toggleAllCardsAdmin, endGameEarly,
     // Settings
     cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled,
     // Settings actions
@@ -426,9 +408,9 @@ function App() {
     updatePlayerName, updatePlayerColor,
     // Layout
     updateAutoSizeMetrics, calculateOptimalCardSizeForCount,
-    // Game actions
-    initializeGame, startGameWithFirstPlayer, resetGame, isAnimatingCards,
-  } = localGame;
+    // Game setup
+    initializeGame, startGameWithFirstPlayer, isAnimatingCards,
+  } = game;
 
   // Cursor sync for online mode - only active during gameplay
   const cursorSyncEnabled = Boolean(isOnlineMode && gameState.gameStatus === 'playing');
@@ -889,8 +871,7 @@ function App() {
   }, [autoSizeEnabled, computeLayoutMetrics, updateAutoSizeMetrics]);
 
   // Auto-size when cards appear (works for both local and online modes)
-  // This is needed because useLocalGame's internal effect only sees its own gameState,
-  // but in online mode the cards are in onlineGame.gameState
+  // The unified game hook provides gameState for both modes
   useEffect(() => {
     if (!autoSizeEnabled || gameState.cards.length === 0) {
       return;
@@ -1148,7 +1129,7 @@ function App() {
       const currentPairCount = lastConfig?.pairCount || room?.config?.pairCount || Math.floor(gameState.cards.length / 2) || 20;
       const configSource = lastConfig || {
         ...activeConfig,
-        firstPlayer: (onlineGame.gameState?.currentPlayer as 1 | 2) || 1,
+        firstPlayer: (gameState?.currentPlayer as 1 | 2) || 1,
         pairCount: currentPairCount,
       };
 
@@ -1182,7 +1163,7 @@ function App() {
     setSelectedCardBack(lastConfig.cardBack);
     setShowResetConfirmation(false);
     setIsReplaying(true);
-  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig, setSelectedPack, setSelectedBackground, setSelectedCardBack, gameState.cards.length, onlineGame.gameState?.currentPlayer, navigate]);
+  }, [isOnlineMode, isHost, lastConfig, room, startOnlineRound, resetGame, getActiveConfig, setSelectedPack, setSelectedBackground, setSelectedCardBack, gameState.cards.length, gameState?.currentPlayer, navigate]);
 
   const handleNewGame = async () => {
     // Close reset confirmation modal
