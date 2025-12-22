@@ -4,41 +4,49 @@
  * Handles the flow: Connect -> Create/Join -> Wait -> Start
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { UserPlus, LogIn } from 'lucide-react';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { useOnlineStore, useSettingsStore } from '../../stores';
-import { ConnectionStatus } from './ConnectionStatus';
-import { RoomCodeDisplay } from './RoomCodeDisplay';
-import { JoinRoomForm } from './JoinRoomForm';
-import { WaitingRoom } from './WaitingRoom';
-import { getFirestoreSyncAdapter } from '../../services/sync/FirestoreSyncAdapter';
-import { initializeCards, createInitialState, startGameWithCards } from '../../services/game/GameEngine';
-import { CARD_DECKS } from '../../data/cardDecks';
-import { DEFAULT_PAIR_COUNT } from '../../utils/gridLayout';
-import type { CardPack, OnlineGameState } from '../../types';
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { LogIn, UserPlus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CARD_DECKS } from "../../data/cardDecks";
+import {
+  createInitialState,
+  initializeCards,
+  startGameWithCards,
+} from "../../services/game/GameEngine";
+import { getFirestoreSyncAdapter } from "../../services/sync/FirestoreSyncAdapter";
+import { useOnlineStore, useSettingsStore } from "../../stores";
+import type { CardPack, OnlineGameState } from "../../types";
+import { DEFAULT_PAIR_COUNT } from "../../utils/gridLayout";
+import { ConnectionStatus } from "./ConnectionStatus";
+import { JoinRoomForm } from "./JoinRoomForm";
+import { RoomCodeDisplay } from "./RoomCodeDisplay";
+import { WaitingRoom } from "./WaitingRoom";
 
-type LobbyView = 'choice' | 'create' | 'join' | 'waiting';
+type LobbyView = "choice" | "create" | "join" | "waiting";
 
 interface OnlineLobbyProps {
   onBack: () => void;
-  onGameStart: (gameState: import('../../types').GameState) => void;
+  onGameStart: (gameState: import("../../types").GameState) => void;
 }
 
 export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
   const navigate = useNavigate();
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
-  
+
   // Derive view from current route
-  const view: LobbyView = currentPath === '/online/create' ? 'create' :
-                          currentPath === '/online/join' ? 'join' :
-                          currentPath === '/online/waiting' ? 'waiting' :
-                          'choice';
-  
+  const view: LobbyView =
+    currentPath === "/online/create"
+      ? "create"
+      : currentPath === "/online/join"
+        ? "join"
+        : currentPath === "/online/waiting"
+          ? "waiting"
+          : "choice";
+
   const [isLoading, setIsLoading] = useState(false);
   const hasStartedGame = useRef(false);
-  const [playerNameInput, setPlayerNameInput] = useState('');
+  const [playerNameInput, setPlayerNameInput] = useState("");
 
   const {
     connectionStatus,
@@ -67,11 +75,11 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
   // Helper to get images for a card pack
   const getPackImages = useCallback((packId: CardPack) => {
-    const deck = CARD_DECKS.find(d => d.id === packId) || CARD_DECKS[0];
+    const deck = CARD_DECKS.find((d) => d.id === packId) || CARD_DECKS[0];
     return deck.cards.map((card) => ({
       id: card.id,
       url: card.imageUrl || card.emoji,
-      gradient: card.gradient
+      gradient: card.gradient,
     }));
   }, []);
 
@@ -82,8 +90,11 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     try {
       // Get card images for the selected pack
       const cardPack = room.config?.cardPack || settings.cardPack;
-      const pairCount = room.config?.pairCount ?? settings.onlinePairCount ?? DEFAULT_PAIR_COUNT;
-      
+      const pairCount =
+        room.config?.pairCount ??
+        settings.onlinePairCount ??
+        DEFAULT_PAIR_COUNT;
+
       // Get all images then randomly select subset based on pair count
       const allImages = getPackImages(cardPack);
       const shuffled = [...allImages].sort(() => 0.5 - Math.random());
@@ -91,11 +102,11 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
       // Create initial game state from presence data
       const players = Object.values(presenceData);
-      const hostPlayer = players.find(p => p.slot === 1);
-      const guestPlayer = players.find(p => p.slot === 2);
+      const hostPlayer = players.find((p) => p.slot === 1);
+      const guestPlayer = players.find((p) => p.slot === 2);
 
       if (!hostPlayer || !guestPlayer) {
-        console.error('Missing players');
+        console.error("Missing players");
         return;
       }
 
@@ -112,8 +123,8 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
       const onlineState: OnlineGameState = {
         ...gameState,
         syncVersion: 1,
-        gameRound: 1,  // First round
-        lastUpdatedBy: 1,  // Host is always slot 1
+        gameRound: 1, // First round
+        lastUpdatedBy: 1, // Host is always slot 1
       };
 
       // Start game via adapter (syncs to Firestore)
@@ -123,13 +134,22 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
       // Pass the complete online state so host's refs are initialized correctly
       onGameStart(onlineState);
     } catch (error) {
-      console.error('Failed to start game:', error);
+      console.error("Failed to start game:", error);
     }
-  }, [isHost, room, roomCode, settings.cardPack, getPackImages, onGameStart, presenceData]);
+  }, [
+    isHost,
+    room,
+    roomCode,
+    settings.cardPack,
+    getPackImages,
+    onGameStart,
+    presenceData,
+    settings.onlinePairCount,
+  ]);
 
   // Connect on mount
   useEffect(() => {
-    if (connectionStatus === 'disconnected') {
+    if (connectionStatus === "disconnected") {
       connect().catch(console.error);
     }
   }, [connectionStatus, connect]);
@@ -146,8 +166,12 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
   // Move to waiting view when room is created/joined
   useEffect(() => {
-    if (roomCode && (view === 'create' || view === 'join') && currentPath !== '/online/waiting') {
-      navigate({ to: '/online/waiting' });
+    if (
+      roomCode &&
+      (view === "create" || view === "join") &&
+      currentPath !== "/online/waiting"
+    ) {
+      navigate({ to: "/online/waiting" });
       setIsLoading(false);
     }
   }, [roomCode, view, currentPath, navigate]);
@@ -155,10 +179,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
   // Auto-transition to game when host starts (for guest players)
   // Game state is now in separate /games/{roomCode} document, so fetch it from adapter
   useEffect(() => {
-    if (
-      room?.status === 'playing' &&
-      !hasStartedGame.current
-    ) {
+    if (room?.status === "playing" && !hasStartedGame.current) {
       hasStartedGame.current = true;
       // Fetch game state from separate Firestore document
       const adapter = getFirestoreSyncAdapter();
@@ -175,7 +196,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     clearError();
 
     try {
-      const preferredName = playerNameInput.trim() || 'Player';
+      const preferredName = playerNameInput.trim() || "Player";
       setPlayerNamePreference(preferredName);
 
       // Get stored online preferences, fall back to local game settings
@@ -198,7 +219,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     clearError();
 
     try {
-      const preferredName = playerNameInput.trim() || 'Player';
+      const preferredName = playerNameInput.trim() || "Player";
       setPlayerNamePreference(preferredName);
       await joinRoom(code, preferredName, settings.player1Color);
     } catch {
@@ -208,16 +229,16 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
   const handleLeaveRoom = async () => {
     await leaveRoom();
-    navigate({ to: '/online' });
+    navigate({ to: "/online" });
   };
 
   const handleBack = () => {
-    if (view === 'waiting') {
+    if (view === "waiting") {
       handleLeaveRoom();
-    } else if (view === 'choice') {
+    } else if (view === "choice") {
       onBack();
     } else {
-      navigate({ to: '/online' });
+      navigate({ to: "/online" });
       clearError();
     }
   };
@@ -225,7 +246,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
   // Render based on current view
   const renderContent = () => {
     // Still connecting
-    if (connectionStatus === 'connecting') {
+    if (connectionStatus === "connecting") {
       return (
         <div className="text-center space-y-6 py-8">
           <div className="text-6xl animate-bounce">{"connect"}</div>
@@ -235,12 +256,13 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     }
 
     // Connection failed
-    if (connectionStatus === 'disconnected' && error) {
+    if (connectionStatus === "disconnected" && error) {
       return (
         <div className="text-center space-y-6 py-8">
           <div className="text-6xl">{"err"}</div>
           <p className="text-red-600 font-medium">{error}</p>
           <button
+            type="button"
             onClick={() => connect()}
             className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
           >
@@ -251,18 +273,26 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
     }
 
     switch (view) {
-      case 'choice':
+      case "choice":
         return (
           <div className="text-center space-y-8">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Online Multiplayer</h2>
-              <p className="text-gray-600">Create a room or join an existing one</p>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                Online Multiplayer
+              </h2>
+              <p className="text-gray-600">
+                Create a room or join an existing one
+              </p>
             </div>
 
             <div className="max-w-sm mx-auto w-full text-left space-y-2">
-              <label className="text-sm font-semibold text-gray-700" htmlFor="online-name-input">
+              <label
+                className="text-sm font-semibold text-gray-700"
+                htmlFor="online-name-input"
+              >
                 Your online name
               </label>
+              {/** biome-ignore lint/correctness/useUniqueElementIds: Opus says this is fine */}
               <input
                 id="online-name-input"
                 type="text"
@@ -274,14 +304,16 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
                 placeholder="Enter your name"
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-500">This name is shared when you create or join rooms.</p>
+              <p className="text-xs text-gray-500">
+                This name is shared when you create or join rooms.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl mx-auto">
               <button
                 type="button"
                 onClick={() => {
-                  navigate({ to: '/online/create' });
+                  navigate({ to: "/online/create" });
                   handleCreateRoom();
                 }}
                 disabled={isLoading}
@@ -291,7 +323,9 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
                   <div className="flex justify-center">
                     <UserPlus className="w-14 h-14 text-blue-500 transition-transform group-hover:scale-110" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800">Create Room</h3>
+                  <h3 className="text-xl font-bold text-gray-800">
+                    Create Room
+                  </h3>
                   <p className="text-gray-600 text-sm">
                     Start a new game and invite a friend
                   </p>
@@ -300,7 +334,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
 
               <button
                 type="button"
-                onClick={() => navigate({ to: '/online/join' })}
+                onClick={() => navigate({ to: "/online/join" })}
                 disabled={isLoading}
                 className="p-8 rounded-xl border-3 border-gray-200 bg-white hover:border-purple-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105 group disabled:opacity-50"
               >
@@ -317,6 +351,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
             </div>
 
             <button
+              type="button"
               onClick={onBack}
               className="text-gray-500 hover:text-gray-700 font-medium"
             >
@@ -325,7 +360,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
           </div>
         );
 
-      case 'create':
+      case "create":
         return (
           <div className="text-center space-y-6 py-8">
             <div className="text-6xl animate-pulse">{"..."}</div>
@@ -333,7 +368,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
           </div>
         );
 
-      case 'join':
+      case "join":
         return (
           <JoinRoomForm
             onJoin={handleJoinRoom}
@@ -343,7 +378,7 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
           />
         );
 
-      case 'waiting':
+      case "waiting":
         return roomCode && room ? (
           <WaitingRoom
             roomCode={roomCode}
@@ -370,16 +405,14 @@ export const OnlineLobby = ({ onBack, onGameStart }: OnlineLobbyProps) => {
       </div>
 
       {/* Room Code (when in room) */}
-      {roomCode && view === 'waiting' && (
+      {roomCode && view === "waiting" && (
         <div className="mb-6">
           <RoomCodeDisplay roomCode={roomCode} />
         </div>
       )}
 
       {/* Main Content */}
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        {renderContent()}
-      </div>
+      <div className="bg-white rounded-xl shadow-lg p-8">{renderContent()}</div>
     </div>
   );
 };

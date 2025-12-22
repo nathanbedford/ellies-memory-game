@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EffectManager, type GameEffect } from "./EffectManager";
 import { createTTSEffect, type TTSHook } from "./TTSEffect";
 

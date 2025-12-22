@@ -13,13 +13,13 @@
  */
 
 import { useCallback, useEffect, useMemo } from "react";
+import { createTTSEffect, EffectManager } from "../services/effects";
+import { getPlayersFromSettings } from "../services/game/GameEngine";
+import { useSettingsStore, useUIStore } from "../stores";
 import type { Card, GameState } from "../types";
+import { calculateGridDimensions } from "../utils/gridLayout";
 import { useGameController } from "./useGameController";
 import { useTextToSpeech } from "./useTextToSpeech";
-import { getPlayersFromSettings } from "../services/game/GameEngine";
-import { EffectManager, createTTSEffect } from "../services/effects";
-import { calculateGridDimensions } from "../utils/gridLayout";
-import { useSettingsStore, useUIStore } from "../stores";
 
 export interface UseLocalGameReturn {
 	// State

@@ -1,14 +1,14 @@
-import type { GameEffect } from './EffectManager';
+import type { GameEffect } from "./EffectManager";
 
 /**
  * Interface for TTS hook return type
  */
 export interface TTSHook {
-  isAvailable: () => boolean;
-  speakPlayerTurn: (playerName: string) => void;
-  speakMatchFound: (playerName: string) => void;
-  speak: (text: string) => void;
-  cancel: () => void;
+	isAvailable: () => boolean;
+	speakPlayerTurn: (playerName: string) => void;
+	speakMatchFound: (playerName: string) => void;
+	speak: (text: string) => void;
+	cancel: () => void;
 }
 
 /**
@@ -26,46 +26,48 @@ export interface TTSHook {
  * @param delay Optional delay in ms before speaking (default: 400ms for better UX)
  */
 export function createTTSEffect(
-  ttsHook: TTSHook,
-  isEnabled: () => boolean,
-  delay: number = 400
+	ttsHook: TTSHook,
+	isEnabled: () => boolean,
+	delay: number = 400,
 ): GameEffect {
-  const speakWithDelay = (fn: () => void) => {
-    if (!isEnabled() || !ttsHook.isAvailable()) {
-      return;
-    }
-    setTimeout(fn, delay);
-  };
+	const speakWithDelay = (fn: () => void) => {
+		if (!isEnabled() || !ttsHook.isAvailable()) {
+			return;
+		}
+		setTimeout(fn, delay);
+	};
 
-  return {
-    onMatchFound(playerName: string, _playerId: number, cardName?: string) {
-      speakWithDelay(() => {
-        if (cardName) {
-          // Use custom message with card name for richer feedback
-          ttsHook.speak(`${playerName} found a ${cardName}! It's still their turn.`);
-        } else {
-          // Fall back to generic message
-          ttsHook.speakMatchFound(playerName);
-        }
-      });
-    },
+	return {
+		onMatchFound(playerName: string, _playerId: number, cardName?: string) {
+			speakWithDelay(() => {
+				if (cardName) {
+					// Use custom message with card name for richer feedback
+					ttsHook.speak(
+						`${playerName} found a ${cardName}! It's still their turn.`,
+					);
+				} else {
+					// Fall back to generic message
+					ttsHook.speakMatchFound(playerName);
+				}
+			});
+		},
 
-    onTurnChange(playerName: string) {
-      speakWithDelay(() => ttsHook.speakPlayerTurn(playerName));
-    },
+		onTurnChange(playerName: string) {
+			speakWithDelay(() => ttsHook.speakPlayerTurn(playerName));
+		},
 
-    onGameStart(firstPlayerName: string) {
-      speakWithDelay(() => ttsHook.speakPlayerTurn(firstPlayerName));
-    },
+		onGameStart(firstPlayerName: string) {
+			speakWithDelay(() => ttsHook.speakPlayerTurn(firstPlayerName));
+		},
 
-    onGameOver(winner, isTie) {
-      speakWithDelay(() => {
-        if (isTie) {
-          ttsHook.speak("It's a tie!");
-        } else if (winner) {
-          ttsHook.speak(`${winner.name} wins!`);
-        }
-      });
-    },
-  };
+		onGameOver(winner, isTie) {
+			speakWithDelay(() => {
+				if (isTie) {
+					ttsHook.speak("It's a tie!");
+				} else if (winner) {
+					ttsHook.speak(`${winner.name} wins!`);
+				}
+			});
+		},
+	};
 }

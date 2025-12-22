@@ -14,11 +14,11 @@
  */
 
 import { useEffect, useMemo } from "react";
-import { getFirestoreSyncAdapter } from "../services/sync/FirestoreSyncAdapter";
-import { logger } from "../services/logging/LogService";
-import type { GameState, Player } from "../types";
-import { useGameController, type GameSettings } from "./useGameController";
 import type { EffectManager } from "../services/effects";
+import { logger } from "../services/logging/LogService";
+import { getFirestoreSyncAdapter } from "../services/sync/FirestoreSyncAdapter";
+import type { GameState, Player } from "../types";
+import { type GameSettings, useGameController } from "./useGameController";
 
 interface UseOnlineGameOptions {
 	roomCode: string;
@@ -30,7 +30,14 @@ interface UseOnlineGameOptions {
 }
 
 export function useOnlineGame(options: UseOnlineGameOptions) {
-	const { roomCode, localPlayerSlot, flipDuration, initialGameState, players, effectManager } = options;
+	const {
+		roomCode,
+		localPlayerSlot,
+		flipDuration,
+		initialGameState,
+		players,
+		effectManager,
+	} = options;
 
 	// Set logger context for this room/player
 	useEffect(() => {
@@ -50,14 +57,17 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 	}, [roomCode]);
 
 	// Default settings for online mode (settings are managed by the host)
-	const initialSettings: GameSettings = useMemo(() => ({
-		flipDuration,
-		cardSize: 100, // Default - not used in online mode
-		autoSizeEnabled: true,
-		useWhiteCardBackground: false,
-		emojiSizePercentage: 100,
-		ttsEnabled: false,
-	}), [flipDuration]);
+	const initialSettings: GameSettings = useMemo(
+		() => ({
+			flipDuration,
+			cardSize: 100, // Default - not used in online mode
+			autoSizeEnabled: true,
+			useWhiteCardBackground: false,
+			emojiSizePercentage: 100,
+			ttsEnabled: false,
+		}),
+		[flipDuration],
+	);
 
 	// Use the game controller with online mode configuration
 	const controller = useGameController({
@@ -76,7 +86,11 @@ export function useOnlineGame(options: UseOnlineGameOptions) {
 		if (controller.settings.flipDuration !== flipDuration) {
 			controller.updateSettings({ flipDuration });
 		}
-	}, [flipDuration, controller.settings.flipDuration, controller.updateSettings]);
+	}, [
+		flipDuration,
+		controller.settings.flipDuration,
+		controller.updateSettings,
+	]);
 
 	return {
 		gameState: controller.gameState,

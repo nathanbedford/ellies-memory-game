@@ -9,7 +9,7 @@
  * The hook reads from onlineStore's presence tracking and manages a countdown timer.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOnlineStore } from "../stores/onlineStore";
 
 interface UseOpponentDisconnectOptions {

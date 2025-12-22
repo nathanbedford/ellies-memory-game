@@ -7,18 +7,18 @@
 
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
-import type {
-	GameMode,
-	ConnectionStatus,
-	Room,
-	PresenceData,
-	CardPack,
-} from "../types";
 import {
 	getFirestoreSyncAdapter,
 	resetFirestoreSyncAdapter,
 } from "../services/sync/FirestoreSyncAdapter";
 import { PresenceService } from "../services/sync/PresenceService";
+import type {
+	CardPack,
+	ConnectionStatus,
+	GameMode,
+	PresenceData,
+	Room,
+} from "../types";
 
 // ============================================
 // Module-level subscription management

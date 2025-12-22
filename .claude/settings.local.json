@@ -1,15 +1,15 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(for dir in /Users/nathanbedford/dev/playground/memory-finally/public/deck-images/*/)",
-      "Bash(done)",
-      "Bash(for deck in */)",
-      "Bash(find:*)",
-      "Bash(cat:*)",
-      "Bash(bun --version:*)",
-      "Bash(git log:*)"
-    ],
-    "deny": [],
-    "ask": []
-  }
+	"permissions": {
+		"allow": [
+			"Bash(for dir in /Users/nathanbedford/dev/playground/memory-finally/public/deck-images/*/)",
+			"Bash(done)",
+			"Bash(for deck in */)",
+			"Bash(find:*)",
+			"Bash(cat:*)",
+			"Bash(bun --version:*)",
+			"Bash(git log:*)"
+		],
+		"deny": [],
+		"ask": []
+	}
 }

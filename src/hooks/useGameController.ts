@@ -11,23 +11,22 @@
  * 4. EffectManager handles side effects (TTS, sounds) in a pluggable way
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import type { Card, GameState, OnlineGameState } from "../types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { EffectManager } from "../services/effects/EffectManager";
 import {
-	canFlipCard,
-	flipCard as engineFlipCard,
-	checkMatch,
 	applyMatch,
 	applyNoMatchWithReset,
-	isGameOver,
-	finishGame,
-	endTurn as engineEndTurn,
-	getPlayerById,
 	calculateWinner,
+	canFlipCard,
+	checkMatch,
+	endTurn as engineEndTurn,
+	flipCard as engineFlipCard,
+	finishGame,
+	getPlayerById,
+	isGameOver,
 } from "../services/game/GameEngine";
-import type { Player } from "../types";
-import { EffectManager } from "../services/effects/EffectManager";
 import type { ISyncAdapter } from "../services/sync/ISyncAdapter";
+import type { Card, GameState, OnlineGameState, Player } from "../types";
 
 // ============================================
 // Types
@@ -128,9 +127,9 @@ const STUCK_THRESHOLD_MS = 15000; // 15 seconds without resolution is stuck
  */
 const formatCardNameForSpeech = (imageId: string): string => {
 	return imageId
-		.split('-')
-		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(' ');
+		.split("-")
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
 };
 
 // ============================================
@@ -251,7 +250,9 @@ export function useGameController(
 		// This prevents the race condition where guest initially gets slot 1 as fallback
 		// and then filters out host's first card flip thinking it's their own update
 		if (!localPlayerSlot || localPlayerSlot < 1 || localPlayerSlot > 2) {
-			console.log("[SUBSCRIPTION] Invalid localPlayerSlot, skipping", { localPlayerSlot });
+			console.log("[SUBSCRIPTION] Invalid localPlayerSlot, skipping", {
+				localPlayerSlot,
+			});
 			return;
 		}
 
@@ -283,11 +284,14 @@ export function useGameController(
 			// Apply if remote is newer OR if it's a new round (reset)
 			if (remoteVersion > lastSyncedVersionRef.current || isNewRound) {
 				if (isNewRound) {
-					console.log("[SUBSCRIPTION] New round detected - resetting version tracking", {
-						oldRound: lastGameRoundRef.current,
-						newRound: remoteGameRound,
-						remoteVersion,
-					});
+					console.log(
+						"[SUBSCRIPTION] New round detected - resetting version tracking",
+						{
+							oldRound: lastGameRoundRef.current,
+							newRound: remoteGameRound,
+							remoteVersion,
+						},
+					);
 					// Reset version tracking for new round
 					lastSyncedVersionRef.current = remoteVersion;
 					localVersionRef.current = remoteVersion;
@@ -406,40 +410,47 @@ export function useGameController(
 				return;
 			}
 
-		const { isMatch, firstCard, secondCard } = matchResult;
-		const cardIds: [string, string] = [firstCard.id, secondCard.id];
-		const currentPlayerId = currentState.currentPlayer;
-		// Use ref to always get latest player names
-		const currentPlayerName =
-			getPlayerById(playersRef.current, currentPlayerId)?.name ||
-			`Player ${currentPlayerId}`;
+			const { isMatch, firstCard, secondCard } = matchResult;
+			const cardIds: [string, string] = [firstCard.id, secondCard.id];
+			const currentPlayerId = currentState.currentPlayer;
+			// Use ref to always get latest player names
+			const currentPlayerName =
+				getPlayerById(playersRef.current, currentPlayerId)?.name ||
+				`Player ${currentPlayerId}`;
 
-		if (isMatch) {
-			// Apply match directly - animation is handled locally by GameBoard
-			// NOTE: We intentionally don't call finishGame() here even if all cards are matched.
-			// The game finish is triggered by GameBoard's onLastMatchAnimationComplete callback
-			// after the flying card animation completes. This ensures the animation plays before
-			// the game over modal appears.
-			const matchedState = applyMatch(currentState, matchResult);
+			if (isMatch) {
+				// Apply match directly - animation is handled locally by GameBoard
+				// NOTE: We intentionally don't call finishGame() here even if all cards are matched.
+				// The game finish is triggered by GameBoard's onLastMatchAnimationComplete callback
+				// after the flying card animation completes. This ensures the animation plays before
+				// the game over modal appears.
+				const matchedState = applyMatch(currentState, matchResult);
 
-			setGameState(matchedState);
-			if (isOnlineMode) {
-				syncToFirestore(matchedState, `match:complete`);
-			}
+				setGameState(matchedState);
+				if (isOnlineMode) {
+					syncToFirestore(matchedState, `match:complete`);
+				}
 
-			// Notify effect manager (TTS will announce match with card name)
-			const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
-			effectManager?.notifyMatchFound(currentPlayerName, currentPlayerId, matchedCardName);
+				// Notify effect manager (TTS will announce match with card name)
+				const matchedCardName = formatCardNameForSpeech(firstCard.imageId);
+				effectManager?.notifyMatchFound(
+					currentPlayerName,
+					currentPlayerId,
+					matchedCardName,
+				);
 
-			// Check if this was the final match - notify game over effects
-			// (but don't set status to 'finished' yet - that happens after animation)
-			if (isGameOver(matchedState)) {
-				const { winner, isTie } = calculateWinner(matchedState.cards, playersRef.current);
-				effectManager?.notifyGameOver(winner, isTie);
-			}
+				// Check if this was the final match - notify game over effects
+				// (but don't set status to 'finished' yet - that happens after animation)
+				if (isGameOver(matchedState)) {
+					const { winner, isTie } = calculateWinner(
+						matchedState.cards,
+						playersRef.current,
+					);
+					effectManager?.notifyGameOver(winner, isTie);
+				}
 
-			isCheckingMatchRef.current = false;
-		} else {
+				isCheckingMatchRef.current = false;
+			} else {
 				// No match - flip back and switch turns
 				const noMatchState = applyNoMatchWithReset(currentState, cardIds);
 
@@ -494,13 +505,15 @@ export function useGameController(
 			}
 
 			// Schedule match check if 2 cards selected (derived from card state)
-			const selectedCards = newState.cards.filter(c => c.isFlipped && !c.isMatched);
+			const selectedCards = newState.cards.filter(
+				(c) => c.isFlipped && !c.isMatched,
+			);
 			if (selectedCards.length === 2) {
 				if (matchCheckTimeoutRef.current) {
 					clearTimeout(matchCheckTimeoutRef.current);
 				}
 
-				const selectedCardIds = selectedCards.map(c => c.id);
+				const selectedCardIds = selectedCards.map((c) => c.id);
 				matchCheckTimeoutRef.current = setTimeout(() => {
 					matchCheckTimeoutRef.current = null;
 					checkForMatch(selectedCardIds, newState);
@@ -626,7 +639,8 @@ export function useGameController(
 		(firstPlayer: number) => {
 			// Use ref to always get latest player names
 			const firstPlayerName =
-				getPlayerById(playersRef.current, firstPlayer)?.name || `Player ${firstPlayer}`;
+				getPlayerById(playersRef.current, firstPlayer)?.name ||
+				`Player ${firstPlayer}`;
 
 			// Notify effects (TTS will announce first player's turn)
 			effectManager?.notifyGameStart(firstPlayerName, firstPlayer);
@@ -656,11 +670,15 @@ export function useGameController(
 
 		// Only finish if all cards are matched (sanity check)
 		if (!isGameOver(gameState)) {
-			console.warn("[GAME FINISH] triggerGameFinish called but game is not over");
+			console.warn(
+				"[GAME FINISH] triggerGameFinish called but game is not over",
+			);
 			return;
 		}
 
-		console.log("[GAME FINISH] Animation complete, setting game status to finished");
+		console.log(
+			"[GAME FINISH] Animation complete, setting game status to finished",
+		);
 		const finishedState = finishGame(gameState);
 		setGameState(finishedState);
 

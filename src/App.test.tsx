@@ -11,9 +11,18 @@
  * full integration testing, as App.tsx orchestrates many complex systems.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+/// <reference types="@testing-library/jest-dom" />
+
+import React, { type ReactNode } from "react";
+import {
+	act,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Card, GameStatus } from "./types";
 
 // ============================================
 // Mock TanStack Router
@@ -25,12 +34,14 @@ const mockRouterState = { location: { pathname: "/" } };
 vi.mock("@tanstack/react-router", () => ({
 	useNavigate: () => mockNavigate,
 	useRouterState: () => mockRouterState,
-	Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+	Link: ({ children, to }: { children: ReactNode; to: string }) => (
 		<a href={to}>{children}</a>
 	),
 	Outlet: () => null,
 	createRouter: vi.fn(),
-	RouterProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+	RouterProvider: ({ children }: { children: ReactNode }) => (
+		<>{children}</>
+	),
 }));
 
 // ============================================
@@ -90,11 +101,53 @@ vi.mock("./stores/onlineStore", () => ({
 // Mock Hooks
 // ============================================
 
-const mockLocalGame = {
+const mockLocalGame: {
 	gameState: {
-		cards: [],
+		cards: Card[];
+		currentPlayer: number;
+		gameStatus: GameStatus;
+	};
+	players: { id: number; name: string; color: string }[];
+	cardSize: number;
+	flipDuration: number;
+	autoSizeEnabled: boolean;
+	useWhiteCardBackground: boolean;
+	emojiSizePercentage: number;
+	ttsEnabled: boolean;
+	showStartModal: boolean;
+	isAnimatingCards: boolean;
+	allCardsFlipped: boolean;
+	effectManager: { register: ReturnType<typeof vi.fn> };
+	initializeGame: ReturnType<typeof vi.fn>;
+	flipCard: ReturnType<typeof vi.fn>;
+	resetGame: ReturnType<typeof vi.fn>;
+	setShowStartModal: ReturnType<typeof vi.fn>;
+	setFullGameState: ReturnType<typeof vi.fn>;
+	startGameWithFirstPlayer: ReturnType<typeof vi.fn>;
+	updatePlayerName: ReturnType<typeof vi.fn>;
+	updatePlayerColor: ReturnType<typeof vi.fn>;
+	increaseCardSize: ReturnType<typeof vi.fn>;
+	decreaseCardSize: ReturnType<typeof vi.fn>;
+	toggleWhiteCardBackground: ReturnType<typeof vi.fn>;
+	toggleAutoSize: ReturnType<typeof vi.fn>;
+	increaseFlipDuration: ReturnType<typeof vi.fn>;
+	decreaseFlipDuration: ReturnType<typeof vi.fn>;
+	increaseEmojiSize: ReturnType<typeof vi.fn>;
+	decreaseEmojiSize: ReturnType<typeof vi.fn>;
+	toggleTtsEnabled: ReturnType<typeof vi.fn>;
+	toggleAllCardsFlipped: ReturnType<typeof vi.fn>;
+	updateAutoSizeMetrics: ReturnType<typeof vi.fn>;
+	calculateOptimalCardSizeForCount: ReturnType<typeof vi.fn>;
+	showStartGameModal: ReturnType<typeof vi.fn>;
+	endGameEarly: ReturnType<typeof vi.fn>;
+	triggerGameFinish: ReturnType<typeof vi.fn>;
+	setIsAnimatingCards: ReturnType<typeof vi.fn>;
+	setAllCardsFlipped: ReturnType<typeof vi.fn>;
+} = {
+	gameState: {
+		cards: [] as Card[],
 		currentPlayer: 1,
-		gameStatus: "setup" as const,
+		gameStatus: "setup" as GameStatus,
 	},
 	players: [
 		{ id: 1, name: "Player 1", color: "#3b82f6" },
@@ -233,15 +286,20 @@ vi.mock("./components/GameOver", () => ({
 }));
 
 vi.mock("./components/Modal", () => ({
-	Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
-		isOpen ? <div data-testid="modal">{children}</div> : null,
+	Modal: ({
+		children,
+		isOpen,
+	}: {
+		children: ReactNode;
+		isOpen: boolean;
+	}) => (isOpen ? <div data-testid="modal">{children}</div> : null),
 }));
 
 vi.mock("./components/Pong", () => ({
 	Pong: ({ onClose }: { onClose: () => void }) => (
 		<div data-testid="pong">
 			Pong Game
-			<button onClick={onClose}>Close</button>
+			<button type="button" onClick={onClose}>Close</button>
 		</div>
 	),
 }));
@@ -253,15 +311,27 @@ vi.mock("./components/AdminSidebar", () => ({
 
 // Mock all other components
 vi.mock("./components/CardPackModal", () => ({ CardPackModal: () => null }));
-vi.mock("./components/BackgroundModal", () => ({ BackgroundModal: () => null }));
+vi.mock("./components/BackgroundModal", () => ({
+	BackgroundModal: () => null,
+}));
 vi.mock("./components/CardBackModal", () => ({ CardBackModal: () => null }));
 vi.mock("./components/GameStartModal", () => ({ GameStartModal: () => null }));
-vi.mock("./components/ThemeSelectorModal", () => ({ ThemeSelectorModal: () => null }));
-vi.mock("./components/ResetConfirmationModal", () => ({ ResetConfirmationModal: () => null }));
-vi.mock("./components/ReloadConfirmationModal", () => ({ ReloadConfirmationModal: () => null }));
+vi.mock("./components/ThemeSelectorModal", () => ({
+	ThemeSelectorModal: () => null,
+}));
+vi.mock("./components/ResetConfirmationModal", () => ({
+	ResetConfirmationModal: () => null,
+}));
+vi.mock("./components/ReloadConfirmationModal", () => ({
+	ReloadConfirmationModal: () => null,
+}));
 vi.mock("./components/SettingsMenu", () => ({ SettingsMenu: () => null }));
-vi.mock("./components/PlayerMatchesModal", () => ({ PlayerMatchesModal: () => null }));
-vi.mock("./components/CardExplorerModal", () => ({ CardExplorerModal: () => null }));
+vi.mock("./components/PlayerMatchesModal", () => ({
+	PlayerMatchesModal: () => null,
+}));
+vi.mock("./components/CardExplorerModal", () => ({
+	CardExplorerModal: () => null,
+}));
 vi.mock("./components/game", () => ({
 	GameplayHeader: () => null,
 	FixedGameControls: () => null,
@@ -269,11 +339,19 @@ vi.mock("./components/game", () => ({
 	FloatingSettingsButton: () => null,
 }));
 vi.mock("./components/layout", () => ({
-	SettingsSidebarWrapper: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+	SettingsSidebarWrapper: ({ children }: { children: ReactNode }) => (
+		<>{children}</>
+	),
 }));
-vi.mock("./components/BackgroundViewer", () => ({ BackgroundViewer: () => null }));
-vi.mock("./components/MobileWarningModal", () => ({ MobileWarningModal: () => null }));
-vi.mock("./components/PWAInstallModal", () => ({ PWAInstallModal: () => null }));
+vi.mock("./components/BackgroundViewer", () => ({
+	BackgroundViewer: () => null,
+}));
+vi.mock("./components/MobileWarningModal", () => ({
+	MobileWarningModal: () => null,
+}));
+vi.mock("./components/PWAInstallModal", () => ({
+	PWAInstallModal: () => null,
+}));
 vi.mock("./components/LogViewerModal", () => ({ LogViewerModal: () => null }));
 vi.mock("./components/PairCountModal", () => ({ PairCountModal: () => null }));
 
@@ -414,7 +492,13 @@ describe("App", () => {
 		it("should not redirect /local/game when cards exist", async () => {
 			mockRouterState.location.pathname = "/local/game";
 			mockLocalGame.gameState.cards = [
-				{ id: "card-1", imageId: "cat", imageUrl: "/cat.png", isFlipped: false, isMatched: false },
+				{
+					id: "card-1",
+					imageId: "cat",
+					imageUrl: "/cat.png",
+					isFlipped: false,
+					isMatched: false,
+				},
 			];
 			mockLocalGame.gameState.gameStatus = "playing";
 
@@ -493,7 +577,13 @@ describe("App", () => {
 			});
 			mockRouterState.location.pathname = "/local/game";
 			mockLocalGame.gameState.cards = [
-				{ id: "card-1", imageId: "cat", imageUrl: "/cat.png", isFlipped: false, isMatched: false },
+				{
+					id: "card-1",
+					imageId: "cat",
+					imageUrl: "/cat.png",
+					isFlipped: false,
+					isMatched: false,
+				},
 			];
 
 			render(<App />);
@@ -588,8 +678,22 @@ describe("App", () => {
 			mockRouterState.location.pathname = "/local/game";
 			mockLocalGame.gameState.gameStatus = "finished";
 			mockLocalGame.gameState.cards = [
-				{ id: "card-1", imageId: "cat", imageUrl: "/cat.png", isFlipped: true, isMatched: true, matchedByPlayerId: 1 },
-				{ id: "card-2", imageId: "cat", imageUrl: "/cat.png", isFlipped: true, isMatched: true, matchedByPlayerId: 1 },
+				{
+					id: "card-1",
+					imageId: "cat",
+					imageUrl: "/cat.png",
+					isFlipped: true,
+					isMatched: true,
+					matchedByPlayerId: 1,
+				},
+				{
+					id: "card-2",
+					imageId: "cat",
+					imageUrl: "/cat.png",
+					isFlipped: true,
+					isMatched: true,
+					matchedByPlayerId: 1,
+				},
 			];
 
 			render(<App />);
@@ -623,7 +727,13 @@ describe("App", () => {
 			mockRouterState.location.pathname = "/local/game";
 			mockLocalGame.gameState.gameStatus = "playing";
 			mockLocalGame.gameState.cards = [
-				{ id: "card-1", imageId: "cat", imageUrl: "/cat.png", isFlipped: false, isMatched: false },
+				{
+					id: "card-1",
+					imageId: "cat",
+					imageUrl: "/cat.png",
+					isFlipped: false,
+					isMatched: false,
+				},
 			];
 
 			// Set appNavigation to prevent refresh redirect

@@ -5,9 +5,13 @@
  * display settings, and game configuration.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { useSettingsStore, selectSettings, selectPlayers } from "./settingsStore";
-import { setupStorageMocks, resetStorageMocks, getMockLocalStorage } from "../test/mocks/storage";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { resetStorageMocks, setupStorageMocks } from "../test/mocks/storage";
+import {
+	selectPlayers,
+	selectSettings,
+	useSettingsStore,
+} from "./settingsStore";
 
 describe("settingsStore", () => {
 	beforeEach(() => {
@@ -169,10 +173,14 @@ describe("settingsStore", () => {
 			const { setUseWhiteCardBackground } = useSettingsStore.getState();
 
 			setUseWhiteCardBackground(true);
-			expect(useSettingsStore.getState().settings.useWhiteCardBackground).toBe(true);
+			expect(useSettingsStore.getState().settings.useWhiteCardBackground).toBe(
+				true,
+			);
 
 			setUseWhiteCardBackground(false);
-			expect(useSettingsStore.getState().settings.useWhiteCardBackground).toBe(false);
+			expect(useSettingsStore.getState().settings.useWhiteCardBackground).toBe(
+				false,
+			);
 		});
 
 		it("should update emoji size percentage", () => {
@@ -196,10 +204,14 @@ describe("settingsStore", () => {
 			const { setBackgroundBlurEnabled } = useSettingsStore.getState();
 
 			setBackgroundBlurEnabled(false);
-			expect(useSettingsStore.getState().settings.backgroundBlurEnabled).toBe(false);
+			expect(useSettingsStore.getState().settings.backgroundBlurEnabled).toBe(
+				false,
+			);
 
 			setBackgroundBlurEnabled(true);
-			expect(useSettingsStore.getState().settings.backgroundBlurEnabled).toBe(true);
+			expect(useSettingsStore.getState().settings.backgroundBlurEnabled).toBe(
+				true,
+			);
 		});
 	});
 
@@ -244,7 +256,8 @@ describe("settingsStore", () => {
 		});
 
 		it("should keep local and online pair counts independent", () => {
-			const { setLocalPairCount, setOnlinePairCount } = useSettingsStore.getState();
+			const { setLocalPairCount, setOnlinePairCount } =
+				useSettingsStore.getState();
 
 			setLocalPairCount(10);
 			setOnlinePairCount(30);

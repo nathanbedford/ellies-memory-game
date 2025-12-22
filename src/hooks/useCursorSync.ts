@@ -7,7 +7,7 @@
  * - Converting between pixel and grid-relative coordinates (0-8 for x, 0-5 for y)
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CursorService } from "../services/sync/CursorService";
 import type { CursorPosition } from "../types";
 

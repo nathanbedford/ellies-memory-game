@@ -7,7 +7,7 @@
  * the adapter syncs state to/from Firestore.
  */
 
-import type { GameState, Room, RoomConfig, CardPack } from "../../types";
+import type { CardPack, GameState, Room, RoomConfig } from "../../types";
 
 export interface CreateRoomOptions {
 	hostId: string;

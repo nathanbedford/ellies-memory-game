@@ -90,9 +90,7 @@ class LogDB {
 		// Filter by minimum level
 		if (query.minLevel) {
 			const minOrder = LEVEL_ORDER[query.minLevel];
-			results = results.filter(
-				(entry) => LEVEL_ORDER[entry.level] <= minOrder,
-			);
+			results = results.filter((entry) => LEVEL_ORDER[entry.level] <= minOrder);
 		}
 
 		// Apply limit
@@ -161,12 +159,11 @@ class LogDB {
 		return this.getLogs({ roomCode });
 	}
 
-	async getUniqueRoomCodes(): Promise<{ roomCode: string; lastActivity: number }[]> {
+	async getUniqueRoomCodes(): Promise<
+		{ roomCode: string; lastActivity: number }[]
+	> {
 		// Get all logs with room codes, ordered by timestamp descending
-		const logs = await this.db.logs
-			.where("roomCode")
-			.notEqual("")
-			.toArray();
+		const logs = await this.db.logs.where("roomCode").notEqual("").toArray();
 
 		// Group by roomCode and find most recent timestamp for each
 		const roomMap = new Map<string, number>();

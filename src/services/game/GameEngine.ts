@@ -5,7 +5,7 @@
  * This makes the game logic testable, replayable, and easy to sync across network.
  */
 
-import type { Card, Player, GameState } from "../../types";
+import type { Card, GameState, Player } from "../../types";
 
 // ============================================
 // Helper Functions
@@ -301,9 +301,7 @@ export function applyNoMatchWithReset(
 
 	// Flip cards back
 	const newCards = state.cards.map((c) =>
-		c.id === firstId || c.id === secondId
-			? { ...c, isFlipped: false }
-			: c,
+		c.id === firstId || c.id === secondId ? { ...c, isFlipped: false } : c,
 	);
 
 	// Switch to next player

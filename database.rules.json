@@ -1,20 +1,20 @@
 {
-  "rules": {
-    "presence": {
-      "$roomCode": {
-        ".read": true,
-        "$odahId": {
-          ".write": "auth != null && auth.uid == $odahId"
-        }
-      }
-    },
-    "cursors": {
-      "$roomCode": {
-        ".read": true,
-        "$odahId": {
-          ".write": "auth != null && auth.uid == $odahId"
-        }
-      }
-    }
-  }
+	"rules": {
+		"presence": {
+			"$roomCode": {
+				".read": true,
+				"$odahId": {
+					".write": "auth != null && auth.uid == $odahId"
+				}
+			}
+		},
+		"cursors": {
+			"$roomCode": {
+				".read": true,
+				"$odahId": {
+					".write": "auth != null && auth.uid == $odahId"
+				}
+			}
+		}
+	}
 }

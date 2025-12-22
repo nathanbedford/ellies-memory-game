@@ -6,8 +6,8 @@
  */
 
 import { vi } from "vitest";
-import type { Room, GameState, OnlineGameState, RoomConfig } from "../../types";
-import { createTestRoom, createTestOnlineGameState } from "../testUtils";
+import type { GameState, OnlineGameState, Room, RoomConfig } from "../../types";
+import { createTestOnlineGameState, createTestRoom } from "../testUtils";
 
 // ============================================
 // Mock Firestore Sync Adapter
@@ -66,44 +66,51 @@ export function createMockFirestoreSyncAdapter(
 		getIsHost: vi.fn(() => state.isHost),
 
 		// Room operations
-		createRoom: vi.fn(async (options: {
-			hostId: string;
-			hostName: string;
-			hostColor: string;
-			cardPack: string;
-			background: string;
-			cardBack: string;
-			pairCount: number;
-		}) => {
-			const roomCode = "MOCK";
-			state.roomCode = roomCode;
-			state.isHost = true;
-			state.room = createTestRoom({
-				roomCode,
-				hostId: options.hostId,
-				config: {
-					cardPack: options.cardPack as any,
-					background: options.background,
-					cardBack: options.cardBack,
-					pairCount: options.pairCount,
-				},
-			});
-			return roomCode;
-		}),
+		createRoom: vi.fn(
+			async (options: {
+				hostId: string;
+				hostName: string;
+				hostColor: string;
+				cardPack: string;
+				background: string;
+				cardBack: string;
+				pairCount: number;
+			}) => {
+				const roomCode = "MOCK";
+				state.roomCode = roomCode;
+				state.isHost = true;
+				state.room = createTestRoom({
+					roomCode,
+					hostId: options.hostId,
+					config: {
+						cardPack: options.cardPack as any,
+						background: options.background,
+						cardBack: options.cardBack,
+						pairCount: options.pairCount,
+					},
+				});
+				return roomCode;
+			},
+		),
 
-		joinRoom: vi.fn(async (roomCode: string, options: {
-			odahId: string;
-			name: string;
-			color: string;
-		}) => {
-			state.roomCode = roomCode.toUpperCase();
-			state.isHost = false;
-			if (!state.room) {
-				state.room = createTestRoom({ roomCode: roomCode.toUpperCase() });
-			}
-			state.room.playerSlots[options.odahId] = 2;
-			return state.room;
-		}),
+		joinRoom: vi.fn(
+			async (
+				roomCode: string,
+				options: {
+					odahId: string;
+					name: string;
+					color: string;
+				},
+			) => {
+				state.roomCode = roomCode.toUpperCase();
+				state.isHost = false;
+				if (!state.room) {
+					state.room = createTestRoom({ roomCode: roomCode.toUpperCase() });
+				}
+				state.room.playerSlots[options.odahId] = 2;
+				return state.room;
+			},
+		),
 
 		leaveRoom: vi.fn(async () => {
 			state.roomCode = null;
@@ -118,35 +125,39 @@ export function createMockFirestoreSyncAdapter(
 			return null;
 		}),
 
-		subscribeToRoom: vi.fn((roomCode: string, callback: (room: Room | null) => void) => {
-			state.roomCallbacks.push(callback);
-			// Immediately call with current room
-			if (state.room) {
-				callback(state.room);
-			}
-			return () => {
-				const index = state.roomCallbacks.indexOf(callback);
-				if (index > -1) {
-					state.roomCallbacks.splice(index, 1);
+		subscribeToRoom: vi.fn(
+			(_roomCode: string, callback: (room: Room | null) => void) => {
+				state.roomCallbacks.push(callback);
+				// Immediately call with current room
+				if (state.room) {
+					callback(state.room);
 				}
-			};
-		}),
+				return () => {
+					const index = state.roomCallbacks.indexOf(callback);
+					if (index > -1) {
+						state.roomCallbacks.splice(index, 1);
+					}
+				};
+			},
+		),
 
-		updateRoomConfig: vi.fn(async (roomCode: string, config: Partial<RoomConfig>) => {
-			if (state.room) {
-				state.room.config = { ...state.room.config, ...config };
-				state.roomCallbacks.forEach((cb) => cb(state.room));
-			}
-		}),
+		updateRoomConfig: vi.fn(
+			async (_roomCode: string, config: Partial<RoomConfig>) => {
+				if (state.room) {
+					state.room.config = { ...state.room.config, ...config };
+					state.roomCallbacks.forEach((cb) => cb(state.room));
+				}
+			},
+		),
 
-		resetRoomToWaiting: vi.fn(async (roomCode: string) => {
+		resetRoomToWaiting: vi.fn(async (_roomCode: string) => {
 			if (state.room) {
 				state.room.status = "waiting";
 				state.roomCallbacks.forEach((cb) => cb(state.room));
 			}
 		}),
 
-		startGame: vi.fn(async (roomCode: string, initialState: GameState) => {
+		startGame: vi.fn(async (_roomCode: string, initialState: GameState) => {
 			if (state.room) {
 				state.room.status = "playing";
 				state.gameState = createTestOnlineGameState({
@@ -185,8 +196,8 @@ export function createMockFirestoreSyncAdapter(
 		}),
 
 		// Player operations
-		updatePlayerName: vi.fn(async (name: string) => {}),
-		updatePlayerColor: vi.fn(async (color: string) => {}),
+		updatePlayerName: vi.fn(async (_name: string) => {}),
+		updatePlayerColor: vi.fn(async (_color: string) => {}),
 
 		// Test helpers
 		_simulateRoomUpdate: (room: Room | null) => {
@@ -269,7 +280,8 @@ export function createMockPresenceService(
 // Module Mock Setup
 // ============================================
 
-let mockAdapter: ReturnType<typeof createMockFirestoreSyncAdapter> | null = null;
+let mockAdapter: ReturnType<typeof createMockFirestoreSyncAdapter> | null =
+	null;
 
 /**
  * Setup Firebase mocks for testing.

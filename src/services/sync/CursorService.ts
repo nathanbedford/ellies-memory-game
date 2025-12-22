@@ -8,12 +8,12 @@
  */
 
 import {
+	type DatabaseReference,
+	off,
+	onDisconnect,
+	onValue,
 	ref,
 	set,
-	onValue,
-	onDisconnect,
-	off,
-	DatabaseReference,
 } from "firebase/database";
 import { rtdb } from "../../lib/firebase";
 import type { CursorPosition } from "../../types";

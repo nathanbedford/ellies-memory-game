@@ -1,4 +1,4 @@
-import { CardPack } from "../types";
+import type { CardPack } from "../types";
 
 // Helper function to get image URL for animals-real deck
 // Images should be in public folder for Vite to serve them
