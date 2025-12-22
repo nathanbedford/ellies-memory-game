@@ -33,6 +33,7 @@ import { MobileWarningModal } from './components/MobileWarningModal';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { AdminSidebar } from './components/AdminSidebar';
 import { LogViewerModal } from './components/LogViewerModal';
+import { BuildInfoModal } from './components/BuildInfoModal';
 import { ModeSelector, OnlineLobby, OpponentDisconnectOverlay } from './components/online';
 import { useOpponentDisconnect } from './hooks/useOpponentDisconnect';
 import { PairCountModal } from './components/PairCountModal';
@@ -125,6 +126,7 @@ function App() {
   const [showAdminSidebar, setShowAdminSidebar] = useState(false);
   const [adminEnabled, setAdminEnabled] = useState(false); // In-memory only, resets on refresh
   const [showLogViewer, setShowLogViewer] = useState(false);
+  const [showBuildInfo, setShowBuildInfo] = useState(false);
   const [showMobileWarning, setShowMobileWarning] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [showPWAInstall, setShowPWAInstall] = useState(false);
@@ -1906,6 +1908,7 @@ function App() {
                   .every(c => c.isFlipped)
               }
               onViewLogs={() => setShowLogViewer(true)}
+              onViewBuildInfo={() => setShowBuildInfo(true)}
             />
           )}
 
@@ -1915,6 +1918,12 @@ function App() {
             onClose={() => setShowLogViewer(false)}
             roomCode={roomCode ?? undefined}
           />
+          {/* Build Info Modal */}
+          <BuildInfoModal
+            isOpen={showBuildInfo}
+            onClose={() => setShowBuildInfo(false)}
+          />
+
 
           {/* Mobile Warning Modal */}
           <MobileWarningModal

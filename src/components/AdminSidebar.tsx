@@ -7,6 +7,7 @@ interface AdminSidebarProps {
   onToggleFlipAll: () => void;
   allCardsFlipped: boolean;
   onViewLogs?: () => void;
+  onViewBuildInfo?: () => void;
 }
 
 export const AdminSidebar = ({
@@ -16,6 +17,7 @@ export const AdminSidebar = ({
   onToggleFlipAll,
   allCardsFlipped,
   onViewLogs,
+  onViewBuildInfo,
 }: AdminSidebarProps) => {
   // Handle Escape key to close sidebar
   useEffect(() => {
@@ -52,7 +54,7 @@ export const AdminSidebar = ({
         </button>
 
         {/* Admin Actions */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 flex-1">
           {/* End Game Early */}
           <button
             onClick={onEndGameEarly}
@@ -93,8 +95,23 @@ export const AdminSidebar = ({
             </button>
           )}
         </div>
+
+        {/* Build Info Button - Fixed at bottom */}
+        {onViewBuildInfo && (
+          <div className="mt-auto pt-4 border-t border-gray-200">
+            <button
+              onClick={onViewBuildInfo}
+              className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded transition-colors duration-200 flex items-center justify-center gap-2"
+              title="View build information"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Info</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-
