@@ -146,7 +146,8 @@ export const LogViewerModal = ({
 
 	const formatContext = (context?: Record<string, unknown>) => {
 		if (!context) return null;
-		const { roomCode: _, playerSlot: __, ...rest } = context;
+		const { roomCode, playerSlot, ...rest } = context;
+		void roomCode; void playerSlot;
 		if (Object.keys(rest).length === 0) return null;
 		return JSON.stringify(rest, null, 2);
 	};

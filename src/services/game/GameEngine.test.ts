@@ -3,6 +3,7 @@ import {
 	sortPlayersByID,
 	getPlayerById,
 	getPlayerScore,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	getSelectedCards,
 	getSelectedCardIds,
 	generateRoomCode,

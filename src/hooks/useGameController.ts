@@ -680,6 +680,8 @@ export function useGameController(
 	const updatePlayerName = useCallback(
 		(_playerId: number, _newName: string) => {
 			// No-op: use useSettingsStore.setPlayerName instead
+			void _playerId;
+			void _newName;
 		},
 		[],
 	);
@@ -687,6 +689,8 @@ export function useGameController(
 	const updatePlayerColor = useCallback(
 		(_playerId: number, _newColor: string) => {
 			// No-op: use useSettingsStore.setPlayerColor instead
+			void _playerId;
+			void _newColor;
 		},
 		[],
 	);

@@ -25,6 +25,7 @@ interface WrapperProps {
 	children: ReactNode;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface RenderWithProvidersOptions extends Omit<RenderOptions, "wrapper"> {
 	// Add any provider-specific options here if needed
 }
@@ -50,6 +51,7 @@ interface RenderWithRouterOptions extends RenderWithProvidersOptions {
  * Zustand stores don't need providers, but this wrapper can be extended
  * for any future provider needs.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 function BaseWrapper({ children }: WrapperProps): ReactElement {
 	return <>{children}</>;
 }

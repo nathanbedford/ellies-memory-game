@@ -21,6 +21,7 @@ import {
 	resetFirebaseMocks,
 } from "../test/mocks/firebase";
 import { setupStorageMocks, resetStorageMocks } from "../test/mocks/storage";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { createTestPresenceData, createHostPresence, createGuestPresence } from "../test/testUtils";
 
 // Mock the FirestoreSyncAdapter module
@@ -33,6 +34,7 @@ vi.mock("../services/sync/FirestoreSyncAdapter", () => ({
 vi.mock("../services/sync/PresenceService", () => ({
 	PresenceService: {
 		subscribeToRoomPresence: vi.fn((roomCode, callback) => {
+			void roomCode; void callback;
 			// Return unsubscribe function
 			return () => {};
 		}),
@@ -348,7 +350,7 @@ describe("onlineStore", () => {
 
 	describe("presence data", () => {
 		it("should set presence data", () => {
-			const { setPresenceData, connect } = useOnlineStore.getState();
+			const { setPresenceData } = useOnlineStore.getState();
 
 			const presenceData = {
 				"host-id": createHostPresence(),

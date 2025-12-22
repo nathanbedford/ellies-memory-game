@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useSettingsStore, selectSettings, selectPlayers } from "./settingsStore";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { setupStorageMocks, resetStorageMocks, getMockLocalStorage } from "../test/mocks/storage";
 
 describe("settingsStore", () => {

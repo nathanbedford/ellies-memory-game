@@ -82,7 +82,7 @@ export function createMockFirestoreSyncAdapter(
 				roomCode,
 				hostId: options.hostId,
 				config: {
-					cardPack: options.cardPack as any,
+					cardPack: options.cardPack,
 					background: options.background,
 					cardBack: options.cardBack,
 					pairCount: options.pairCount,
@@ -140,6 +140,7 @@ export function createMockFirestoreSyncAdapter(
 		}),
 
 		resetRoomToWaiting: vi.fn(async (roomCode: string) => {
+			void roomCode;
 			if (state.room) {
 				state.room.status = "waiting";
 				state.roomCallbacks.forEach((cb) => cb(state.room));
@@ -185,8 +186,12 @@ export function createMockFirestoreSyncAdapter(
 		}),
 
 		// Player operations
-		updatePlayerName: vi.fn(async (name: string) => {}),
-		updatePlayerColor: vi.fn(async (color: string) => {}),
+		updatePlayerName: vi.fn(async (name: string) => {
+			void name;
+		}),
+		updatePlayerColor: vi.fn(async (color: string) => {
+			void color;
+		}),
 
 		// Test helpers
 		_simulateRoomUpdate: (room: Room | null) => {

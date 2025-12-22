@@ -9,9 +9,12 @@ import type {
 	Card,
 	Player,
 	GameState,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	GameStatus,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	CardPack,
 	Room,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	RoomStatus,
 	PresenceData,
 	OnlineGameState,

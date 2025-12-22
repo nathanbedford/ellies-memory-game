@@ -168,7 +168,7 @@ export function createRouterMock() {
 		useSearch: useSearchMock,
 		useParams: useParamsMock,
 		useMatch: useMatchMock,
-		Link: ({ to, children, ...props }: any) => {
+		Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [key: string]: unknown }) => {
 			return {
 				type: "a",
 				props: {
@@ -183,6 +183,6 @@ export function createRouterMock() {
 			};
 		},
 		Outlet: () => null,
-		RouterProvider: ({ children }: any) => children,
+		RouterProvider: ({ children }: { children: React.ReactNode }) => children,
 	};
 }

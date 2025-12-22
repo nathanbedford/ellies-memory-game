@@ -142,6 +142,7 @@ class LogService {
 
 		// Remove roomCode and playerSlot from displayed context (already in prefix)
 		const { roomCode, playerSlot, ...displayContext } = context;
+		void roomCode; void playerSlot;
 		const hasContext = Object.keys(displayContext).length > 0;
 
 		if (hasContext) {
@@ -267,6 +268,7 @@ class LogService {
 
 			// Format context if present
 			const { roomCode, playerSlot, ...contextRest } = log.context || {};
+			void roomCode; void playerSlot;
 			const contextStr = Object.keys(contextRest).length > 0
 				? ` ${JSON.stringify(contextRest)}`
 				: "";

@@ -21,7 +21,7 @@ import {
 } from "./ISyncAdapter";
 import { PresenceService } from "./PresenceService";
 import { generateRoomCode } from "../game/GameEngine";
-import type { GameState, Room, RoomConfig, OnlineGameState } from "../../types";
+import type { GameState, Room, RoomConfig, OnlineGameState, Card } from "../../types";
 
 export class FirestoreSyncAdapter extends BaseSyncAdapter {
 	private connected = false;
@@ -381,13 +381,13 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		// Clean undefined values from cards (Firestore doesn't accept undefined)
 		// Note: isFlyingToPlayer and flyingToPlayerId are no longer synced - animation is local UI state
 		const cleanedCards = state.cards.map((card) => {
-			const cleaned: any = {
+			const cleaned = {
 				id: card.id,
 				imageId: card.imageId,
 				imageUrl: card.imageUrl,
 				isFlipped: card.isFlipped,
 				isMatched: card.isMatched,
-			};
+			} as Card;
 			// Only include optional fields if they have values
 			if (card.gradient !== undefined) cleaned.gradient = card.gradient;
 			if (card.matchedByPlayerId !== undefined) cleaned.matchedByPlayerId = card.matchedByPlayerId;
@@ -403,7 +403,7 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 		};
 		// Only include lastUpdatedBy if it exists
 		if (onlineState.lastUpdatedBy === undefined) {
-			delete (onlineState as any).lastUpdatedBy;
+			delete (onlineState as unknown as Record<string, unknown>).lastUpdatedBy;
 		}
 
 		// Write game state to separate document
@@ -435,7 +435,7 @@ export class FirestoreSyncAdapter extends BaseSyncAdapter {
 				});
 				if (snapshot.exists()) {
 					const gameState = snapshot.data() as OnlineGameState;
-					console.log(`[Adapter] Calling callback with syncVersion=${(gameState as any).syncVersion}`);
+					console.log(`[Adapter] Calling callback with syncVersion=${gameState.syncVersion}`);
 					callback(gameState);
 				} else {
 					console.warn(`[Adapter] Game document does not exist: /games/${roomCode}`);

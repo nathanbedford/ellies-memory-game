@@ -68,8 +68,8 @@ async function main() {
         console.log("  lastUpdatedBy:", data.lastUpdatedBy);
         console.log("  selectedCards:", data.selectedCards?.length || 0);
 
-        const flipped = (data.cards || []).filter((c: any) => c.isFlipped && !c.isMatched);
-        console.log("  flipped (unmatched):", flipped.map((c: any) => c.id).join(", ") || "none");
+        const flipped = (data.cards || []).filter((c: { isFlipped: boolean; isMatched: boolean }) => c.isFlipped && !c.isMatched);
+        console.log("  flipped (unmatched):", flipped.map((c: { id: string }) => c.id).join(", ") || "none");
       } else {
         console.log("  Document does not exist");
       }

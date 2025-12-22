@@ -44,13 +44,14 @@ async function main() {
           console.log("    Game exists!");
           console.log("    syncVersion: " + gameData.syncVersion);
           console.log("    currentPlayer: " + gameData.currentPlayer);
-          const flipped = (gameData.cards || []).filter((c: any) => c.isFlipped && !c.isMatched);
-          console.log("    flipped cards: " + flipped.map((c: any) => c.id).join(", "));
+          const flipped = (gameData.cards || []).filter((c: { isFlipped: boolean; isMatched: boolean }) => c.isFlipped && !c.isMatched);
+          console.log("    flipped cards: " + flipped.map((c: { id: string }) => c.id).join(", "));
         } else {
           console.log("    No game document exists");
         }
-      } catch (e: any) {
-        console.log("    Cannot read game: " + e.code);
+      } catch (e: unknown) {
+        const error = e as { code?: string };
+        console.log("    Cannot read game: " + (error.code || 'unknown error'));
       }
     }
   }
@@ -58,7 +59,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(e => {
+main().catch((e: unknown) => {
   console.error(e);
   process.exit(1);
 });

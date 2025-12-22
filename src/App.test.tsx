@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import userEvent from "@testing-library/user-event";
 
 // ============================================
