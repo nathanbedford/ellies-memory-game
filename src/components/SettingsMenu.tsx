@@ -24,9 +24,10 @@ interface SettingsMenuProps {
   onEnableAdmin?: () => void;
   onShowPWAInstall?: () => void;
   onReloadApp: () => void;
+  onViewBuildInfo?: () => void;
 }
 
-export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, backgroundBlurEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onToggleBackgroundBlur, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin, onShowPWAInstall, onReloadApp }: SettingsMenuProps) => {
+export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground, flipDuration, emojiSizePercentage, ttsEnabled, backgroundBlurEnabled, onIncreaseSize, onDecreaseSize, onToggleAutoSize, onToggleWhiteCardBackground, onIncreaseFlipDuration, onDecreaseFlipDuration, onIncreaseEmojiSize, onDecreaseEmojiSize, onToggleTtsEnabled, onToggleBackgroundBlur, onClose, onToggleFullscreen, isFullscreen, onEndTurn, gameStatus, onEnableAdmin, onShowPWAInstall, onReloadApp, onViewBuildInfo }: SettingsMenuProps) => {
   return (
     <div className="h-full bg-white shadow-2xl p-6 overflow-y-auto flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -323,8 +324,25 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
         )}
       </div>
 
-      {/* Reload App Button - pinned to bottom */}
-      <div className="pt-4 mt-4 border-t border-gray-200">
+      {/* Build Info and Reload App Buttons - pinned to bottom */}
+      <div className="pt-4 mt-4 border-t border-gray-200 space-y-3">
+        {/* Build Info Button */}
+        {onViewBuildInfo && (
+          <button
+            onClick={() => {
+              onViewBuildInfo();
+              onClose();
+            }}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors duration-200"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-medium">Build Info</span>
+          </button>
+        )}
+
+        {/* Reload App Button */}
         <button
           onClick={() => {
             onReloadApp();
@@ -341,4 +359,3 @@ export const SettingsMenu = ({ cardSize, autoSizeEnabled, useWhiteCardBackground
     </div>
   );
 };
-
