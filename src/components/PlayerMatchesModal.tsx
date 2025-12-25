@@ -3,6 +3,7 @@ import type { CardBackOption } from "../hooks/useCardBackSelector";
 import type { Card, Player } from "../types";
 import { Card as CardComponent } from "./Card";
 import { CardGridModal } from "./CardGridModal";
+import { PlayerNameEditModal } from "./PlayerNameEditModal";
 
 interface PlayerMatchesModalProps {
 	isOpen: boolean;
@@ -13,7 +14,8 @@ interface PlayerMatchesModalProps {
 	emojiSizePercentage?: number;
 	cardBack?: CardBackOption;
 	onPlayerNameChange?: (playerId: 1 | 2, newName: string) => void;
-	canEditName?: boolean; // Controls whether name editing is allowed (for online mode)
+	onPlayerColorChange?: (playerId: 1 | 2, newColor: string) => void;
+	canEditPlayer?: boolean; // Controls whether player editing is allowed (for online mode)
 }
 
 export const PlayerMatchesModal = ({
@@ -25,10 +27,10 @@ export const PlayerMatchesModal = ({
 	emojiSizePercentage = 72,
 	cardBack,
 	onPlayerNameChange,
-	canEditName = true, // Default to true for backwards compatibility
+	onPlayerColorChange,
+	canEditPlayer = true, // Default to true for backwards compatibility
 }: PlayerMatchesModalProps) => {
-	const [isEditingName, setIsEditingName] = useState(false);
-	const [editNameValue, setEditNameValue] = useState(player.name);
+	const [isNameModalOpen, setIsNameModalOpen] = useState(false);
 
 	// Get all cards matched by this player, grouped by imageId (pairs)
 	const matchedCards = cards.filter(
@@ -48,47 +50,19 @@ export const PlayerMatchesModal = ({
 	// Get unique cards (one per pair) for navigation in lightbox
 	const uniqueCards = pairs.map((pair) => pair[0]);
 
-	// Render editable title with player name
+	// Render title with player name and optional edit button
+	const canEdit = canEditPlayer && (onPlayerNameChange || onPlayerColorChange);
 	const renderTitle = () => (
 		<div className="flex items-center gap-2">
-			{isEditingName ? (
-				<input
-					type="text"
-					value={editNameValue}
-					onChange={(e) => setEditNameValue(e.target.value)}
-					onBlur={() => {
-						if (editNameValue.trim() && onPlayerNameChange) {
-							onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
-						}
-						setIsEditingName(false);
-					}}
-					onKeyDown={(e) => {
-						if (e.key === "Enter") {
-							if (editNameValue.trim() && onPlayerNameChange) {
-								onPlayerNameChange(player.id as 1 | 2, editNameValue.trim());
-							}
-							setIsEditingName(false);
-						} else if (e.key === "Escape") {
-							setEditNameValue(player.name);
-							setIsEditingName(false);
-						}
-					}}
-					className="text-2xl font-bold text-gray-800 border-b-2 border-blue-500 outline-none bg-transparent"
-				/>
-			) : (
-				<h2 className="text-2xl font-bold text-gray-800">
-					{player.name}'s Matches
-				</h2>
-			)}
-			{onPlayerNameChange && canEditName && !isEditingName && (
+			<h2 className="text-2xl font-bold text-gray-800">
+				{player.name}'s Matches
+			</h2>
+			{canEdit && (
 				<button
-					onClick={() => {
-						setEditNameValue(player.name);
-						setIsEditingName(true);
-					}}
+					onClick={() => setIsNameModalOpen(true)}
 					className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
 					type="button"
-					title="Edit player name"
+					title="Edit player"
 				>
 					<svg
 						className="w-4 h-4"
@@ -127,7 +101,7 @@ export const PlayerMatchesModal = ({
 			>
 				<CardComponent
 					card={card}
-					onClick={() => {}}
+					onClick={() => { }}
 					size={200}
 					useWhiteBackground={useWhiteCardBackground}
 					emojiSizePercentage={emojiSizePercentage}
@@ -140,17 +114,37 @@ export const PlayerMatchesModal = ({
 	);
 
 	return (
-		<CardGridModal
-			isOpen={isOpen}
-			onClose={onClose}
-			title={renderTitle()}
-			subtitle={`${pairs.length} pair${pairs.length !== 1 ? "s" : ""} matched`}
-			cards={uniqueCards}
-			useWhiteCardBackground={useWhiteCardBackground}
-			emojiSizePercentage={emojiSizePercentage}
-			cardBack={cardBack}
-			emptyMessage="No matches yet!"
-			renderCard={renderCard}
-		/>
+		<>
+			<CardGridModal
+				isOpen={isOpen}
+				onClose={onClose}
+				title={renderTitle()}
+				subtitle={`${pairs.length} pair${pairs.length !== 1 ? "s" : ""} matched`}
+				cards={uniqueCards}
+				useWhiteCardBackground={useWhiteCardBackground}
+				emojiSizePercentage={emojiSizePercentage}
+				cardBack={cardBack}
+				emptyMessage="No matches yet!"
+				renderCard={renderCard}
+			/>
+
+			{/* Player Edit Modal */}
+			{canEdit && (
+				<PlayerNameEditModal
+					isOpen={isNameModalOpen}
+					onClose={() => setIsNameModalOpen(false)}
+					playerName={player.name}
+					playerColor={player.color}
+					onSave={(newName) => {
+						onPlayerNameChange?.(player.id as 1 | 2, newName);
+					}}
+					onColorChange={
+						onPlayerColorChange
+							? (newColor) => onPlayerColorChange(player.id as 1 | 2, newColor)
+							: undefined
+					}
+				/>
+			)}
+		</>
 	);
 };

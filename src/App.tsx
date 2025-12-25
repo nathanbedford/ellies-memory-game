@@ -958,7 +958,7 @@ function App() {
 		if (
 			"standalone" in window.navigator &&
 			(window.navigator as Navigator & { standalone?: boolean }).standalone ===
-				true
+			true
 		) {
 			return true;
 		}
@@ -1831,17 +1831,17 @@ function App() {
 	const backgroundLayerStyle: React.CSSProperties =
 		shouldShowCustomBackground && currentBackground.imageUrl
 			? {
-					backgroundImage: `url(${currentBackground.imageUrl})`,
-					backgroundSize: "cover",
-					backgroundPosition: "center",
-					backgroundRepeat: "no-repeat",
-					filter: blurFilter,
-					transition: "filter 0.3s ease",
-				}
+				backgroundImage: `url(${currentBackground.imageUrl})`,
+				backgroundSize: "cover",
+				backgroundPosition: "center",
+				backgroundRepeat: "no-repeat",
+				filter: blurFilter,
+				transition: "filter 0.3s ease",
+			}
 			: {
-					filter: blurFilter,
-					transition: "filter 0.3s ease",
-				};
+				filter: blurFilter,
+				transition: "filter 0.3s ease",
+			};
 
 	// Background class for gradient backgrounds (applied to background layer)
 	const backgroundLayerClass =
@@ -1942,45 +1942,45 @@ function App() {
 						{/* Mode Selection Screen (merged with Welcome) */}
 						{(currentPath === "/" ||
 							(setupStep === "modeSelect" && gameMode !== "online")) && (
-							<div className="fixed inset-0 flex items-center justify-center z-0">
-								<div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
-									<ModeSelector
-										onSelectMode={(mode: GameMode) => {
-											setGameMode(mode);
-											if (mode === "local") {
-												navigateToStep("theme", "local mode selected");
-											} else if (mode === "online") {
-												sessionStorage.setItem("appNavigation", "true");
-												navigate({ to: "/online" });
-											}
-											// For online mode, navigate to online route
-										}}
-									/>
+								<div className="fixed inset-0 flex items-center justify-center z-0">
+									<div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl mx-auto">
+										<ModeSelector
+											onSelectMode={(mode: GameMode) => {
+												setGameMode(mode);
+												if (mode === "local") {
+													navigateToStep("theme", "local mode selected");
+												} else if (mode === "online") {
+													sessionStorage.setItem("appNavigation", "true");
+													navigate({ to: "/online" });
+												}
+												// For online mode, navigate to online route
+											}}
+										/>
+									</div>
 								</div>
-							</div>
-						)}
+							)}
 
 						{/* Online Lobby */}
 						{(currentPath === "/online" ||
 							currentPath === "/online/create" ||
 							currentPath === "/online/join" ||
 							currentPath === "/online/waiting") && (
-							<div className="flex flex-col items-center min-h-[60vh] overflow-y-auto max-h-[calc(100vh-4rem)] py-4">
-								<OnlineLobby
-									onBack={() => {
-										setGameMode(null);
-										sessionStorage.removeItem("appNavigation");
-										navigate({ to: "/" });
-									}}
-									onGameStart={(onlineGameState) => {
-										// Set the game state from online lobby
-										setFullGameState(onlineGameState);
-										sessionStorage.setItem("appNavigation", "true");
-										navigate({ to: "/online/game" });
-									}}
-								/>
-							</div>
-						)}
+								<div className="flex flex-col items-center min-h-[60vh] overflow-y-auto max-h-[calc(100vh-4rem)] py-4">
+									<OnlineLobby
+										onBack={() => {
+											setGameMode(null);
+											sessionStorage.removeItem("appNavigation");
+											navigate({ to: "/" });
+										}}
+										onGameStart={(onlineGameState) => {
+											// Set the game state from online lobby
+											setFullGameState(onlineGameState);
+											sessionStorage.setItem("appNavigation", "true");
+											navigate({ to: "/online/game" });
+										}}
+									/>
+								</div>
+							)}
 
 						{gameState.gameStatus === "playing" &&
 							(currentPath === "/local/game" ||
@@ -2239,10 +2239,13 @@ function App() {
 								onPlayerNameChange={(playerId, name) => {
 									handlePlayerNameChange(playerId as 1 | 2, name);
 								}}
-								canEditName={
+								onPlayerColorChange={(playerId, color) => {
+									updatePlayerColor(playerId as 1 | 2, color);
+								}}
+								canEditPlayer={
 									gameMode === "local" || // Local mode: can edit both
 									localPlayerSlot === 1 || // Host (slot 1): can edit both
-									selectedPlayerForMatches === localPlayerSlot // Guest: can only edit own name
+									selectedPlayerForMatches === localPlayerSlot // Guest: can only edit own player
 								}
 							/>
 						)}

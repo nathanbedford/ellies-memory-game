@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Player } from "../types";
+import { PlayerNamePicker } from "./PlayerNamePicker";
 
 const ENABLE_SETUP_DEBUG_LOGS = true;
 
@@ -40,7 +41,19 @@ export const GameStartModal = ({
 		2: player2?.color || "#10b981",
 	});
 
-	// Sync local state with players prop when it changes (e.g., after Zustand hydration)
+	const handleSwapPlayers = () => {
+		setTempNames((prev) => ({
+			1: prev[2],
+			2: prev[1],
+		}));
+		setTempColors((prev) => ({
+			1: prev[2],
+			2: prev[1],
+		}));
+		// Note: Don't call swapPlayersStore() here - we only update local state during editing.
+		// The store is updated when "Start Game" is clicked via handleStart().
+	};
+
 	useEffect(() => {
 		const p1 = players.find((p) => p.id === 1);
 		const p2 = players.find((p) => p.id === 2);
@@ -54,7 +67,6 @@ export const GameStartModal = ({
 		});
 	}, [players]);
 
-	// Predefined color options
 	const colorOptions = [
 		"#3b82f6", // Blue
 		"#10b981", // Green
@@ -77,7 +89,6 @@ export const GameStartModal = ({
 		const currentPlayer1 = players.find((p) => p.id === 1);
 		const currentPlayer2 = players.find((p) => p.id === 2);
 
-		// Check if any changes need to be applied
 		const nameChanged =
 			tempNames[1] !== currentPlayer1?.name ||
 			tempNames[2] !== currentPlayer2?.name;
@@ -85,14 +96,12 @@ export const GameStartModal = ({
 			tempColors[1] !== currentPlayer1?.color ||
 			tempColors[2] !== currentPlayer2?.color;
 
-		// Apply any name changes before starting
 		if (tempNames[1] !== currentPlayer1?.name && onPlayerNameChange) {
 			onPlayerNameChange(1, tempNames[1]);
 		}
 		if (tempNames[2] !== currentPlayer2?.name && onPlayerNameChange) {
 			onPlayerNameChange(2, tempNames[2]);
 		}
-		// Apply any color changes before starting
 		if (tempColors[1] !== currentPlayer1?.color && onPlayerColorChange) {
 			onPlayerColorChange(1, tempColors[1]);
 		}
@@ -100,7 +109,6 @@ export const GameStartModal = ({
 			onPlayerColorChange(2, tempColors[2]);
 		}
 
-		// If names or colors changed, defer game start to next tick to allow React to update
 		if (nameChanged || colorChanged) {
 			setTimeout(() => {
 				onStartGame(selectedPlayer);
@@ -136,13 +144,6 @@ export const GameStartModal = ({
 		setSelectedPlayer(playerId);
 	};
 
-	const handleNameSubmit = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (editingPlayer && tempNames[editingPlayer].trim()) {
-			setEditingPlayer(null);
-		}
-	};
-
 	const handleNameCancel = () => {
 		if (editingPlayer) {
 			const currentPlayer =
@@ -157,375 +158,229 @@ export const GameStartModal = ({
 		}
 	};
 
+	// Compact player chip component
+	const PlayerChip = ({
+		playerId,
+		isSelected,
+		otherIsEditing,
+	}: {
+		playerId: 1 | 2;
+		isSelected: boolean;
+		otherIsEditing: boolean;
+	}) => {
+		const name = tempNames[playerId];
+		const color = tempColors[playerId];
+
+		return (
+			<button
+				type="button"
+				onClick={() => {
+					if (!otherIsEditing) {
+						handlePlayerSelection(playerId);
+					}
+				}}
+				disabled={otherIsEditing}
+				className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-all duration-200 min-h-[56px] ${
+					isSelected
+						? "shadow-lg ring-2 ring-opacity-40"
+						: "border-gray-200 bg-white hover:border-gray-300"
+				} ${otherIsEditing ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.02]"}`}
+				style={
+					isSelected
+						? ({
+								borderColor: color,
+								backgroundColor: `${color}15`,
+								"--tw-ring-color": color,
+							} as React.CSSProperties & { "--tw-ring-color": string })
+						: {}
+				}
+			>
+				{/* Color dot */}
+				<div
+					className="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0"
+					style={{ backgroundColor: color }}
+				/>
+
+				{/* Name + First indicator grouped together */}
+				<div className="flex-1 flex items-center justify-center gap-1.5">
+					<span className="text-lg font-bold text-gray-800">
+						{name}
+					</span>
+					{isSelected && (
+						<svg
+							className="w-5 h-5 flex-shrink-0"
+							fill={color}
+							viewBox="0 0 20 20"
+						>
+							<title>Goes First</title>
+							<path
+								fillRule="evenodd"
+								d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+								clipRule="evenodd"
+							/>
+						</svg>
+					)}
+				</div>
+
+				{/* Edit icon - far right with separator */}
+				<div className="border-l border-gray-300 pl-2 ml-2">
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							if (!otherIsEditing) {
+								handleNameClick(playerId);
+							}
+						}}
+						disabled={otherIsEditing}
+						className={`p-1 rounded transition-opacity flex-shrink-0 ${otherIsEditing ? "opacity-30 cursor-not-allowed" : "hover:opacity-70 cursor-pointer"}`}
+						title="Edit player"
+					>
+						<svg
+							className="w-4 h-4"
+							fill="currentColor"
+							viewBox="0 0 20 20"
+							style={{ color }}
+						>
+							<title>Edit</title>
+							<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+						</svg>
+					</button>
+				</div>
+			</button>
+		);
+	};
+
 	return (
-		<div className="text-center space-y-8">
-			<div>
-				<h3 className="text-2xl font-bold text-gray-800 mb-4">
-					Who Goes First?
-				</h3>
-				<p className="text-gray-600">
-					Choose which player will start the game!
-				</p>
+		<div className="space-y-4">
+			{/* Compact player selection row */}
+			<div className="flex items-center gap-2">
+				<PlayerChip
+					playerId={1}
+					isSelected={selectedPlayer === 1}
+					otherIsEditing={editingPlayer === 2}
+				/>
+
+				{/* Swap button */}
+				<button
+					type="button"
+					onClick={handleSwapPlayers}
+					disabled={editingPlayer !== null}
+					className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+					title="Swap players"
+				>
+					<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<title>Swap</title>
+						<path
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							strokeWidth={2}
+							d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+						/>
+					</svg>
+				</button>
+
+				<PlayerChip
+					playerId={2}
+					isSelected={selectedPlayer === 2}
+					otherIsEditing={editingPlayer === 1}
+				/>
 			</div>
 
-			<div className="grid grid-cols-2 gap-6">
-				{editingPlayer === 1 ? (
-					<div
-						className={`p-8 rounded-xl border-3 transition-all duration-300 ${
-							selectedPlayer === 1
-								? "shadow-xl ring-4 ring-opacity-30"
-								: "border-gray-200 bg-white"
-						}`}
-						style={
-							selectedPlayer === 1
-								? ({
-										borderColor: tempColors[1],
-										backgroundColor: `${tempColors[1]}20`,
-										"--tw-ring-color": tempColors[1],
-									} as React.CSSProperties & { "--tw-ring-color": string })
-								: {}
-						}
-					>
-						<div className="space-y-4">
-							<div className="text-6xl">👤</div>
+			{/* Who Goes First indicator */}
+			{!editingPlayer && (
+				<div className="text-center py-2">
+					<p className="text-sm text-gray-600 mb-1">Who Goes First?</p>
+					<p className="text-base font-semibold text-gray-800">
+						{tempNames[selectedPlayer]} goes first
+					</p>
+				</div>
+			)}
 
-							{/* Player 1 Name Input */}
-							<form onSubmit={handleNameSubmit} className="space-y-2">
-								<div className="flex items-center justify-center gap-2">
-									<div
-										className="w-6 h-6 rounded-full border-2 border-gray-300 flex-shrink-0"
-										style={{ backgroundColor: tempColors[1] }}
-										title={`Selected color: ${tempColors[1]}`}
-									/>
-									<input
-										type="text"
-										value={tempNames[1]}
-										onChange={(e) => handleNameChange(1, e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Escape") {
-												handleNameCancel();
-											} else if (e.key === "Enter") {
-												e.preventDefault();
-												handleNameSubmit(e);
-											}
-										}}
-										className="flex-1 px-3 py-2 text-xl font-bold text-center border-2 rounded-lg focus:outline-none focus:ring-2"
-										style={{
-											color: tempColors[1],
-											borderColor: tempColors[1],
-										}}
-										maxLength={20}
-									/>
-								</div>
-								{/* Color Picker */}
-								<div className="flex flex-wrap gap-2 justify-center mt-2">
-									{colorOptions.map((color) => (
-										<button
-											key={color}
-											type="button"
-											onClick={(e) => {
-												e.stopPropagation();
-												e.preventDefault();
-												handleColorChange(1, color);
-											}}
-											className={`w-8 h-8 rounded-full border-2 transition-all ${
-												tempColors[1] === color
-													? "border-gray-800 scale-110"
-													: "border-gray-300 hover:scale-110"
-											}`}
-											style={{ backgroundColor: color }}
-											title={color}
-										/>
-									))}
-									<input
-										type="color"
-										value={tempColors[1]}
-										onChange={(e) => {
-											e.stopPropagation();
-											handleColorChange(1, e.target.value);
-										}}
-										onClick={(e) => e.stopPropagation()}
-										className="w-8 h-8 rounded-full border-2 border-gray-300 cursor-pointer"
-										title="Custom color"
-									/>
-								</div>
-								<div className="flex gap-2 justify-center mt-3">
+			{/* Editing panel - shown below when editing */}
+			{editingPlayer && (
+				<div
+					className="relative p-4 rounded-xl border-2 transition-all duration-300"
+					style={{
+						borderColor: tempColors[editingPlayer],
+						backgroundColor: `${tempColors[editingPlayer]}10`,
+					}}
+				>
+					<div className="space-y-3">
+						{/* Header */}
+						<div className="flex items-center justify-between">
+							<span className="text-sm font-semibold text-gray-700">
+								Editing {editingPlayer === 1 ? "Player 1" : "Player 2"}
+							</span>
+						</div>
+
+						{/* Name Picker */}
+						<PlayerNamePicker
+							currentName={tempNames[editingPlayer]}
+							playerColor={tempColors[editingPlayer]}
+							onSelect={(name) => {
+								handleNameChange(editingPlayer, name);
+								// Don't close panel - let user also change color if desired
+							}}
+							onCancel={handleNameCancel}
+							hideActionButtons={true}
+						/>
+
+						{/* Color Picker - compact inline */}
+						<div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+							<span className="text-xs text-gray-500 flex-shrink-0">Color:</span>
+							<div className="flex flex-wrap gap-1.5">
+								{colorOptions.map((color) => (
 									<button
+										key={color}
 										type="button"
-										onClick={handleNameCancel}
-										className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors duration-200"
-									>
-										Cancel
-									</button>
-									<button
-										type="submit"
-										className="px-4 py-2 text-white font-semibold rounded-lg transition-all duration-200 hover:opacity-90"
-										style={{
-											background: tempColors[1],
-										}}
-									>
-										Save
-									</button>
-								</div>
-							</form>
+										onClick={() => handleColorChange(editingPlayer, color)}
+										className={`w-6 h-6 rounded-full border-2 transition-all ${
+											tempColors[editingPlayer] === color
+												? "border-gray-800 scale-110"
+												: "border-gray-300 hover:scale-110"
+										}`}
+										style={{ backgroundColor: color }}
+										title={color}
+									/>
+								))}
+								<input
+									type="color"
+									value={tempColors[editingPlayer]}
+									onChange={(e) => handleColorChange(editingPlayer, e.target.value)}
+									className="w-6 h-6 rounded-full border-2 border-gray-300 cursor-pointer"
+									title="Custom color"
+								/>
+							</div>
+						</div>
+
+						{/* Action buttons */}
+						<div className="flex gap-3 pt-3 border-t border-gray-200">
+							<button
+								type="button"
+								onClick={handleNameCancel}
+								className="flex-1 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition-colors"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={() => setEditingPlayer(null)}
+								className="flex-1 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-semibold transition-colors"
+							>
+								Done
+							</button>
 						</div>
 					</div>
-				) : (
-					<button
-						type="button"
-						onClick={() => handlePlayerSelection(1)}
-						className={`p-8 rounded-xl border-3 transition-all duration-300 transform hover:scale-105 ${
-							selectedPlayer === 1
-								? "shadow-xl ring-4 ring-opacity-30"
-								: "border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg"
-						} ${editingPlayer === 2 ? "opacity-50 cursor-not-allowed" : ""}`}
-						style={
-							selectedPlayer === 1
-								? ({
-										borderColor: tempColors[1],
-										backgroundColor: `${tempColors[1]}20`,
-										"--tw-ring-color": tempColors[1],
-									} as React.CSSProperties & { "--tw-ring-color": string })
-								: {}
-						}
-					>
-						<div className="space-y-4">
-							<div className="text-6xl">👤</div>
+				</div>
+			)}
 
-							{/* Player 1 Name Display */}
-							<div className="flex items-center justify-center gap-2">
-								<div
-									className="w-6 h-6 rounded-full border-2 border-gray-300 flex-shrink-0"
-									style={{ backgroundColor: tempColors[1] }}
-									title={`Selected color: ${tempColors[1]}`}
-								/>
-								<button
-									type="button"
-									onClick={() => handleNameClick(1)}
-									className="text-xl font-bold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0"
-									style={{ color: tempColors[1] }}
-									title="Click to edit name"
-									aria-label="Edit player 1 name"
-								>
-									{tempNames[1]}
-									<svg
-										className="w-4 h-4 inline-block ml-1 opacity-60"
-										fill="currentColor"
-										viewBox="0 0 20 20"
-										aria-hidden="true"
-									>
-										<title>Edit</title>
-										<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-									</svg>
-								</button>
-							</div>
-
-							{selectedPlayer === 1 && (
-								<div
-									className="text-sm font-semibold flex items-center justify-center gap-2"
-									style={{ color: tempColors[1] }}
-								>
-									<svg
-										className="w-5 h-5"
-										fill="currentColor"
-										viewBox="0 0 20 20"
-										aria-hidden="true"
-									>
-										<title>Checkmark</title>
-										<path
-											fillRule="evenodd"
-											d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-											clipRule="evenodd"
-										/>
-									</svg>
-									Goes First
-								</div>
-							)}
-						</div>
-					</button>
-				)}
-
-				{editingPlayer === 2 ? (
-					<div
-						className={`p-8 rounded-xl border-3 transition-all duration-300 ${
-							selectedPlayer === 2
-								? "shadow-xl ring-4 ring-opacity-30"
-								: "border-gray-200 bg-white"
-						}`}
-						style={
-							selectedPlayer === 2
-								? ({
-										borderColor: tempColors[2],
-										backgroundColor: `${tempColors[2]}20`,
-										"--tw-ring-color": tempColors[2],
-									} as React.CSSProperties & { "--tw-ring-color": string })
-								: {}
-						}
-					>
-						<div className="space-y-4">
-							<div className="text-6xl">👤</div>
-
-							{/* Player 2 Name Input */}
-							<form onSubmit={handleNameSubmit} className="space-y-2">
-								<div className="flex items-center justify-center gap-2">
-									<div
-										className="w-6 h-6 rounded-full border-2 border-gray-300 flex-shrink-0"
-										style={{ backgroundColor: tempColors[2] }}
-										title={`Selected color: ${tempColors[2]}`}
-									/>
-									<input
-										type="text"
-										value={tempNames[2]}
-										onChange={(e) => handleNameChange(2, e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Escape") {
-												handleNameCancel();
-											} else if (e.key === "Enter") {
-												e.preventDefault();
-												handleNameSubmit(e);
-											}
-										}}
-										className="flex-1 px-3 py-2 text-xl font-bold text-center border-2 rounded-lg focus:outline-none focus:ring-2"
-										style={{
-											color: tempColors[2],
-											borderColor: tempColors[2],
-										}}
-										maxLength={20}
-									/>
-								</div>
-								{/* Color Picker */}
-								<div className="flex flex-wrap gap-2 justify-center mt-2">
-									{colorOptions.map((color) => (
-										<button
-											key={color}
-											type="button"
-											onClick={(e) => {
-												e.stopPropagation();
-												e.preventDefault();
-												handleColorChange(2, color);
-											}}
-											className={`w-8 h-8 rounded-full border-2 transition-all ${
-												tempColors[2] === color
-													? "border-gray-800 scale-110"
-													: "border-gray-300 hover:scale-110"
-											}`}
-											style={{ backgroundColor: color }}
-											title={color}
-										/>
-									))}
-									<input
-										type="color"
-										value={tempColors[2]}
-										onChange={(e) => {
-											e.stopPropagation();
-											handleColorChange(2, e.target.value);
-										}}
-										onClick={(e) => e.stopPropagation()}
-										className="w-8 h-8 rounded-full border-2 border-gray-300 cursor-pointer"
-										title="Custom color"
-									/>
-								</div>
-								<div className="flex gap-2 justify-center mt-3">
-									<button
-										type="button"
-										onClick={handleNameCancel}
-										className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition-colors duration-200"
-									>
-										Cancel
-									</button>
-									<button
-										type="submit"
-										className="px-4 py-2 text-white font-semibold rounded-lg transition-all duration-200 hover:opacity-90"
-										style={{
-											background: tempColors[2],
-										}}
-									>
-										Save
-									</button>
-								</div>
-							</form>
-						</div>
-					</div>
-				) : (
-					<button
-						type="button"
-						onClick={() => handlePlayerSelection(2)}
-						className={`p-8 rounded-xl border-3 transition-all duration-300 transform hover:scale-105 ${
-							selectedPlayer === 2
-								? "shadow-xl ring-4 ring-opacity-30"
-								: "border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg"
-						} ${editingPlayer === 1 ? "opacity-50 cursor-not-allowed" : ""}`}
-						style={
-							selectedPlayer === 2
-								? ({
-										borderColor: tempColors[2],
-										backgroundColor: `${tempColors[2]}20`,
-										"--tw-ring-color": tempColors[2],
-									} as React.CSSProperties & { "--tw-ring-color": string })
-								: {}
-						}
-					>
-						<div className="space-y-4">
-							<div className="text-6xl">👤</div>
-
-							{/* Player 2 Name Display */}
-							<div className="flex items-center justify-center gap-2">
-								<div
-									className="w-6 h-6 rounded-full border-2 border-gray-300 flex-shrink-0"
-									style={{ backgroundColor: tempColors[2] }}
-									title={`Selected color: ${tempColors[2]}`}
-								/>
-								<button
-									type="button"
-									onClick={() => handleNameClick(2)}
-									className="text-xl font-bold cursor-pointer hover:opacity-80 transition-opacity bg-transparent border-0 p-0"
-									style={{ color: tempColors[2] }}
-									title="Click to edit name"
-									aria-label="Edit player 2 name"
-								>
-									{tempNames[2]}
-									<svg
-										className="w-4 h-4 inline-block ml-1 opacity-60"
-										fill="currentColor"
-										viewBox="0 0 20 20"
-										aria-hidden="true"
-									>
-										<title>Edit</title>
-										<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-									</svg>
-								</button>
-							</div>
-
-							{selectedPlayer === 2 && (
-								<div
-									className="text-sm font-semibold flex items-center justify-center gap-2"
-									style={{ color: tempColors[2] }}
-								>
-									<svg
-										className="w-5 h-5"
-										fill="currentColor"
-										viewBox="0 0 20 20"
-										aria-hidden="true"
-									>
-										<title>Checkmark</title>
-										<path
-											fillRule="evenodd"
-											d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-											clipRule="evenodd"
-										/>
-									</svg>
-									Goes First
-								</div>
-							)}
-						</div>
-					</button>
-				)}
-			</div>
-
+			{/* Start Game button */}
 			<button
 				type="button"
 				onClick={handleStart}
-				className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-lg transition-all duration-200 text-lg shadow-lg transform hover:scale-[1.02]"
+				disabled={editingPlayer !== null}
+				className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 text-lg shadow-lg hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
 			>
 				🎮 Start Game
 			</button>

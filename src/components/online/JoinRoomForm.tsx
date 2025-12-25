@@ -54,6 +54,7 @@ export const JoinRoomForm = ({
 						className="w-full max-w-xs mx-auto block text-center text-4xl font-mono font-bold tracking-widest px-6 py-4 border-3 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent uppercase"
 						maxLength={4}
 						disabled={isLoading}
+						autoFocus
 					/>
 				</div>
 
