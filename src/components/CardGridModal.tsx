@@ -67,7 +67,7 @@ export const CardGridModal = ({
 					e.stopPropagation();
 					onCardClick(index);
 				}}
-				className="cursor-pointer transition-transform hover:scale-110 active:scale-95 border-0 bg-transparent p-0"
+				className="cursor-pointer transition-transform can-hover:scale-110 active:scale-95 border-0 bg-transparent p-0"
 				title="Click to view card details"
 			>
 				<CardComponent
@@ -147,7 +147,7 @@ export const CardGridModal = ({
 					</div>
 
 					{/* Content */}
-					<div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+					<div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] touch-pan-y">
 						{cards.length === 0 ? (
 							<div className="text-center py-12">
 								<p className="text-gray-500 text-lg">{emptyMessage}</p>
