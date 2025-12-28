@@ -8,5 +8,10 @@ export default {
 			},
 		},
 	},
-	plugins: [],
+	plugins: [
+		function ({ addVariant }) {
+			// Only apply hover styles on devices that support hover (not touch)
+			addVariant("can-hover", "@media (hover: hover) { &:hover }");
+		},
+	],
 };

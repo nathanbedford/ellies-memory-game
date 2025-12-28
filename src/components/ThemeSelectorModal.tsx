@@ -91,7 +91,7 @@ export const ThemeSelectorModal = ({
 						type="button"
 						key={theme.id}
 						onClick={() => handleThemeSelect(theme)}
-						className="p-6 rounded-xl border-3 border-gray-200 bg-white hover:border-blue-500 hover:ring-2 hover:ring-blue-300 hover:ring-opacity-50 transition-all duration-200 text-left"
+						className="p-6 rounded-xl border-3 border-gray-200 bg-white can-hover:border-blue-500 can-hover:ring-2 can-hover:ring-blue-300 can-hover:ring-opacity-50 transition-all duration-200 text-left"
 					>
 						<div className="flex items-start gap-4">
 							{/* Preview Emoji */}
@@ -122,7 +122,7 @@ export const ThemeSelectorModal = ({
 				<button
 					type="button"
 					onClick={handleBuildCustom}
-					className="p-6 rounded-xl border-3 border-dashed border-gray-300 bg-gradient-to-br from-purple-50 to-blue-50 hover:border-purple-500 hover:ring-2 hover:ring-purple-300 hover:ring-opacity-50 transition-all duration-200 text-left"
+					className="p-6 rounded-xl border-3 border-dashed border-gray-300 bg-gradient-to-br from-purple-50 to-blue-50 can-hover:border-purple-500 can-hover:ring-2 can-hover:ring-purple-300 can-hover:ring-opacity-50 transition-all duration-200 text-left"
 				>
 					<div className="flex flex-col items-center justify-center h-full text-center">
 						<div className="text-5xl mb-3">🎨</div>

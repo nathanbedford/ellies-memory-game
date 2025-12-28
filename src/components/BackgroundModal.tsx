@@ -71,10 +71,10 @@ export const BackgroundModal = ({
 							type="button"
 							key={option.id}
 							onClick={(e) => handleSelect(e, option.id)}
-							className={`p-6 rounded-xl border-3 transition-all duration-200 transform hover:scale-[1.02] ${
+							className={`p-6 rounded-xl border-3 transition-all duration-200 transform can-hover:scale-[1.02] ${
 								selectedBackground === option.id
 									? "border-purple-500 bg-purple-50 shadow-lg"
-									: "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+									: "border-gray-200 bg-white can-hover:border-gray-300 can-hover:shadow-md"
 							}`}
 						>
 							<div className="flex items-center gap-6">

@@ -56,7 +56,7 @@ export const PairCountModal = ({
 							className={`px-5 py-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center min-w-[80px] ${
 								isSelected
 									? "border-blue-500 bg-blue-50 shadow-lg scale-105"
-									: `border-gray-200 bg-white hover:border-blue-300 hover:shadow-md hover:scale-105`
+									: `border-gray-200 bg-white can-hover:border-blue-300 can-hover:shadow-md can-hover:scale-105`
 							}`}
 						>
 							<span

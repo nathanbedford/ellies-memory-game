@@ -286,9 +286,9 @@ export const CardPackModal = ({
 				{displayedPacks.map((pack) => (
 					<div
 						key={pack.id}
-						className={`relative p-8 rounded-xl border-3 transition-all duration-200 transform hover:scale-105 touch-pan-y ${selectedPack === pack.id
+						className={`relative p-8 rounded-xl border-3 transition-all duration-200 transform can-hover:scale-105 touch-pan-y ${selectedPack === pack.id
 							? "border-blue-500 bg-blue-50 shadow-lg"
-							: "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+							: "border-gray-200 bg-white can-hover:border-gray-300 can-hover:shadow-md"
 							}`}
 					>
 						{/* Preview Icon Button */}
