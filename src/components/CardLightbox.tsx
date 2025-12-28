@@ -40,17 +40,26 @@ export const CardLightbox = ({
   currentIndex = 0,
   onNavigate,
 }: CardLightboxProps) => {
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(
-    null,
-  );
-  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(
-    null,
-  );
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [isPositioning, setIsPositioning] = useState(false); // true = no transition (instant position)
+  const [entryDirection, setEntryDirection] = useState<"left" | "right" | null>(null);
+  const touchStartTimeRef = useRef<number>(0);
   const cardContainerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate rotation based on swipe (subtle tilt effect)
+  const rotation = (swipeOffset / window.innerWidth) * 8; // max ~8 degrees
+  const opacity = isAnimatingOut ? 0.5 : 1;
+
+  // Disable transition when actively swiping or positioning for entry
+  const disableTransition = isSwiping || isPositioning;
   const { speak, isAvailable } = useTextToSpeech();
 
-  // Minimum swipe distance (in pixels)
+  // Swipe configuration
   const minSwipeDistance = 50;
+  const velocityThreshold = 0.3; // pixels per ms - fast flicks trigger navigation
 
   // Check if navigation is possible
   const canNavigate = cards.length > 1 && onNavigate;
@@ -59,13 +68,13 @@ export const CardLightbox = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
-      } else if (e.key === "ArrowLeft" && cards.length > 0 && onNavigate) {
-        const prevIndex =
-          currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
+      } else if (e.key === "ArrowLeft" && cards.length > 0 && onNavigate && !isAnimatingOut) {
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
+        setEntryDirection("left");
         onNavigate(prevIndex);
-      } else if (e.key === "ArrowRight" && cards.length > 0 && onNavigate) {
-        const nextIndex =
-          currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
+      } else if (e.key === "ArrowRight" && cards.length > 0 && onNavigate && !isAnimatingOut) {
+        const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
+        setEntryDirection("right");
         onNavigate(nextIndex);
       }
     };
@@ -79,70 +88,119 @@ export const CardLightbox = ({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, onClose, cards, currentIndex, onNavigate]);
+  }, [isOpen, onClose, cards, currentIndex, onNavigate, isAnimatingOut]);
+
+  // Animate new card entering from the appropriate side
+  useEffect(() => {
+    if (entryDirection) {
+      // Disable transition and position off-screen instantly
+      setIsPositioning(true);
+      const startOffset = entryDirection === "left" ? -window.innerWidth : window.innerWidth;
+      setSwipeOffset(startOffset);
+      setIsAnimatingOut(false);
+      setIsSwiping(false);
+
+      // Wait for position to apply, then enable transition and animate to center
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsPositioning(false); // Re-enable transition
+          setSwipeOffset(0);       // Animate to center
+          setEntryDirection(null);
+        });
+      });
+    } else {
+      // Normal reset (e.g., when opening modal)
+      setSwipeOffset(0);
+      setIsSwiping(false);
+      setIsAnimatingOut(false);
+      setIsPositioning(false);
+    }
+  }, [currentIndex, entryDirection]);
 
   // Handle touch start
   const onTouchStart = (e: React.TouchEvent) => {
+    if (isAnimatingOut) return;
     const touch = e.touches[0];
-    setTouchEnd(null);
+    touchStartTimeRef.current = Date.now();
     setTouchStart({
       x: touch.clientX,
       y: touch.clientY,
     });
+    setIsSwiping(true);
   };
 
-  // Handle touch move
+  // Handle touch move - card follows finger
   const onTouchMove = (e: React.TouchEvent) => {
+    if (!touchStart || isAnimatingOut) return;
     const touch = e.touches[0];
-    setTouchEnd({
-      x: touch.clientX,
-      y: touch.clientY,
-    });
-  };
+    const deltaX = touch.clientX - touchStart.x;
+    const deltaY = touch.clientY - touchStart.y;
 
-  // Handle touch end and detect swipe
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd || !canNavigate || !onNavigate) return;
-
-    const distanceX = touchStart.x - touchEnd.x;
-    const distanceY = touchStart.y - touchEnd.y;
-    const isLeftSwipe = distanceX > minSwipeDistance;
-    const isRightSwipe = distanceX < -minSwipeDistance;
-    const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
-
-    // Only handle horizontal swipes (ignore vertical swipes)
-    if (isVerticalSwipe) {
-      setTouchStart(null);
-      setTouchEnd(null);
+    // If vertical movement dominates, don't swipe horizontally
+    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(swipeOffset) < 10) {
       return;
     }
 
+    setSwipeOffset(deltaX);
+  };
+
+  // Handle touch end - snap or spring back
+  const onTouchEnd = () => {
+    if (!touchStart || !canNavigate || !onNavigate || isAnimatingOut) {
+      setTouchStart(null);
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      return;
+    }
+
+    const elapsed = Date.now() - touchStartTimeRef.current;
+    const velocity = Math.abs(swipeOffset) / elapsed;
+    const isLeftSwipe = swipeOffset < -minSwipeDistance || (swipeOffset < -20 && velocity > velocityThreshold);
+    const isRightSwipe = swipeOffset > minSwipeDistance || (swipeOffset > 20 && velocity > velocityThreshold);
+
     if (isLeftSwipe) {
-      // Swipe left - go to next card
-      const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
-      onNavigate(nextIndex);
+      // Animate out to the left, then navigate - new card enters from right
+      setIsAnimatingOut(true);
+      const screenWidth = window.innerWidth;
+      setSwipeOffset(-screenWidth);
+      setTimeout(() => {
+        const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
+        setEntryDirection("right");
+        onNavigate(nextIndex);
+      }, 100);
     } else if (isRightSwipe) {
-      // Swipe right - go to previous card
-      const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
-      onNavigate(prevIndex);
+      // Animate out to the right, then navigate - new card enters from left
+      setIsAnimatingOut(true);
+      const screenWidth = window.innerWidth;
+      setSwipeOffset(screenWidth);
+      setTimeout(() => {
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
+        setEntryDirection("left");
+        onNavigate(prevIndex);
+      }, 100);
+    } else {
+      // Spring back to center
+      setSwipeOffset(0);
     }
 
     setTouchStart(null);
-    setTouchEnd(null);
+    setIsSwiping(false);
   };
 
   if (!isOpen || !card) return null;
 
   const handlePrevious = () => {
-    if (canNavigate) {
+    if (canNavigate && !isAnimatingOut) {
       const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
+      setEntryDirection("left");
       onNavigate(prevIndex);
     }
   };
 
   const handleNext = () => {
-    if (canNavigate) {
+    if (canNavigate && !isAnimatingOut) {
       const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
+      setEntryDirection("right");
       onNavigate(nextIndex);
     }
   };
@@ -263,7 +321,13 @@ export const CardLightbox = ({
         {/* Card container with rounded corners */}
         <div
           className="relative flex items-center justify-center w-full max-w-[95vmin] max-h-[95vmin] rounded-3xl overflow-hidden shadow-2xl"
-          style={{ aspectRatio: "1/1" }}
+          style={{
+            aspectRatio: "1/1",
+            transform: `translateX(${swipeOffset}px) rotate(${rotation}deg)`,
+            opacity,
+            transition: disableTransition ? "none" : "transform 125ms ease-out, opacity 100ms ease-out",
+            willChange: disableTransition ? "transform" : "auto",
+          }}
         >
           {isImage ? (
             <img
