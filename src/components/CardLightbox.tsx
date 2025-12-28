@@ -56,10 +56,8 @@ export const CardLightbox = ({
   // Disable transition when actively swiping or positioning for entry
   const disableTransition = isSwiping || isPositioning;
 
-  // Calculate transition time based on remaining distance (100-250ms range)
-  // More distance to travel = more time, so animation is always visible
-  const remainingDistance = Math.abs(window.innerWidth - Math.abs(swipeOffset));
-  const transitionTime = Math.max(100, Math.min(250, (remainingDistance / window.innerWidth) * 300));
+  // Calculate transition time - always visible, minimum 400ms for testing
+  const transitionTime = 400;
   const { speak, isAvailable } = useTextToSpeech();
 
   // Swipe configuration
@@ -164,9 +162,8 @@ export const CardLightbox = ({
     const isLeftSwipe = swipeOffset < -minSwipeDistance || (swipeOffset < -20 && velocity > velocityThreshold);
     const isRightSwipe = swipeOffset > minSwipeDistance || (swipeOffset > 20 && velocity > velocityThreshold);
 
-    // Calculate exit animation time based on remaining distance
-    const remainingDist = screenWidth - Math.abs(swipeOffset);
-    const exitTime = Math.max(80, Math.min(200, (remainingDist / screenWidth) * 250));
+    // Fixed exit time for testing - 400ms to match transition
+    const exitTime = 400;
 
     if (isLeftSwipe) {
       // Animate out to the left, then navigate - new card enters from right
