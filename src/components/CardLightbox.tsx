@@ -32,6 +32,102 @@ const formatCardName = (imageId: string): string => {
     .join(" ");
 };
 
+// Helper to check if imageUrl is an actual image
+const isImageUrl = (url: string | undefined): boolean => {
+  return !!(url &&
+    (url.startsWith("http") ||
+      url.startsWith("/") ||
+      url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
+      url.includes("blob:") ||
+      url.includes("data:")));
+};
+
+// Reusable card content component
+const CardContent = ({ card, cardName, speak, isAvailable }: {
+  card: Card;
+  cardName: string;
+  speak: (text: string) => void;
+  isAvailable: () => boolean;
+}) => {
+  const isImage = isImageUrl(card.imageUrl);
+
+  return (
+    <>
+      {isImage ? (
+        <img
+          src={card.imageUrl}
+          alt=""
+          className="w-full h-full object-contain"
+        />
+      ) : (
+        <div
+          className={`relative w-full h-full flex items-center justify-center ${card.gradient
+            ? `bg-gradient-to-br ${card.gradient}`
+            : "bg-white"
+            }`}
+        >
+          {card.gradient && (
+            <div className="absolute inset-0 bg-white opacity-30" />
+          )}
+          <div
+            className="text-center relative z-10"
+            style={{ fontSize: "min(52.25vmin, 200px)" }}
+          >
+            {card.imageUrl || "?"}
+          </div>
+        </div>
+      )}
+
+      {/* Card Name Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8">
+        <div className="flex items-center justify-center gap-3">
+          <h2
+            className="text-white text-center text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold"
+            style={{
+              textShadow:
+                "0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.9)",
+            }}
+          >
+            {cardName}
+          </h2>
+          {isAvailable() && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                speak(cardName);
+              }}
+              className="p-2 sm:p-3 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-sm border border-white/30 text-white transition-colors flex-shrink-0 shadow-lg"
+              type="button"
+              title="Read name aloud"
+              style={{
+                boxShadow:
+                  "0 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+              }}
+            >
+              <svg
+                className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 drop-shadow-lg"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.8))" }}
+                aria-hidden="true"
+              >
+                <title>Speak</title>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
 export const CardLightbox = ({
   isOpen,
   onClose,
@@ -43,43 +139,45 @@ export const CardLightbox = ({
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
-  const [isPositioning, setIsPositioning] = useState(false); // true = no transition (instant position)
-  const [entryDirection, setEntryDirection] = useState<"left" | "right" | null>(null);
+  const [isPositioning, setIsPositioning] = useState(false);
+
+  // Outgoing card state (for simultaneous animations)
+  const [outgoingCard, setOutgoingCard] = useState<Card | null>(null);
+  const [outgoingOffset, setOutgoingOffset] = useState(0);
+
+  // Incoming card state
+  const [incomingOffset, setIncomingOffset] = useState(0);
+
   const touchStartTimeRef = useRef<number>(0);
   const cardContainerRef = useRef<HTMLDivElement>(null);
-
-  // Calculate rotation based on swipe (subtle tilt effect)
-  const rotation = (swipeOffset / window.innerWidth) * 8; // max ~8 degrees
-  const opacity = isAnimatingOut ? 0.5 : 1;
-
-  // Disable transition when actively swiping or positioning for entry
-  const disableTransition = isSwiping || isPositioning;
-
-  // Calculate transition time - always visible, minimum 400ms for testing
-  const transitionTime = 400;
   const { speak, isAvailable } = useTextToSpeech();
 
-  // Swipe configuration
-  const screenWidth = window.innerWidth;
-  const minSwipeDistance = screenWidth / 2; // Must drag 50% of screen to trigger
-  const velocityThreshold = 0.3; // pixels per ms - fast flicks trigger navigation
+  // Animation config
+  const transitionTime = 250;
+  const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 800;
+  const minSwipeDistance = screenWidth / 2;
+  const velocityThreshold = 0.3;
+
+  // Calculate rotation based on swipe (subtle tilt effect)
+  const outgoingRotation = (outgoingOffset / screenWidth) * 8;
+
+  // Disable transition when actively swiping or positioning
+  const disableTransition = isSwiping || isPositioning;
 
   // Check if navigation is possible
   const canNavigate = cards.length > 1 && onNavigate;
+  const isTransitioning = outgoingCard !== null;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
-      } else if (e.key === "ArrowLeft" && cards.length > 0 && onNavigate && !isAnimatingOut) {
+      } else if (e.key === "ArrowLeft" && cards.length > 0 && onNavigate && !isTransitioning) {
         const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
-        setEntryDirection("left");
-        onNavigate(prevIndex);
-      } else if (e.key === "ArrowRight" && cards.length > 0 && onNavigate && !isAnimatingOut) {
+        triggerTransition("left", prevIndex);
+      } else if (e.key === "ArrowRight" && cards.length > 0 && onNavigate && !isTransitioning) {
         const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
-        setEntryDirection("right");
-        onNavigate(nextIndex);
+        triggerTransition("right", nextIndex);
       }
     };
 
@@ -92,38 +190,48 @@ export const CardLightbox = ({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, onClose, cards, currentIndex, onNavigate, isAnimatingOut]);
+  }, [isOpen, onClose, cards, currentIndex, onNavigate, isTransitioning]);
 
-  // Animate new card entering from the appropriate side
-  useEffect(() => {
-    if (entryDirection) {
-      // Disable transition and position off-screen instantly
-      setIsPositioning(true);
-      const startOffset = entryDirection === "left" ? -window.innerWidth : window.innerWidth;
-      setSwipeOffset(startOffset);
-      setIsAnimatingOut(false);
-      setIsSwiping(false);
+  // Trigger a transition with both cards animating
+  const triggerTransition = (direction: "left" | "right", nextIndex: number) => {
+    if (!card || !onNavigate) return;
 
-      // Wait for position to apply, then enable transition and animate to center
+    // Store current card as outgoing
+    setOutgoingCard(card);
+    setOutgoingOffset(swipeOffset); // Start from current position
+
+    // Set target for outgoing card (exit direction)
+    const exitOffset = direction === "right" ? -screenWidth : screenWidth;
+
+    // Position incoming card off-screen on opposite side
+    const entryOffset = direction === "right" ? screenWidth : -screenWidth;
+    setIncomingOffset(entryOffset);
+    setIsPositioning(true);
+
+    // Navigate immediately (new card appears)
+    onNavigate(nextIndex);
+
+    // Start animations on next frame
+    requestAnimationFrame(() => {
+      setOutgoingOffset(exitOffset); // Animate outgoing card off-screen
+
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setIsPositioning(false); // Re-enable transition
-          setSwipeOffset(0);       // Animate to center
-          setEntryDirection(null);
-        });
+        setIsPositioning(false);
+        setIncomingOffset(0); // Animate incoming card to center
+        setSwipeOffset(0);
       });
-    } else {
-      // Normal reset (e.g., when opening modal)
-      setSwipeOffset(0);
-      setIsSwiping(false);
-      setIsAnimatingOut(false);
-      setIsPositioning(false);
-    }
-  }, [currentIndex, entryDirection]);
+    });
+
+    // Clean up outgoing card after animation
+    setTimeout(() => {
+      setOutgoingCard(null);
+      setOutgoingOffset(0);
+    }, transitionTime + 50);
+  };
 
   // Handle touch start
   const onTouchStart = (e: React.TouchEvent) => {
-    if (isAnimatingOut) return;
+    if (isTransitioning) return;
     const touch = e.touches[0];
     touchStartTimeRef.current = Date.now();
     setTouchStart({
@@ -135,7 +243,7 @@ export const CardLightbox = ({
 
   // Handle touch move - card follows finger
   const onTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart || isAnimatingOut) return;
+    if (!touchStart || isTransitioning) return;
     const touch = e.touches[0];
     const deltaX = touch.clientX - touchStart.x;
     const deltaY = touch.clientY - touchStart.y;
@@ -150,7 +258,7 @@ export const CardLightbox = ({
 
   // Handle touch end - snap or spring back
   const onTouchEnd = () => {
-    if (!touchStart || !canNavigate || !onNavigate || isAnimatingOut) {
+    if (!touchStart || !canNavigate || !onNavigate || isTransitioning) {
       setTouchStart(null);
       setIsSwiping(false);
       setSwipeOffset(0);
@@ -162,64 +270,43 @@ export const CardLightbox = ({
     const isLeftSwipe = swipeOffset < -minSwipeDistance || (swipeOffset < -20 && velocity > velocityThreshold);
     const isRightSwipe = swipeOffset > minSwipeDistance || (swipeOffset > 20 && velocity > velocityThreshold);
 
-    // Fixed exit time for testing - 400ms to match transition
-    const exitTime = 400;
+    setTouchStart(null);
+    setIsSwiping(false);
 
     if (isLeftSwipe) {
-      // Animate out to the left, then navigate - new card enters from right
-      setIsAnimatingOut(true);
-      setSwipeOffset(-screenWidth);
-      setTimeout(() => {
-        const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
-        setEntryDirection("right");
-        onNavigate(nextIndex);
-      }, exitTime);
+      const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
+      triggerTransition("right", nextIndex);
     } else if (isRightSwipe) {
-      // Animate out to the right, then navigate - new card enters from left
-      setIsAnimatingOut(true);
-      setSwipeOffset(screenWidth);
-      setTimeout(() => {
-        const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
-        setEntryDirection("left");
-        onNavigate(prevIndex);
-      }, exitTime);
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
+      triggerTransition("left", prevIndex);
     } else {
       // Spring back to center
       setSwipeOffset(0);
     }
-
-    setTouchStart(null);
-    setIsSwiping(false);
   };
 
   if (!isOpen || !card) return null;
 
   const handlePrevious = () => {
-    if (canNavigate && !isAnimatingOut) {
+    if (canNavigate && !isTransitioning) {
       const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
-      setEntryDirection("left");
-      onNavigate(prevIndex);
+      triggerTransition("left", prevIndex);
     }
   };
 
   const handleNext = () => {
-    if (canNavigate && !isAnimatingOut) {
+    if (canNavigate && !isTransitioning) {
       const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
-      setEntryDirection("right");
-      onNavigate(nextIndex);
+      triggerTransition("right", nextIndex);
     }
   };
 
-  // Check if imageUrl is an actual image URL or an emoji
-  const isImage =
-    card.imageUrl &&
-    (card.imageUrl.startsWith("http") ||
-      card.imageUrl.startsWith("/") ||
-      card.imageUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
-      card.imageUrl.includes("blob:") ||
-      card.imageUrl.includes("data:"));
-
   const cardName = formatCardName(card.imageId);
+  const outgoingCardName = outgoingCard ? formatCardName(outgoingCard.imageId) : "";
+
+  // Calculate current card offset (incoming during transition, or swipe during drag)
+  const currentCardOffset = isTransitioning ? incomingOffset : swipeOffset;
+  const currentCardRotation = (currentCardOffset / screenWidth) * 8;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
@@ -323,89 +410,43 @@ export const CardLightbox = ({
         role="region"
         aria-label="Card display"
       >
-        {/* Card container with rounded corners */}
+        {/* Outgoing card (animating out) */}
+        {outgoingCard && (
+          <div
+            className="absolute flex items-center justify-center w-full max-w-[95vmin] max-h-[95vmin] rounded-3xl overflow-hidden shadow-2xl"
+            style={{
+              aspectRatio: "1/1",
+              transform: `translateX(${outgoingOffset}px) rotate(${outgoingRotation}deg)`,
+              transition: `transform ${transitionTime}ms ease-out`,
+              zIndex: 1,
+            }}
+          >
+            <CardContent
+              card={outgoingCard}
+              cardName={outgoingCardName}
+              speak={speak}
+              isAvailable={isAvailable}
+            />
+          </div>
+        )}
+
+        {/* Current card (incoming during transition, or draggable) */}
         <div
-          className="relative flex items-center justify-center w-full max-w-[95vmin] max-h-[95vmin] rounded-3xl overflow-hidden shadow-2xl"
+          className="absolute flex items-center justify-center w-full max-w-[95vmin] max-h-[95vmin] rounded-3xl overflow-hidden shadow-2xl"
           style={{
             aspectRatio: "1/1",
-            transform: `translateX(${swipeOffset}px) rotate(${rotation}deg)`,
-            opacity,
-            transition: disableTransition ? "none" : `transform ${transitionTime}ms ease-out, opacity ${transitionTime * 0.8}ms ease-out`,
+            transform: `translateX(${currentCardOffset}px) rotate(${currentCardRotation}deg)`,
+            transition: disableTransition ? "none" : `transform ${transitionTime}ms ease-out`,
             willChange: disableTransition ? "transform" : "auto",
+            zIndex: 2,
           }}
         >
-          {isImage ? (
-            <img
-              src={card.imageUrl}
-              alt=""
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <div
-              className={`relative w-full h-full flex items-center justify-center ${card.gradient
-                ? `bg-gradient-to-br ${card.gradient}`
-                : "bg-white"
-                }`}
-            >
-              {/* Semi-transparent overlay for gradient backgrounds */}
-              {card.gradient && (
-                <div className="absolute inset-0 bg-white opacity-30" />
-              )}
-              <div
-                className="text-center relative z-10"
-                style={{ fontSize: "min(52.25vmin, 200px)" }}
-              >
-                {card.imageUrl || "?"}
-              </div>
-            </div>
-          )}
-
-          {/* Card Name Overlay */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8">
-            <div className="flex items-center justify-center gap-3">
-              <h2
-                className="text-white text-center text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold"
-                style={{
-                  textShadow:
-                    "0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.9)",
-                }}
-              >
-                {cardName}
-              </h2>
-              {isAvailable() && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    speak(cardName);
-                  }}
-                  className="p-2 sm:p-3 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-sm border border-white/30 text-white transition-colors flex-shrink-0 shadow-lg"
-                  type="button"
-                  title="Read name aloud"
-                  style={{
-                    boxShadow:
-                      "0 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
-                  }}
-                >
-                  <svg
-                    className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 drop-shadow-lg"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.8))" }}
-                    aria-hidden="true"
-                  >
-                    <title>Speak</title>
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                    />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
+          <CardContent
+            card={card}
+            cardName={cardName}
+            speak={speak}
+            isAvailable={isAvailable}
+          />
         </div>
       </div>
     </div>
