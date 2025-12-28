@@ -55,10 +55,16 @@ export const CardLightbox = ({
 
   // Disable transition when actively swiping or positioning for entry
   const disableTransition = isSwiping || isPositioning;
+
+  // Calculate transition time based on remaining distance (100-250ms range)
+  // More distance to travel = more time, so animation is always visible
+  const remainingDistance = Math.abs(window.innerWidth - Math.abs(swipeOffset));
+  const transitionTime = Math.max(100, Math.min(250, (remainingDistance / window.innerWidth) * 300));
   const { speak, isAvailable } = useTextToSpeech();
 
   // Swipe configuration
-  const minSwipeDistance = 50;
+  const screenWidth = window.innerWidth;
+  const minSwipeDistance = screenWidth / 2; // Must drag 50% of screen to trigger
   const velocityThreshold = 0.3; // pixels per ms - fast flicks trigger navigation
 
   // Check if navigation is possible
@@ -158,26 +164,28 @@ export const CardLightbox = ({
     const isLeftSwipe = swipeOffset < -minSwipeDistance || (swipeOffset < -20 && velocity > velocityThreshold);
     const isRightSwipe = swipeOffset > minSwipeDistance || (swipeOffset > 20 && velocity > velocityThreshold);
 
+    // Calculate exit animation time based on remaining distance
+    const remainingDist = screenWidth - Math.abs(swipeOffset);
+    const exitTime = Math.max(80, Math.min(200, (remainingDist / screenWidth) * 250));
+
     if (isLeftSwipe) {
       // Animate out to the left, then navigate - new card enters from right
       setIsAnimatingOut(true);
-      const screenWidth = window.innerWidth;
       setSwipeOffset(-screenWidth);
       setTimeout(() => {
         const nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
         setEntryDirection("right");
         onNavigate(nextIndex);
-      }, 100);
+      }, exitTime);
     } else if (isRightSwipe) {
       // Animate out to the right, then navigate - new card enters from left
       setIsAnimatingOut(true);
-      const screenWidth = window.innerWidth;
       setSwipeOffset(screenWidth);
       setTimeout(() => {
         const prevIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
         setEntryDirection("left");
         onNavigate(prevIndex);
-      }, 100);
+      }, exitTime);
     } else {
       // Spring back to center
       setSwipeOffset(0);
@@ -325,7 +333,7 @@ export const CardLightbox = ({
             aspectRatio: "1/1",
             transform: `translateX(${swipeOffset}px) rotate(${rotation}deg)`,
             opacity,
-            transition: disableTransition ? "none" : "transform 125ms ease-out, opacity 100ms ease-out",
+            transition: disableTransition ? "none" : `transform ${transitionTime}ms ease-out, opacity ${transitionTime * 0.8}ms ease-out`,
             willChange: disableTransition ? "transform" : "auto",
           }}
         >
