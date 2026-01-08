@@ -92,6 +92,9 @@ const setupWizardLog = (...args: unknown[]) => {
 
 // Removed setupWizardWarn - no longer needed with router navigation
 
+// Delay for autosize calculations to wait for layout to settle
+const AUTOSIZE_DEBOUNCE_MS = 100;
+
 // Secret keyboard combo: P+P+O+N+G (press P twice, then O, N, G)
 const COMBO_SEQUENCE = ["p", "p", "o", "n", "g"];
 // Test combo: 1, 2, 2, 5, 1, 2, 2, 5 (to advance game to end state)
@@ -716,6 +719,7 @@ function App() {
 	const scoreboardRef = useRef<HTMLDivElement>(null);
 	const gameBoardContainerRef = useRef<HTMLDivElement>(null);
 	const layoutMeasureRafRef = useRef<number | null>(null);
+	const resizeRecalcDebounceRef = useRef<number | null>(null);
 
 	// Long-press detection for background viewer during gameplay
 	const longPressTimerRef = useRef<number | null>(null);
@@ -1129,40 +1133,95 @@ function App() {
 		};
 	}, [autoSizeEnabled, computeLayoutMetrics, updateAutoSizeMetrics]);
 
+	// Debounced card size recalculation on window resize
+	// This is separate from the layout metrics effect - that one updates metrics,
+	// this one actually recalculates card size based on new container dimensions
+	useEffect(() => {
+		if (
+			!autoSizeEnabled ||
+			gameState.cards.length === 0 ||
+			gameState.gameStatus !== "playing"
+		) {
+			return;
+		}
+
+		const recalculateCardSize = () => {
+			// Clear any pending debounce
+			if (resizeRecalcDebounceRef.current) {
+				clearTimeout(resizeRecalcDebounceRef.current);
+			}
+
+			// Debounce to wait for resize to settle
+			resizeRecalcDebounceRef.current = window.setTimeout(() => {
+				const metrics = computeLayoutMetrics();
+				if (metrics.boardWidth > 0) {
+					calculateOptimalCardSizeForCount(gameState.cards.length, metrics);
+				}
+			}, AUTOSIZE_DEBOUNCE_MS);
+		};
+
+		window.addEventListener("resize", recalculateCardSize);
+
+		return () => {
+			if (resizeRecalcDebounceRef.current) {
+				clearTimeout(resizeRecalcDebounceRef.current);
+			}
+			window.removeEventListener("resize", recalculateCardSize);
+		};
+	}, [
+		autoSizeEnabled,
+		gameState.cards.length,
+		gameState.gameStatus,
+		computeLayoutMetrics,
+		calculateOptimalCardSizeForCount,
+	]);
+
 	// Auto-size when cards appear (works for both local and online modes)
 	// This is needed because useLocalGame's internal effect only sees its own gameState,
 	// but in online mode the cards are in onlineGame.gameState
 	useEffect(() => {
-		if (!autoSizeEnabled || gameState.cards.length === 0) {
+		// Only run when on a game route where the game board DOM exists
+		const isOnGameRoute =
+			currentPath === "/local/game" || currentPath === "/online/game";
+
+		if (!autoSizeEnabled || gameState.cards.length === 0 || !isOnGameRoute) {
 			return;
 		}
 
-		// Increased delay to ensure layout is rendered, especially for guests joining online games
+		let retryTimeoutId: number | null = null;
+
+		// Delay to ensure layout is rendered, especially for guests joining online games
 		// Use requestAnimationFrame to ensure DOM is ready before measuring
 		const timeoutId = setTimeout(() => {
 			requestAnimationFrame(() => {
-				// Double-check refs are attached before computing metrics
-				if (
-					boardWrapperRef.current &&
-					scoreboardRef.current &&
-					gameBoardContainerRef.current
-				) {
-					const metrics = computeLayoutMetrics();
+				const metrics = computeLayoutMetrics();
+
+				// Only proceed if we got valid measurements
+				if (metrics.boardWidth > 0 && metrics.boardAvailableHeight > 0) {
 					calculateOptimalCardSizeForCount(gameState.cards.length, metrics);
 				} else {
-					// Fallback: try again after another frame if refs aren't ready
-					requestAnimationFrame(() => {
-						const metrics = computeLayoutMetrics();
-						calculateOptimalCardSizeForCount(gameState.cards.length, metrics);
-					});
+					// Retry after another delay if measurements aren't ready
+					retryTimeoutId = window.setTimeout(() => {
+						const retryMetrics = computeLayoutMetrics();
+						calculateOptimalCardSizeForCount(
+							gameState.cards.length,
+							retryMetrics,
+						);
+					}, 100);
 				}
 			});
-		}, 150);
+		}, AUTOSIZE_DEBOUNCE_MS);
 
-		return () => clearTimeout(timeoutId);
+		return () => {
+			clearTimeout(timeoutId);
+			if (retryTimeoutId) {
+				clearTimeout(retryTimeoutId);
+			}
+		};
 	}, [
 		autoSizeEnabled,
 		gameState.cards.length,
+		currentPath,
 		computeLayoutMetrics,
 		calculateOptimalCardSizeForCount,
 	]);
@@ -1634,25 +1693,8 @@ function App() {
 		navigate({ to: "/local/game" });
 		setIsResetting(false);
 
-		if (autoSizeEnabled) {
-			setTimeout(() => {
-				const measuredMetrics = computeLayoutMetrics();
-				console.log(
-					"[handleStartGame] Measured metrics after delay:",
-					measuredMetrics,
-				);
-
-				const cardCount = images.length * 2;
-				if (cardCount > 0 && measuredMetrics) {
-					console.log(
-						"[handleStartGame] Calculating card size with metrics for",
-						cardCount,
-						"cards",
-					);
-					calculateOptimalCardSizeForCount(cardCount, measuredMetrics);
-				}
-			}, 100);
-		}
+		// Note: Autosize is handled by the "cards appear" effect which triggers
+		// when gameState.cards.length changes, using AUTOSIZE_DEBOUNCE_MS delay
 
 		setLastConfig({
 			pack: selectedPack,
@@ -1670,9 +1712,10 @@ function App() {
 		currentPath === "/terms" || currentPath === "/privacy";
 	useEffect(() => {
 		if (isStandalonePage) {
-			// Allow scrolling on standalone pages
-			document.body.style.overflow = "";
-			document.documentElement.style.overflow = "";
+			// Allow scrolling on standalone pages - must explicitly set 'auto'
+			// Setting to empty string doesn't work consistently across browsers
+			document.body.style.overflow = "auto";
+			document.documentElement.style.overflow = "auto";
 			return;
 		}
 
@@ -1867,7 +1910,7 @@ function App() {
 			/>
 
 			{/* Main content container */}
-			<div className={`min-h-screen ${isPlaying ? "pt-4" : "py-8"}`}>
+			<div className={`min-h-screen ${isPlaying ? "pt-4" : "py-8"} ${!isStandalonePage ? "overflow-hidden" : ""}`}>
 				<div className="container mx-auto px-4 max-w-full">
 					{gameState.gameStatus === "setup" ? (
 						<SetupControls
